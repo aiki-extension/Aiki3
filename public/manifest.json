@@ -6,7 +6,7 @@
   "icons": {
     "128": "images/AikiLogo.png"
   },
-  "permissions": ["storage", "tabs", "windows", "<all_urls>", "webNavigation"],
+  "permissions": ["storage", "tabs", "windows", "webNavigation"],
   "background": {
     "service_worker": "build/background.js"
   },
