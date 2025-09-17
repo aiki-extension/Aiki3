@@ -1,32 +1,36 @@
-import browser from "webextension-polyfill";
-  //Functions to control the badge that appears on the extension icon in the chrome toolbar.
- 
-  /**
-  * @description Adds text to the badge.
-  * @param { String | number } value Should be less than 4 characters long.  */
-  function setText(value) {
-    browser.browserAction.setBadgeText({text: `${value}`});
-  }
+// Functions to control the badge on the extension toolbar icon.
 
-  /**
-  * @description Changes the background colour of the badge to green.  */
-  function setBusy() {
-    browser.browserAction.setBadgeBackgroundColor({color:'limegreen'});
-  }
+// Prefer Manifest V3 `chrome.action` API, with fallbacks for older namespaces.
+const actionApi = (typeof chrome !== 'undefined' && (chrome.action || chrome.browserAction));
 
-  /**
-  * @description Changes the background colour of the badge to blue.  */
-  function setDone() {
-    browser.browserAction.setBadgeBackgroundColor({color:'deepskyblue'});
+function setText(value) {
+  if (actionApi && actionApi.setBadgeText) {
+    actionApi.setBadgeText({ text: String(value) });
   }
+}
 
-  /**
-  * @description Removes the badge from the icon entirely.  */
-  function remove() {
-    browser.browserAction.setBadgeText({text: ''});
+function setBusy() {
+  if (actionApi && actionApi.setBadgeBackgroundColor) {
+    actionApi.setBadgeBackgroundColor({ color: 'limegreen' });
   }
+}
 
-  export default {
-    setText, setBusy, setDone, remove
+function setDone() {
+  if (actionApi && actionApi.setBadgeBackgroundColor) {
+    actionApi.setBadgeBackgroundColor({ color: 'deepskyblue' });
   }
+}
+
+function remove() {
+  if (actionApi && actionApi.setBadgeText) {
+    actionApi.setBadgeText({ text: '' });
+  }
+}
+
+export default {
+  setText,
+  setBusy,
+  setDone,
+  remove,
+}
   

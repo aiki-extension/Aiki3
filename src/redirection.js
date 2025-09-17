@@ -171,7 +171,7 @@ async function checkActiveTime() {
   const date = makeDate();
   if (date.hours < fromTime.hrs) {
     return false;
-  } else if (date.hours === fromTime.hours && date.minutes < fromTime.minutes) {
+  } else if (date.hours === fromTime.hrs && date.minutes < fromTime.min) {
     return false;
   }
   if (date.hours > toTime.hrs) {

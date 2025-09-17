@@ -72,8 +72,9 @@ function removeOverlay() {
     const elements = document.getElementsByClassName("aiki-overlay");
     l("Elements: ", elements);
     if (elements.length > 0) {
-      for (let i = 0; elements.length; i++) {
-        elements[i].remove();
+      for (let i = elements.length - 1; i >= 0; i--) {
+        const el = elements[i];
+        if (el && el.remove) el.remove();
       }
     }
   } catch (error) {
@@ -118,7 +119,7 @@ function renderLearningContent(shouldShowWelcome) {
       resolve({ action: "end injection" });
     }
 
-    let port = browser.extension.connect({
+    let port = browser.runtime.connect({
       name: "Content Communication",
     });
     port.onMessage.addListener(function (msg) {
@@ -152,7 +153,7 @@ function renderLearningContent(shouldShowWelcome) {
 
 function renderContentBlocker() {
   removeOverlay();
-    let port = browser.extension.connect({
+    let port = browser.runtime.connect({
       name: "Content Communication",
     });
     l("Injecting blocker");

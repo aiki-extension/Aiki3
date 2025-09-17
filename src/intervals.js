@@ -23,7 +23,9 @@ function intervalSetup() {
 
 async function counter() {
   const window = await browser.windows.getCurrent();
-  const views = chrome.extension.getViews({ type: "popup" });
+  const views = (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.getViews)
+    ? chrome.runtime.getViews({ type: "popup" })
+    : [];
   if (window.focused || views.length > 0) {
     data.chromeActive++;
     const result = await browser.tabs.query({

@@ -57,7 +57,7 @@ function setList(list) {
  * @description returns the list of procrastination websites from storage.*/
 async function getList() {
   const result = await storage.get("list");
-  return result.list;
+  return Array.isArray(result.list) ? result.list : [];
 }
 
 /**
@@ -132,7 +132,11 @@ async function getLearningUri() {
  * before they can continue to their origin procrastination website. */
 async function getLearningTime() {
   const result = await storage.get("learningTime");
-  return result.learningTime;
+  const lt = result.learningTime;
+  if (lt && typeof lt.min === "number" && typeof lt.sec === "number") {
+    return lt;
+  }
+  return { min: 5, sec: 0 };
 }
 
 /**
@@ -151,7 +155,11 @@ function setLearningTime(time) {
  * procrastination websites before interception is turned back on. */
 async function getRewardTime() {
   const result = await storage.get("rewardTime");
-  return result.rewardTime;
+  const rt = result.rewardTime;
+  if (rt && typeof rt.min === "number" && typeof rt.sec === "number") {
+    return rt;
+  }
+  return { min: 15, sec: 0 };
 }
 
 /**
@@ -169,8 +177,11 @@ function setRewardTime(time) {
  * @description returns an object containing the time-related
  * values set by the user: rewardTime and learningTime. */
 async function getUserTimes() {
-  const result = await storage.get(["rewardTime", "learningTime"]);
-  return result;
+  const [rewardTime, learningTime] = await Promise.all([
+    getRewardTime(),
+    getLearningTime(),
+  ]);
+  return { rewardTime, learningTime };
 }
 
 /**
@@ -205,7 +216,10 @@ async function storeSession(data) {
   const { statsDate } = await storage.get("statsDate");
   await checkDate(statsDate);
   const { sessionData } = await storage.get("sessionData");
-  let newData = sessionData;
+  let newData = sessionData || {
+    procrastinationDuration: 0,
+    learningDuration: 0,
+  };
   if (
     !newData.hasOwnProperty("procrastinationDuration") ||
     newData.procrastinationDuration === NaN
@@ -223,8 +237,8 @@ async function storeSession(data) {
     if (key === participantResource.name) {
       newData.learningDuration += data[key];
     } else if (!["chromeInactive", "chromeActive"].includes(key)) {
-      newData[key] = sessionData.hasOwnProperty(key)
-        ? sessionData[key] + data[key]
+      newData[key] = newData.hasOwnProperty(key)
+        ? newData[key] + data[key]
         : data[key];
       newData.procrastinationDuration += data[key];
     }
@@ -284,7 +298,36 @@ async function getAllStats() {
     "yesterday",
     "history",
   ]);
-  return result;
+
+  const defaultSession = { procrastinationDuration: 0, learningDuration: 0 };
+  const today = result.sessionData && typeof result.sessionData === 'object'
+    ? { ...defaultSession, ...result.sessionData }
+    : { ...defaultSession };
+  const yesterday = result.yesterday && typeof result.yesterday === 'object'
+    ? {
+        sessionData: { ...defaultSession, ...(result.yesterday.sessionData || {}) },
+        skipCount: result.yesterday.skipCount || 0,
+        completedCount: result.yesterday.completedCount || 0,
+        snoozeCount: result.yesterday.snoozeCount || 0,
+      }
+    : { sessionData: { ...defaultSession }, skipCount: 0, completedCount: 0, snoozeCount: 0 };
+  const history = result.history && typeof result.history === 'object'
+    ? {
+        sessionData: { ...defaultSession, ...(result.history.sessionData || {}) },
+        skipCount: result.history.skipCount || 0,
+        completedCount: result.history.completedCount || 0,
+        snoozeCount: result.history.snoozeCount || 0,
+      }
+    : { sessionData: { ...defaultSession }, skipCount: 0, completedCount: 0, snoozeCount: 0 };
+
+  return {
+    sessionData: today,
+    skipCount: result.skipCount || 0,
+    completedCount: result.completedCount || 0,
+    snoozeCount: result.snoozeCount || 0,
+    yesterday,
+    history,
+  };
 }
 
 // async function testStatsFlow() {
@@ -329,44 +372,60 @@ function initializeStats() {
 
 async function overWriteYesterday() {
   await addToHistory();
-  const yesterday = await storage.get([
+  const y = await storage.get([
     "sessionData",
     "skipCount",
     "completedCount",
     "snoozeCount",
   ]);
-  storage.set({
-    yesterday: yesterday,
-  });
+  const yesterday = {
+    sessionData: y.sessionData || {
+      procrastinationDuration: 0,
+      learningDuration: 0,
+    },
+    skipCount: y.skipCount || 0,
+    completedCount: y.completedCount || 0,
+    snoozeCount: y.snoozeCount || 0,
+  };
+  storage.set({ yesterday });
 }
 
 async function addToHistory() {
   let { yesterday, history } = await storage.get(["yesterday", "history"]);
-  if (!history.hasOwnProperty("skipCount") || history.skipCount === NaN)
-    history.skipCount = 0;
-  if (
-    !history.hasOwnProperty("completedCount") ||
-    history.completedCount === NaN
-  )
-    history.completedCount = 0;
-  if (!history.hasOwnProperty("snoozeCount") || history.snoozeCount === NaN)
-    history.snoozeCount = 0;
-  if (!history.hasOwnProperty("sessionData")) {
-    history.sessionData = { procrastinationDuration: 0, learningDuration: 0 };
-  } else if (
-    history.sessionData.procrastinationDuration === NaN ||
-    history.sessionData.learningDuration === NaN
-  ) {
+  if (!history || typeof history !== "object") {
+    history = {
+      sessionData: { procrastinationDuration: 0, learningDuration: 0 },
+      skipCount: 0,
+      completedCount: 0,
+      snoozeCount: 0,
+    };
+  }
+  if (!yesterday || typeof yesterday !== "object") {
+    yesterday = {
+      sessionData: { procrastinationDuration: 0, learningDuration: 0 },
+      skipCount: 0,
+      completedCount: 0,
+      snoozeCount: 0,
+    };
+  }
+  if (typeof history.skipCount !== "number") history.skipCount = 0;
+  if (typeof history.completedCount !== "number") history.completedCount = 0;
+  if (typeof history.snoozeCount !== "number") history.snoozeCount = 0;
+  if (!history.sessionData || typeof history.sessionData !== "object") {
     history.sessionData = { procrastinationDuration: 0, learningDuration: 0 };
   }
-  history.skipCount += yesterday.skipCount;
-  history.completedCount += yesterday.completedCount;
-  history.snoozeCount += yesterday.snoozeCount;
+  if (!yesterday.sessionData || typeof yesterday.sessionData !== "object") {
+    yesterday.sessionData = { procrastinationDuration: 0, learningDuration: 0 };
+  }
+
+  history.skipCount += yesterday.skipCount || 0;
+  history.completedCount += yesterday.completedCount || 0;
+  history.snoozeCount += yesterday.snoozeCount || 0;
   history.sessionData.procrastinationDuration +=
-    yesterday.sessionData.procrastinationDuration;
+    yesterday.sessionData.procrastinationDuration || 0;
   history.sessionData.learningDuration +=
-    yesterday.sessionData.learningDuration;
-  storage.set({ history: history });
+    yesterday.sessionData.learningDuration || 0;
+  storage.set({ history });
 }
 
 function setActiveTimeFrom(value) {
@@ -374,19 +433,22 @@ function setActiveTimeFrom(value) {
 }
 async function getActiveTimeFrom() {
   const { activeFrom } = await storage.get("activeFrom");
-  return activeFrom;
+  return activeFrom ?? { hrs: 8, min: 0 };
 }
 function setActiveTimeTo(value) {
   storage.set({ activeTo: value });
 }
 async function getActiveTimeTo() {
   const { activeTo } = await storage.get("activeTo");
-  return activeTo;
+  return activeTo ?? { hrs: 21, min: 30 };
 }
 
 async function getAllActiveTimes() {
-  const result = await storage.get(["activeFrom", "activeTo"]);
-  return result;
+  const [activeFrom, activeTo] = await Promise.all([
+    getActiveTimeFrom(),
+    getActiveTimeTo(),
+  ]);
+  return { activeFrom, activeTo };
 }
 
 function operatingHoursInit() {

@@ -15,6 +15,15 @@ var firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 
 const db = firebase.firestore();
+// Improve compatibility in service workers by avoiding WebChannel
+try {
+  db.settings({
+    experimentalForceLongPolling: true,
+    useFetchStreams: false,
+  });
+} catch (e) {
+  // Ignore if not supported by this Firebase version
+}
 
 /**
  * @async
