@@ -24,7 +24,7 @@
     "chartjs": "^0.3.24",
     "firebase": "^12.2.1",
     "sirv-cli": "^1.0.0",
-    "svelte-check": "^1.5.2",
+    "svelte-check": "^4.0.0",
     "svelte-fa": "^2.2.0",
     "svelte-moveable": "^0.16.5"
   }
