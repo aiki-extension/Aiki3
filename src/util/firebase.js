@@ -1,8 +1,11 @@
-import firebase from "firebase/app";
-import "firebase/firebase-firestore";
+// Use compat API for broad compatibility with existing code
+let enabled = false;
+let firebase = null;
+let db = null;
 import { hash } from "./security";
 
-var firebaseConfig = {
+// If you want to enable logging, create a config and set the values below
+const firebaseConfig = {
   apiKey: "",
   authDomain: "",
   projectId: "",
@@ -12,17 +15,31 @@ var firebaseConfig = {
   measurementId: "",
 };
 
-firebase.initializeApp(firebaseConfig);
+function hasConfig(cfg) {
+  return (
+    typeof cfg === "object" &&
+    cfg &&
+    typeof cfg.apiKey === "string" && cfg.apiKey !== "" &&
+    typeof cfg.projectId === "string" && cfg.projectId !== ""
+  );
+}
 
-const db = firebase.firestore();
-// Improve compatibility in service workers by avoiding WebChannel
 try {
-  db.settings({
-    experimentalForceLongPolling: true,
-    useFetchStreams: false,
-  });
+  if (hasConfig(firebaseConfig) && (typeof navigator === "undefined" || navigator.onLine !== false)) {
+    // Lazy require to avoid bundling when disabled
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    firebase = require("firebase/compat/app");
+    require("firebase/compat/firestore");
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+    try {
+      // Improve compatibility in service workers by avoiding WebChannel
+      db.settings({ experimentalForceLongPolling: true, useFetchStreams: false });
+    } catch (_) {}
+    enabled = true;
+  }
 } catch (e) {
-  // Ignore if not supported by this Firebase version
+  enabled = false;
 }
 
 /**
@@ -66,16 +83,16 @@ async function addEntry(entry, reference, type) {
  * Finally adds entry at appropriate log type within the appropriate date collection.
  */
 async function addLog(entry, type) {
+  if (!enabled || !db) return; // Firebase disabled or offline; skip logging
   try {
-    console.log("Logging to firestore:", "Entry:", entry, "type:", type);
     entry.user = `${hash(entry.user)}`;
     const userRef = db.collection("user_logs").doc(entry.user);
-    resolveDoc(userRef);
+    await resolveDoc(userRef);
     const dateRef = userRef.collection("dates").doc(entry.date.dateString);
-    resolveDoc(dateRef);
-    addEntry(entry, dateRef, type);
-  } catch (error) {
-    // console.log(error); // user probably offline. Can't really do anything about that.
+    await resolveDoc(dateRef);
+    await addEntry(entry, dateRef, type);
+  } catch (_) {
+    // Swallow errors; run offline without affecting UX
   }
 }
 
