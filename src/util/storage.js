@@ -107,18 +107,21 @@ function removeOrigin() {
 }
 
 function setLearningUri(uri) {
-  if (uri) {
-    storage.set({ learningUri: uri });
+  if (uri && typeof uri === "string" && uri.trim() !== "") {
+    storage.set({ learningUri: uri.trim() });
   } else {
-    storage.set({ learningUri: participantResource.host });
+    // Default to empty when not provided
+    storage.remove("learningUri");
   }
 }
 
 async function getLearningUri() {
   let result = await storage.get("learningUri");
-  if (result.learningUri) {
+  if (result && typeof result.learningUri === "string") {
     return result.learningUri;
-  } else return `https://${participantResource.host}`;
+  }
+  // Default to empty: user hasn’t set a learning site yet
+  return "";
 }
 
 // function setLearningUri (uri){

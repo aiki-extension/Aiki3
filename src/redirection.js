@@ -1,5 +1,5 @@
 import storage from "./util/storage";
-import { learningSites, participantResource } from "./util/constants";
+import { learningSites } from "./util/constants";
 import firebase from "./util/firebase";
 import browser from "webextension-polyfill";
 import timer from "./timer";
@@ -112,7 +112,9 @@ async function originUpdatedListener(details) {
     if (origin.tabId === details) {
       const tab = await browser.tabs.get(details);
       l(tab);
-      if (tab.url.includes(participantResource.name)) {
+      const currentLearning = await storage.learningUri.get();
+      const learningName = parseUrl(currentLearning).name;
+      if (tab.url.includes(learningName)) {
         storage.learningUri.set(tab.url);
       }
     }
@@ -143,6 +145,7 @@ async function redirect(details) {
         } else {
           timer.startLearningSession();
           const learningUri = await storage.learningUri.get();
+          if (!learningUri) return; // skip redirection if no learning URL configured
           try {
             await browser.tabs.update(details.tabId, {
               url: learningUri,
@@ -152,9 +155,10 @@ async function redirect(details) {
             addRedirectionLog(
               `Interception: instant redirection`,
               parseUrl(details.url).name,
-              participantResource.name
+              parseUrl(learningUri).name
             );
             addLearningSiteLoadedListener(details.tabId);
+            setTimeout(() => triggerLearningOverlay(details.tabId), 1500);
           } catch (error) {
             // console.log(error.message);
           }
@@ -202,9 +206,20 @@ async function onOriginRemoved(details) {
 }
 
 async function addLearningSiteLoadedListener() {
+  const currentLearning = await storage.learningUri.get();
+  if (!currentLearning) return;
+  const learningName = parseUrl(currentLearning).name;
+  if (!learningName) return;
   browser.webNavigation.onCompleted.addListener(messageLearningResource, {
-    url: [{ hostContains: `.${participantResource.name}.` }],
+    url: [{ hostContains: `.${learningName}.` }],
   });
+}
+
+// Fallback trigger in case webNavigation timing misses injection readiness
+async function triggerLearningOverlay(tabId) {
+  try {
+    await messageLearningResource({ tabId });
+  } catch (_) {}
 }
 
 function removeLearningSiteLoadedListener() {
@@ -253,12 +268,13 @@ async function checkActiveTab() {
       const procList = await storage.list.get();
       const procListNames = procList.map((site) => site.name);
       if (procListNames.includes(tabSiteName)) {
+        const learningUri = await storage.learningUri.get();
+        if (!learningUri) return; // no learning site set; do nothing
         addRedirectionLog(
           `Interception: initiating countdown`,
           tabSiteName,
-          participantResource.name
+          parseUrl(learningUri).name
         );
-        const learningUri = await storage.learningUri.get();
         talkToContent(tab.id, learningUri, tab.url);
       }
     }
@@ -322,9 +338,10 @@ async function gotoOrigin(event, source) {
   try {
     await browser.tabs.update(origin.tabId, { url: origin.url });
     removeAllContentBlockers();
+    const currentLearning = await storage.learningUri.get();
     addRedirectionLog(
       `Go to origin: ${event}, source: ${source}`,
-      participantResource.name,
+      parseUrl(currentLearning).name,
       parseUrl(origin.url).name
     );
   } catch (error) {
@@ -350,7 +367,7 @@ async function talkToContent(tabId, url, originUrl) {
       addRedirectionLog(
         `Interception: snoozed`,
         parseUrl(originUrl).name,
-        participantResource.name
+        parseUrl(url).name
       );
       storage.stats.snooze();
       await storage.shouldRedirect.set(false);
@@ -360,7 +377,7 @@ async function talkToContent(tabId, url, originUrl) {
       addRedirectionLog(
         `Interception: auto resolve`,
         parseUrl(originUrl).name,
-        participantResource.name
+        parseUrl(url).name
       );
       timer.startLearningSession();
       storage.origin.set({ url: originUrl, tabId: tabId });
@@ -387,13 +404,13 @@ async function addRedirectionLog(event, from, to) {
   );
 }
 
-function renderContentBlocker(details) {
+async function renderContentBlocker(details) {
   if (details.frameId === 0) {
     removeProcsiteLoadedListener();
     storage.blockedTabs.add(details.tabId);
     try {
       l("Sending block request to content");
-      browser.tabs.sendMessage(details.tabId, {
+      await browser.tabs.sendMessage(details.tabId, {
         action: "inject blocker",
       });
     } catch (error) {
@@ -405,7 +422,7 @@ function renderContentBlocker(details) {
 function removeContentBlocker(tabId) {
   l("Removing blocker on tab ", tabId);
   try {
-    browser.tabs.sendMessage(tabId, { action: "remove blocker" });
+    return browser.tabs.sendMessage(tabId, { action: "remove blocker" }).catch(() => {});
   } catch (error) {
     l(error);
   }

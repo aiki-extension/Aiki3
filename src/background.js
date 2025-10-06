@@ -26,7 +26,8 @@ async function installationSetup() {
   storage.redirection.toggle();
   storage.list.set([]);
   storage.uid.set("");
-  storage.learningUri.set(`https://${participantResource.host}`);
+  // Leave learning URL empty by default; user sets this in settings
+  storage.learningUri.set("");
   storage.timeSettings.init();
   try {
     await browser.runtime.openOptionsPage();
@@ -53,9 +54,11 @@ async function killAiki() {
     active: true,
     currentWindow: true,
   });
-  browser.tabs.sendMessage(tabs[0].id, {
-    action: "kill aiki",
-  });
+  try {
+    await browser.tabs.sendMessage(tabs[0].id, { action: "kill aiki" });
+  } catch (_) {
+    // Tab may not have content script or context invalidated
+  }
   timer.stopLearningSession();
   timer.stopBonusTime();
   timer.killAiki();
@@ -86,7 +89,9 @@ async function reviveAiki() {
 
 async function gotoOriginTab() {
   const origin = await storage.origin.get();
-  browser.tabs.update(origin.tabId, { selected: true });
+  try {
+    await browser.tabs.update(origin.tabId, { active: true });
+  } catch (_) {}
 }
 
 // Manifest V3: Use runtime.onConnect for port messaging

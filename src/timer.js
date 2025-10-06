@@ -7,10 +7,13 @@ let learningTimeRemaining = 0;
 let learningTimeIntervalRef;
 
 async function decrementLearningTime() {
+  // Only tick when user is actively on the learning tab/window
   if (await checkActive()) {
     if (learningTimeRemaining > 0) {
       learningTimeRemaining -= 1000;
-      badge.setText(parseTimerDown(learningTimeRemaining));
+      try {
+        badge.setText(parseTimerDown(learningTimeRemaining));
+      } catch (_) {}
     } else if (learningTimeRemaining < 0) {
       learningTimeRemaining = 0;
     } else {

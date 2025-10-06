@@ -101,26 +101,33 @@ function renderProcrastinationContent(url) {
   });
 }
 
-function renderLearningContent(shouldShowWelcome) {
-  return new Promise((resolve) => {
-    // addCloseListener();
-    function gotoOrigin(source) {
-      // removeCloseListener();
-      clearInterval(intervalRef);
-      resolve({
-        action: "continue",
-        source: source,
-        uri: location.href,
-      });
-    }
+  function renderLearningContent(shouldShowWelcome) {
+    return new Promise((resolve) => {
+      // addCloseListener();
+      function gotoOrigin(source) {
+        // removeCloseListener();
+        clearInterval(intervalRef);
+        resolve({
+          action: "continue",
+          source: source,
+          uri: location.href,
+        });
+      }
 
-    function endInjection() {
-      clearInterval(intervalRef);
-      resolve({ action: "end injection" });
-    }
+      function endInjection() {
+        clearInterval(intervalRef);
+        // Remove overlay so the page is usable again
+        try { removeOverlay(); } catch (_) {}
+        resolve({ action: "end injection" });
+      }
 
     let port = browser.runtime.connect({
       name: "Content Communication",
+    });
+    let disconnected = false;
+    port.onDisconnect.addListener(() => {
+      disconnected = true;
+      try { clearInterval(intervalRef); } catch (_) {}
     });
     port.onMessage.addListener(function (msg) {
       sync(msg);
@@ -134,7 +141,8 @@ function renderLearningContent(shouldShowWelcome) {
     let isReady = false;
 
     let intervalRef = setInterval(() => {
-      port.postMessage("get: timer");
+      if (disconnected) return;
+      try { port.postMessage("get: timer"); } catch (_) { /* ignore */ }
     }, 1000);
 
     function getReady() {
@@ -151,14 +159,30 @@ function renderLearningContent(shouldShowWelcome) {
   });
 }
 
-function renderContentBlocker() {
-  removeOverlay();
-    let port = browser.runtime.connect({
-      name: "Content Communication",
-    });
-    l("Injecting blocker");
-    function gotoOriginTab() {
-      port.postMessage("goto: originTab");
+  function renderContentBlocker() {
+  // Avoid stacking overlays; remove any existing first
+  try { removeOverlay(); } catch (_) {}
+  let port = browser.runtime.connect({
+    name: "Content Communication",
+  });
+  let disc = false;
+  port.onDisconnect.addListener(() => { disc = true; });
+  l("Injecting blocker");
+  async function gotoOriginTab() {
+    // Treat as "Keep Learning": go to the configured learning URL
+    try { removeOverlay(); } catch (_) {}
+    try {
+      const result = await browser.storage.local.get("learningUri");
+      const uri = (result && typeof result.learningUri === "string") ? result.learningUri.trim() : "";
+      if (uri) {
+        location.href = uri;
+        return;
+      }
+    } catch (_) {}
+    // Fallback: ask background to switch to origin tab (previous behavior)
+    if (!disc) {
+      try { port.postMessage("goto: originTab"); } catch (_) {}
     }
-    ContentBlocker(gotoOriginTab, browser);
+  }
+  ContentBlocker(gotoOriginTab, browser);
 }
