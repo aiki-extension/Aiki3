@@ -25,7 +25,32 @@
   let toastCoords = { y: "add-button", x: "site-input-container" };
 
   async function setup() {
-    list = await storage.list.get();
+    const storedList = (await storage.list.get()) || [];
+    let hasUpdates = false;
+    const normalizedList = storedList.map((item) => {
+      if (!item || !item.host) {
+        return item;
+      }
+
+      const parsed = parseUrl(item.host);
+      const updatedItem = {
+        ...item,
+        host: parsed.host || item.host,
+        name: parsed.name || item.name,
+      };
+
+      if (updatedItem.host !== item.host || updatedItem.name !== item.name) {
+        hasUpdates = true;
+      }
+
+      return updatedItem;
+    });
+
+    list = normalizedList;
+
+    if (hasUpdates) {
+      storage.list.set(normalizedList);
+    }
   }
   setup();
   let addItemValue = "";

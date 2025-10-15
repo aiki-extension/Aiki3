@@ -7,20 +7,26 @@
   import firebase from "../../../util/firebase";
   import { makeDate } from "../../../util/utilities";
 
-  let minuteOptions = Array.from({ length: 60 }, (_, i) => i); //Generates an array with values from 1->59
+  let minuteOptions = Array.from({ length: 121 }, (_, i) => i); // 0 - 120 minutes
   let secondsOptions = [0, 15, 30, 45];
   export let settings;
   export let update;
   export let user;
 
   let { min: learnMin, sec: learnSec } = settings.learningTime;
-  let { min: rewardMin, sec: rewardSec } = settings.rewardTime;
 
   function parseNumberToTime(number) {
     return number < 10 ? `0${number}` : number;
   }
 
+  function ensureMinThreshold() {
+    if (learnMin === 0 && learnSec < 30) {
+      learnSec = 30;
+    }
+  }
+
   function setLearningTime() {
+    ensureMinThreshold();
     const learningTime = { min: learnMin, sec: learnSec };
     storage.timeSettings.learningTime.set(learningTime);
     firebase.addLog(
@@ -34,27 +40,12 @@
     );
     update();
   }
-
-  function setRewardTime() {
-    const rewardTime = { min: rewardMin, sec: rewardSec };
-    storage.timeSettings.rewardTime.set(rewardTime);
-    firebase.addLog(
-      {
-        user: user,
-        event: "User changed reward time in settings",
-        value: rewardTime,
-        date: makeDate(),
-      },
-      "config"
-    );
-    update();
-  }
 </script>
 
 <!-- ActiveFrom -->
 <div class="row">
   <div class="col-sm">
-    <p>Time spent learning:</p>
+    <p>Daily learning goal:</p>
   </div>
   <div class="col-sm" />
   <div class="col-sm">
@@ -65,7 +56,6 @@
         id="hrs"
         on:change={(e) => {
           learnMin = parseInt(e.target.value);
-          if (learnMin === 0 && learnSec < 30) learnSec = 30;
           setLearningTime();
         }}
         class="custom-select custom-select-sm inline"
@@ -82,64 +72,14 @@
         selected={learnSec}
         id="min"
         on:change={(e) => {
-          learnMin === 0 && parseInt(e.target.value) < 30
-            ? (learnSec = 30)
-            : (learnSec = parseInt(e.target.value));
+          learnSec = parseInt(e.target.value);
+          ensureMinThreshold();
           setLearningTime();
         }}
         class="custom-select custom-select-sm inline"
       >
         {#each secondsOptions as value}
           <option selected={value === learnSec} {value}
-            >{parseNumberToTime(value)}</option
-          >
-        {/each}
-      </select>
-      <p><small>{"Min/Sec"}</small></p>
-    </div>
-  </div>
-</div>
-
-<!-- ActiveTo -->
-<div class="row">
-  <div class="col-sm">
-    <p>Time you get on your procrastination sites in exchange:</p>
-  </div>
-  <div class="col-sm" />
-  <div class="col-sm">
-    <!-- svelte-ignore a11y-no-onchange -->
-    <div class="wrapper">
-      <select
-        selected={rewardMin}
-        id="hrs"
-        on:change={(e) => {
-          rewardMin = parseInt(e.target.value);
-          if (rewardMin === 0 && rewardSec < 30) rewardSec = 30;
-          setRewardTime();
-        }}
-        class="custom-select custom-select-sm inline"
-      >
-        {#each minuteOptions as value}
-          <option selected={value === rewardMin} {value}
-            >{parseNumberToTime(value)}</option
-          >
-        {/each}
-      </select>
-      <p>:</p>
-      <!-- svelte-ignore a11y-no-onchange -->
-      <select
-        selected={rewardSec}
-        id="min"
-        on:change={(e) => {
-          rewardMin === 0 && parseInt(e.target.value) < 30
-            ? (rewardSec = 30)
-            : (rewardSec = parseInt(e.target.value));
-          setRewardTime();
-        }}
-        class="custom-select custom-select-sm inline"
-      >
-        {#each secondsOptions as value}
-          <option selected={value === rewardSec} {value}
             >{parseNumberToTime(value)}</option
           >
         {/each}

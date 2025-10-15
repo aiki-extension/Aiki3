@@ -23,7 +23,7 @@
 <Container headline="Statistics">
   <h5>Your Statistics:</h5>
   <hr />
-  <p>Here's how you use Aiki! (Updates every 5 minutes)</p>
+  <p>A quick look at where your focus time goes (updates every 5 minutes).</p>
   {#await statistics}
     <h1>Loading...</h1>
   {:then data}

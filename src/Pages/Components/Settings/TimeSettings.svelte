@@ -16,8 +16,8 @@
 <h5>Set Learning Time:</h5>
 <hr />
 <p>
-  Choose the amount of time you want to spend learning, and how much time you
-  are rewarded for doing so.
+  Set a daily learning goal so Aiki knows how long to keep you on your
+  learning platform before letting procrastination sites through.
 </p>
 {#await timeSettings}
   LOADING...

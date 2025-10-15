@@ -139,7 +139,7 @@ async function getLearningTime() {
   if (lt && typeof lt.min === "number" && typeof lt.sec === "number") {
     return lt;
   }
-  return { min: 5, sec: 0 };
+  return { min: 30, sec: 0 };
 }
 
 /**
@@ -162,7 +162,7 @@ async function getRewardTime() {
   if (rt && typeof rt.min === "number" && typeof rt.sec === "number") {
     return rt;
   }
-  return { min: 15, sec: 0 };
+  return { min: 0, sec: 0 };
 }
 
 /**
@@ -187,11 +187,55 @@ async function getUserTimes() {
   return { rewardTime, learningTime };
 }
 
+function getTodayKey() {
+  return new Date().toDateString();
+}
+
+async function getDailyProgress() {
+  const { dailyProgress, dailyProgressDate } = await storage.get([
+    "dailyProgress",
+    "dailyProgressDate",
+  ]);
+  const today = getTodayKey();
+  if (dailyProgressDate !== today) {
+    await storage.set({ dailyProgress: 0, dailyProgressDate: today });
+    await setShouldRedirect(true);
+    await storage.remove("rewardUnlockAt");
+    return 0;
+  }
+  return typeof dailyProgress === "number" ? dailyProgress : 0;
+}
+
+async function setDailyProgress(value) {
+  const today = getTodayKey();
+  await storage.set({ dailyProgress: value, dailyProgressDate: today });
+}
+
+async function incrementDailyProgress(delta) {
+  const current = await getDailyProgress();
+  const next = current + delta;
+  await setDailyProgress(next);
+  return next;
+}
+
+async function setRewardUnlock(timestamp) {
+  if (typeof timestamp === "number" && timestamp > 0) {
+    await storage.set({ rewardUnlockAt: timestamp });
+  } else {
+    await storage.remove("rewardUnlockAt");
+  }
+}
+
+async function getRewardUnlock() {
+  const { rewardUnlockAt } = await storage.get("rewardUnlockAt");
+  return typeof rewardUnlockAt === "number" ? rewardUnlockAt : 0;
+}
+
 /**
  * @description Initializes the time settings in storage upon app installation. */
 function userTimeInit() {
-  setLearningTime({ min: 5, sec: 0 });
-  setRewardTime({ min: 15, sec: 0 });
+  setLearningTime({ min: 30, sec: 0 });
+  setRewardTime({ min: 0, sec: 0 });
 }
 
 /**
@@ -255,7 +299,6 @@ async function checkDate(statsDate) {
   if (statsDate !== date) {
     console.log("Rolling over date");
     await overWriteYesterday();
-    await storage.set({ snoozeCount: 0 });
     await storage.set({ completedCount: 0 });
     await storage.set({ skipCount: 0 });
     await storage.set({
@@ -263,15 +306,6 @@ async function checkDate(statsDate) {
     });
     await storage.set({ statsDate: date });
   }
-}
-
-async function incrSnoozeCount() {
-  const { statsDate, snoozeCount } = await storage.get([
-    "snoozeCount",
-    "statsDate",
-  ]);
-  await checkDate(statsDate);
-  storage.set({ snoozeCount: snoozeCount + 1 });
 }
 
 async function incrContinueCount() {
@@ -297,7 +331,6 @@ async function getAllStats() {
     "sessionData",
     "skipCount",
     "completedCount",
-    "snoozeCount",
     "yesterday",
     "history",
   ]);
@@ -311,23 +344,20 @@ async function getAllStats() {
         sessionData: { ...defaultSession, ...(result.yesterday.sessionData || {}) },
         skipCount: result.yesterday.skipCount || 0,
         completedCount: result.yesterday.completedCount || 0,
-        snoozeCount: result.yesterday.snoozeCount || 0,
       }
-    : { sessionData: { ...defaultSession }, skipCount: 0, completedCount: 0, snoozeCount: 0 };
+    : { sessionData: { ...defaultSession }, skipCount: 0, completedCount: 0 };
   const history = result.history && typeof result.history === 'object'
     ? {
         sessionData: { ...defaultSession, ...(result.history.sessionData || {}) },
         skipCount: result.history.skipCount || 0,
         completedCount: result.history.completedCount || 0,
-        snoozeCount: result.history.snoozeCount || 0,
       }
-    : { sessionData: { ...defaultSession }, skipCount: 0, completedCount: 0, snoozeCount: 0 };
+    : { sessionData: { ...defaultSession }, skipCount: 0, completedCount: 0 };
 
   return {
     sessionData: today,
     skipCount: result.skipCount || 0,
     completedCount: result.completedCount || 0,
-    snoozeCount: result.snoozeCount || 0,
     yesterday,
     history,
   };
@@ -354,13 +384,11 @@ function initializeStats() {
   });
   storage.set({ skipCount: 0 });
   storage.set({ completedCount: 0 });
-  storage.set({ snoozeCount: 0 });
   storage.set({
     history: {
       sessionData: { procrastinationDuration: 0, learningDuration: 0 },
       completedCount: 0,
       skipCount: 0,
-      snoozeCount: 0,
     },
   });
   storage.set({
@@ -368,7 +396,6 @@ function initializeStats() {
       sessionData: { procrastinationDuration: 0, learningDuration: 0 },
       skipCount: 0,
       completedCount: 0,
-      snoozeCount: 0,
     },
   });
 }
@@ -379,7 +406,6 @@ async function overWriteYesterday() {
     "sessionData",
     "skipCount",
     "completedCount",
-    "snoozeCount",
   ]);
   const yesterday = {
     sessionData: y.sessionData || {
@@ -388,7 +414,6 @@ async function overWriteYesterday() {
     },
     skipCount: y.skipCount || 0,
     completedCount: y.completedCount || 0,
-    snoozeCount: y.snoozeCount || 0,
   };
   storage.set({ yesterday });
 }
@@ -400,7 +425,6 @@ async function addToHistory() {
       sessionData: { procrastinationDuration: 0, learningDuration: 0 },
       skipCount: 0,
       completedCount: 0,
-      snoozeCount: 0,
     };
   }
   if (!yesterday || typeof yesterday !== "object") {
@@ -408,12 +432,10 @@ async function addToHistory() {
       sessionData: { procrastinationDuration: 0, learningDuration: 0 },
       skipCount: 0,
       completedCount: 0,
-      snoozeCount: 0,
     };
   }
   if (typeof history.skipCount !== "number") history.skipCount = 0;
   if (typeof history.completedCount !== "number") history.completedCount = 0;
-  if (typeof history.snoozeCount !== "number") history.snoozeCount = 0;
   if (!history.sessionData || typeof history.sessionData !== "object") {
     history.sessionData = { procrastinationDuration: 0, learningDuration: 0 };
   }
@@ -423,7 +445,6 @@ async function addToHistory() {
 
   history.skipCount += yesterday.skipCount || 0;
   history.completedCount += yesterday.completedCount || 0;
-  history.snoozeCount += yesterday.snoozeCount || 0;
   history.sessionData.procrastinationDuration +=
     yesterday.sessionData.procrastinationDuration || 0;
   history.sessionData.learningDuration +=
@@ -477,8 +498,82 @@ async function getBlockedTabs() {
   } else return [];
 }
 
+async function removeBlockedTab(tab) {
+  const { blockedTabs } = await storage.get("blockedTabs");
+  if (Array.isArray(blockedTabs)) {
+    const next = blockedTabs.filter((item) => item !== tab);
+    storage.set({ blockedTabs: next });
+  }
+}
+
 function clearBlockedTabs() {
   storage.remove("blockedTabs");
+}
+
+async function addBlockedOrigin(tabId, url) {
+  if (!tabId || !url) return;
+  const { blockedOrigins } = await storage.get("blockedOrigins");
+  const next = blockedOrigins && typeof blockedOrigins === "object" ? { ...blockedOrigins } : {};
+  next[tabId] = url;
+  storage.set({ blockedOrigins: next });
+}
+
+async function getBlockedOrigin(tabId) {
+  const { blockedOrigins } = await storage.get("blockedOrigins");
+  if (blockedOrigins && typeof blockedOrigins === "object") {
+    return blockedOrigins[tabId];
+  }
+  return null;
+}
+
+async function removeBlockedOrigin(tabId) {
+  const { blockedOrigins } = await storage.get("blockedOrigins");
+  if (blockedOrigins && typeof blockedOrigins === "object" && tabId in blockedOrigins) {
+    const next = { ...blockedOrigins };
+    delete next[tabId];
+    if (Object.keys(next).length > 0) {
+      storage.set({ blockedOrigins: next });
+    } else {
+      storage.remove("blockedOrigins");
+    }
+  }
+}
+
+function clearBlockedOrigins() {
+  storage.remove("blockedOrigins");
+}
+
+async function setPromptLock(tabId, payload) {
+  if (!tabId || !payload) return;
+  const { promptLocks } = await storage.get("promptLocks");
+  const next = promptLocks && typeof promptLocks === "object" ? { ...promptLocks } : {};
+  next[tabId] = payload;
+  storage.set({ promptLocks: next });
+}
+
+async function getPromptLock(tabId) {
+  const { promptLocks } = await storage.get("promptLocks");
+  if (promptLocks && typeof promptLocks === "object") {
+    return promptLocks[tabId];
+  }
+  return null;
+}
+
+async function removePromptLock(tabId) {
+  const { promptLocks } = await storage.get("promptLocks");
+  if (promptLocks && typeof promptLocks === "object" && tabId in promptLocks) {
+    const next = { ...promptLocks };
+    delete next[tabId];
+    if (Object.keys(next).length > 0) {
+      storage.set({ promptLocks: next });
+    } else {
+      storage.remove("promptLocks");
+    }
+  }
+}
+
+function clearPromptLocks() {
+  storage.remove("promptLocks");
 }
 
 export default {
@@ -487,6 +582,15 @@ export default {
     init: userTimeInit,
     learningTime: { get: getLearningTime, set: setLearningTime },
     rewardTime: { get: getRewardTime, set: setRewardTime },
+  },
+  dailyProgress: {
+    get: getDailyProgress,
+    set: setDailyProgress,
+    increment: incrementDailyProgress,
+  },
+  rewardUnlock: {
+    get: getRewardUnlock,
+    set: setRewardUnlock,
   },
   shouldRedirect: { get: getShouldRedirect, set: setShouldRedirect },
   clearStorage,
@@ -500,7 +604,6 @@ export default {
     storeSession: storeSession,
     skip: incrSkipCount,
     continue: incrContinueCount,
-    snooze: incrSnoozeCount,
     getAll: getAllStats,
     init: initializeStats,
   },
@@ -513,6 +616,20 @@ export default {
   blockedTabs: {
     get: getBlockedTabs,
     add: addBlockedTabs,
+    remove: removeBlockedTab,
     clear: clearBlockedTabs,
   },
+  blockedOrigins: {
+    add: addBlockedOrigin,
+    get: getBlockedOrigin,
+    remove: removeBlockedOrigin,
+    clear: clearBlockedOrigins,
+  },
+  promptLocks: {
+    set: setPromptLock,
+    get: getPromptLock,
+    remove: removePromptLock,
+    clear: clearPromptLocks,
+  },
+  forgetOrigin: () => storage.remove("origin"),
 };

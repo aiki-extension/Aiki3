@@ -4,7 +4,7 @@
  -->
 <script>
   import Fa from "svelte-fa";
-  import { faSkull } from "@fortawesome/free-solid-svg-icons";
+  import { faArrowRight } from "@fortawesome/free-solid-svg-icons";
 
   export let gotoOrigin;
 
@@ -16,9 +16,9 @@
 <button
   on:click={handleClick}
   type="default"
-  class="btn btn-danger item"
-  data-tooltip="Skip this learning session and go to procrastination land!"
-  ><Fa icon={faSkull} /> Emergency Skip!</button
+  class="btn btn-success item"
+  data-tooltip="Head back to your original tab"
+  ><Fa icon={faArrowRight} /> Continue</button
 >
 
 <style>

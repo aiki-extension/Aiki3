@@ -7,11 +7,7 @@ Used in / Parent components: /src/Pages/Settings.svelte
   import { onMount } from "svelte";
   import Chart from "chart.js/auto";
   import Fa from "svelte-fa";
-  import {
-    faBed,
-    faSkull,
-    faThumbsUp,
-  } from "@fortawesome/free-solid-svg-icons";
+  import { faSkull, faThumbsUp } from "@fortawesome/free-solid-svg-icons";
 
   export let stats;
 
@@ -84,8 +80,6 @@ Used in / Parent components: /src/Pages/Settings.svelte
     <p>{stats[2]}</p>
     <h6><Fa icon={faSkull} /> Emergency Skips:</h6>
     <p>{stats[3]}</p>
-    <h6><Fa icon={faBed} /> Snoozes:</h6>
-    <p>{stats[4]}</p>
   </div>
 </div>
 

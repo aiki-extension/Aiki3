@@ -15,8 +15,6 @@
   import ContinueButton from "./Components/Popup/ContinueButton.svelte";
   import SkipButton from "./Components/Popup/SkipButton.svelte";
   import LearningTimeLeft from "./Components/Popup/LearningTimeLeft.svelte";
-  import ProcTimeLeft from "./Components/Popup/ProcTimeLeft.svelte";
-  import ExtraLearningTime from "./Components/Popup/ExtraLearningTime.svelte";
 
   const port = browser.runtime.connect({
   name: "Popup Communication",
@@ -88,27 +86,24 @@
   {#await timeValues}
     LOADING
   {:then values}
+    <LearningTimeLeft
+      learningTimeRemaining={values.learningTimeRemaining}
+      dailyGoal={values.dailyGoal}
+      dailyProgress={values.dailyProgress}
+    />
+    <hr />
     {#if siteName !== ""}
       {#if values.learningTimeRemaining > 0}
-        <LearningTimeLeft
-          learningTimeRemaining={values.learningTimeRemaining}
-        />
-        <hr />
         <div class="container">
           <SkipButton {gotoOrigin} />
         </div>
         <hr />
       {:else}
-        <ExtraLearningTime bonusTime={values.bonusTime} />
-        <hr />
         <div class="container">
           <ContinueButton {gotoOrigin} />
         </div>
         <hr />
       {/if}
-    {:else}
-      <ProcTimeLeft rewardTimeRemaining={values.rewardTimeRemaining} />
-      <hr />
     {/if}
   {/await}
 </main>

@@ -1,15 +1,68 @@
 /**
  * @function
- * @param {object} site
- * @param {string} site.name
- * @param {string} site.host
+ * @param {string} site
  * @returns {object}
  * @description returns an object containing the host and name of the given site.
  * Example: https://example.com/fragment returns {name: "example", host: "www.example.com"} */
 export function parseUrl(site) {
-  let host = site.includes("http") ? site.split("/")[2] : site.split("/")[0];
-  let name = host.includes("www") ? host.split(".")[1] : host.split(".")[0];
-  return { host: host, name: name };
+  if (!site) {
+    return { host: "", name: "" };
+  }
+
+  const trimmedSite = String(site).trim();
+
+  if (!trimmedSite) {
+    return { host: "", name: "" };
+  }
+
+  const ensureProtocol = (value) =>
+    /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(value) ? value : `https://${value}`;
+
+  const tryBuildUrl = (value) => {
+    try {
+      return new URL(ensureProtocol(value));
+    } catch (error) {
+      return null;
+    }
+  };
+
+  const isLikelyLocalHost = (hostname) =>
+    hostname === "localhost" ||
+    hostname.endsWith(".local") ||
+    /^[0-9.]+$/.test(hostname);
+
+  let url = tryBuildUrl(trimmedSite);
+
+  if (url && !isLikelyLocalHost(url.hostname) && !url.hostname.includes(".")) {
+    const appended = tryBuildUrl(`${url.hostname}.com`);
+    if (appended) {
+      url = appended;
+    }
+  }
+
+  if (!url) {
+    if (!trimmedSite.includes(".")) {
+      url = tryBuildUrl(`${trimmedSite}.com`);
+    }
+
+    if (!url) {
+      const host = trimmedSite.includes("http")
+        ? trimmedSite.split("/")[2]
+        : trimmedSite.split("/")[0];
+      const cleanHost = host || trimmedSite;
+      const name = cleanHost.includes("www")
+        ? cleanHost.split(".")[1]
+        : cleanHost.split(".")[0];
+      return { host: cleanHost, name };
+    }
+  }
+
+  const host = url.host;
+  const hostname = url.hostname;
+  const nameSource = hostname.startsWith("www.") ? hostname.slice(4) : hostname;
+  const name = nameSource.split(".")[0];
+
+  return { host, name };
 }
 
 /**

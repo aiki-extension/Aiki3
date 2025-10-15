@@ -17,6 +17,30 @@ browser.runtime.onInstalled.addListener(({ reason }) => {
   }
 });
 
+browser.runtime.onMessage.addListener((message, sender) => {
+  if (!message || typeof message !== "object") {
+    return;
+  }
+
+  if (message.type === "timer:get") {
+    return (async () => {
+      try {
+        await timer.sync();
+      } catch (_) {}
+      return timer.getTime();
+    })();
+  }
+
+  if (message.type === "stats:skip") {
+    storage.stats.skip();
+  }
+
+  if (message.type === "blocker:release" && sender && sender.tab && sender.tab.id !== undefined) {
+    storage.blockedTabs.remove(sender.tab.id);
+    storage.blockedOrigins.remove(sender.tab.id);
+  }
+});
+
 async function installationSetup() {
   storage.clearStorage();
   storage.stats.init();
@@ -110,7 +134,12 @@ browser.runtime.onConnect.addListener(function (port) {
         redirection.removeLearningSiteLoadedListener();
         break;
       case "timer":
-        port.postMessage(timer.getTime());
+        (async () => {
+          try {
+            await timer.sync();
+          } catch (_) {}
+          port.postMessage(timer.getTime());
+        })();
         break;
       case "off":
         killAiki();

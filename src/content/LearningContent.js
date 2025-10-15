@@ -534,13 +534,6 @@ export function LearningContent(
       i = !0;
     setTimeout(() => e(1, (i = !1)), 2e3);
     const o = [
-      "Let's do something productive! 😊",
-      "Time to learn some Python! 🖥️",
-      "Time for some more learning! 👓",
-      "Let's earn some break time! ⏲️",
-      "That's right, it's Python time! 🐍",
-      "Let's get some coding done! 🤖",
-      "Python won't teach itself! 👩‍🏫",
     ];
     let a = (function () {
       let t = ((n = 0), (e = 6), Math.floor(Math.random() * (e - n)) + n);
