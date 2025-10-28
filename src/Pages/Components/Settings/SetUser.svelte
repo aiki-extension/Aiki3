@@ -91,9 +91,7 @@
     <h5>Add your email here so we can log your activity:</h5>
     <hr />
     <p>
-      <strong>Note:</strong> Please make sure you enter the correct email you have
-      been using so far for the study. If you provide the incorrect one, your data
-      is likely to become mixed up with another participant.
+      <strong>Note:</strong> Please use the same email you used when signing up for this study.
     </p>
     <p>
       Secondly, please note that you may be asked to re-enter your email if you
@@ -101,7 +99,7 @@
     </p>
     <p>
       If you have any questions or problems, contact <a
-        href="mailto:aiki.itu.info@gmail.com">aiki.itu.info@gmail.com</a
+        href="mailto:wabe@itu.dk">wabe@itu.dk</a
       >
       for assistance.
     </p>

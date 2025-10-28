@@ -184,7 +184,7 @@ function renderLearningContent() {
     const panel = document.createElement("div");
     panel.setAttribute(
       "style",
-      `pointer-events: auto; margin: 24px; padding: 18px 20px; min-width: 260px; background: rgba(15, 23, 42, 0.92); color: #f9fafb; border-radius: 14px; box-shadow: 0 18px 35px rgba(15, 23, 42, 0.35); font-family: 'Inter', 'Segoe UI', sans-serif; display: flex; flex-direction: column; gap: 12px;`
+      `pointer-events: auto; margin: 24px; padding: 18px 20px; min-width: 260px; background: rgba(15, 23, 42, 0.92); color: #f9fafb; border-radius: 14px; box-shadow: 0 18px 35px rgba(15, 23, 42, 0.35); font-family: 'Inter', 'Segoe UI', sans-serif; display: flex; flex-direction: column; gap: 12px; cursor: grab; position: relative;`
     );
 
     const heading = document.createElement("strong");
@@ -225,6 +225,44 @@ function renderLearningContent() {
     overlay.appendChild(panel);
     document.body.appendChild(overlay);
 
+    let dragState = {
+      dragging: false,
+      startX: 0,
+      startY: 0,
+      offsetX: 0,
+      offsetY: 0,
+    };
+
+    const onPointerDown = (event) => {
+      dragState.dragging = true;
+      dragState.startX = event.clientX;
+      dragState.startY = event.clientY;
+      panel.style.cursor = "grabbing";
+      event.preventDefault();
+    };
+
+    const onPointerMove = (event) => {
+      if (!dragState.dragging) return;
+      const dx = event.clientX - dragState.startX;
+      const dy = event.clientY - dragState.startY;
+      dragState.offsetX += dx;
+      dragState.offsetY += dy;
+      dragState.startX = event.clientX;
+      dragState.startY = event.clientY;
+      panel.style.transform = `translate(${dragState.offsetX}px, ${dragState.offsetY}px)`;
+      event.preventDefault();
+    };
+
+    const endDrag = () => {
+      dragState.dragging = false;
+      panel.style.cursor = "grab";
+    };
+
+    panel.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", endDrag);
+    window.addEventListener("pointerleave", endDrag);
+
     const port = browser.runtime.connect({
       name: "Content Communication",
     });
@@ -237,6 +275,10 @@ function renderLearningContent() {
     const cleanup = () => {
       if (cleanupCalled) return;
       cleanupCalled = true;
+      panel.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", endDrag);
+      window.removeEventListener("pointerleave", endDrag);
       try {
         port.disconnect();
       } catch (_) {}

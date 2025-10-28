@@ -120,6 +120,10 @@ async function gotoOriginTab() {
 
 // Manifest V3: Use runtime.onConnect for port messaging
 browser.runtime.onConnect.addListener(function (port) {
+  let isDisconnected = false;
+  port.onDisconnect.addListener(() => {
+    isDisconnected = true;
+  });
   port.onMessage.addListener(function (msg) {
     switch (msg.split(": ")[1]) {
       case "user":
@@ -138,7 +142,12 @@ browser.runtime.onConnect.addListener(function (port) {
           try {
             await timer.sync();
           } catch (_) {}
-          port.postMessage(timer.getTime());
+          if (isDisconnected) return;
+          try {
+            port.postMessage(timer.getTime());
+          } catch (error) {
+            // Port might have been disconnected between sync and post
+          }
         })();
         break;
       case "off":
