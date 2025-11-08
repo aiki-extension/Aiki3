@@ -35,6 +35,17 @@ browser.runtime.onMessage.addListener((message, sender) => {
     storage.stats.skip();
   }
 
+  if (message.type === "learning:autoStart") {
+    return (async () => {
+      try {
+        if (!timer.isLearningSessionActive()) {
+          await timer.startLearningSession();
+        }
+      } catch (_) {}
+      return true;
+    })();
+  }
+
   if (message.type === "blocker:release" && sender && sender.tab && sender.tab.id !== undefined) {
     storage.blockedTabs.remove(sender.tab.id);
     storage.blockedOrigins.remove(sender.tab.id);
@@ -133,10 +144,29 @@ browser.runtime.onConnect.addListener(function (port) {
         intervals.counter.restart();
         redirection.navigationListener.restart();
         break;
-      case "origin":
-        redirection.gotoOrigin(msg.split(": ")[2], "popup");
-        redirection.removeLearningSiteLoadedListener();
+      case "origin": {
+        const segments = msg.split(": ");
+        const action = segments[2];
+        (async () => {
+          let tabId = port.sender?.tab?.id;
+          if (tabId === undefined) {
+            try {
+              const [activeTab] = await browser.tabs.query({
+                active: true,
+                currentWindow: true,
+              });
+              tabId = activeTab?.id;
+            } catch (_) {}
+          }
+          redirection.gotoOrigin(action, {
+            type: "popup",
+            tabId,
+            restoreAll: action === "skip",
+          });
+          redirection.removeLearningSiteLoadedListener();
+        })();
         break;
+      }
       case "timer":
         (async () => {
           try {

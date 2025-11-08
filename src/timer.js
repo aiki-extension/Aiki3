@@ -190,6 +190,10 @@ function stopBonusTime() {
   bonusTimeIntervalRef = undefined;
 }
 
+function isLearningSessionActive() {
+  return Boolean(learningTimeIntervalRef);
+}
+
 async function checkActive() {
   const window = await browser.windows.getCurrent();
   const views = (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.getViews)
@@ -252,6 +256,7 @@ export default {
   startProcrastinationSession,
   stopProcrastinationSession,
   stopBonusTime,
+  isLearningSessionActive,
   getTime,
   killAiki,
   sync: syncDailyState,

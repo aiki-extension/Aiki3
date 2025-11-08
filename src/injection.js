@@ -1,6 +1,92 @@
 import browser from "webextension-polyfill";
 
 const l = console.log;
+let overlayGuardsInstalled = false;
+let overlayEnsureTimeout = null;
+
+const scheduleOverlayEnsure = () => {
+  if (overlayEnsureTimeout) return;
+  overlayEnsureTimeout = setTimeout(() => {
+    overlayEnsureTimeout = null;
+    if (!document.getElementById("aiki-overlay")) {
+      renderLearningContent().catch(() => {});
+    }
+  }, 120);
+};
+
+function installOverlayPersistence() {
+  if (overlayGuardsInstalled) return;
+  overlayGuardsInstalled = true;
+
+  const wrapHistory = (method) => {
+    try {
+      const original = history[method];
+      if (typeof original !== "function") return;
+      history[method] = function (...args) {
+        const result = original.apply(this, args);
+        scheduleOverlayEnsure();
+        return result;
+      };
+    } catch (_) {}
+  };
+
+  wrapHistory("pushState");
+  wrapHistory("replaceState");
+
+  window.addEventListener("popstate", scheduleOverlayEnsure);
+  window.addEventListener("hashchange", scheduleOverlayEnsure);
+  window.addEventListener("focus", scheduleOverlayEnsure);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) {
+      scheduleOverlayEnsure();
+    }
+  });
+}
+
+let bootstrapAttemptPending = false;
+
+const matchesLearningHost = (learningUri) => {
+  if (typeof learningUri !== "string" || !learningUri.trim()) return false;
+  try {
+    const targetHost = new URL(learningUri).hostname.replace(/^www\./, "");
+    const currentHost = location.hostname.replace(/^www\./, "");
+    return (
+      targetHost === currentHost ||
+      currentHost.endsWith(`.${targetHost}`) ||
+      targetHost.endsWith(`.${currentHost}`)
+    );
+  } catch (_) {
+    return false;
+  }
+};
+
+async function bootstrapLearningOverlayIfNeeded() {
+  if (bootstrapAttemptPending) return;
+  bootstrapAttemptPending = true;
+  try {
+    const result = await browser.storage.local.get("learningUri");
+    const learningUri =
+      result && typeof result.learningUri === "string" ? result.learningUri.trim() : "";
+    if (!learningUri || !matchesLearningHost(learningUri)) {
+      bootstrapAttemptPending = false;
+      return;
+    }
+    try {
+      await browser.runtime.sendMessage({ type: "learning:autoStart" });
+    } catch (_) {}
+    await renderLearningContent();
+  } catch (_) {
+    // swallow
+  } finally {
+    bootstrapAttemptPending = false;
+  }
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", bootstrapLearningOverlayIfNeeded, { once: true });
+} else {
+  bootstrapLearningOverlayIfNeeded();
+}
 
 /* Listener for messages from background script. */
 browser.runtime.onMessage.addListener((request) => {
@@ -224,6 +310,7 @@ function renderLearningContent() {
     panel.appendChild(status);
     overlay.appendChild(panel);
     document.body.appendChild(overlay);
+    installOverlayPersistence();
 
     let dragState = {
       dragging: false,
