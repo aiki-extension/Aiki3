@@ -1,10 +1,11 @@
-// Use compat API for broad compatibility with existing code
-let enabled = false;
-let firebase = null;
-let db = null;
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getFirestore, collection, addDoc } from "firebase/firestore";
 import { hash } from "./security";
 
-// If you want to enable logging, create a config and set the values below
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyBi5aVAsIyr97vDlddg-PJ5YP5xlcf0q7w",
   authDomain: "aiki-ecf9c.firebaseapp.com",
@@ -15,39 +16,10 @@ const firebaseConfig = {
   appId: "1:435184665385:web:71746ce5c75d20d42c6d38"
 };
 
-function hasConfig(cfg) {
-  return (
-    typeof cfg === "object" &&
-    cfg &&
-    typeof cfg.apiKey === "string" && cfg.apiKey !== "" &&
-    typeof cfg.projectId === "string" && cfg.projectId !== ""
-  );
-}
-
-try {
-  console.log("trying to connect to the db")
-  if (hasConfig(firebaseConfig) && (typeof navigator === "undefined" || navigator.onLine !== false)) {
-    console.log("inside has config");
-    // Lazy require to avoid bundling when disabled
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    firebase = require("firebase/compat/app");
-    require("firebase/compat/firestore");
-    firebase.initializeApp(firebaseConfig);
-    db = firebase.firestore();
-    try {
-      // Improve compatibility in service workers by avoiding WebChannel
-      db.settings({ experimentalForceLongPolling: true, useFetchStreams: false });
-    } catch (e) {
-      console.dir(e);
-    }
-    enabled = true;
-  }
-} catch (e) {
-
-  console.dir(e);
-
-  enabled = false;
-}
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+console.dir(db);
 
 /**
  * @async
@@ -92,22 +64,23 @@ async function addEntry(entry, reference, type) {
  */
 async function addLog(entry, type) {
   console.log("add entry....");
-  console.log(enabled);
   console.log(db);
 
-  if (!enabled || !db) return; // Firebase disabled or offline; skip logging
-  console.log("firebase not disabled or offline.");
   try {
     entry.user = `${hash(entry.user)}`;
     console.log(entry.user);
-    const userRef = db.collection("user_logs").doc(entry.user);
-    console.log(userRef);
-    await resolveDoc(userRef);
-    const dateRef = userRef.collection("dates").doc(entry.date.dateString);
-    await resolveDoc(dateRef);
-    await addEntry(entry, dateRef, type);
-  } catch (_) {
-    // Swallow errors; run offline without affecting UX
+    const userRef = addDoc(collection(db, "user_logs"),entry)
+        .then(docRef => console.log("Success:", docRef.id))
+        .catch(error => console.error("ERROR:", error));  // ✅ See the error!
+
+    // await resolveDoc(userRef);
+    // const dateRef = collection("dates").addDoc(entry.date.dateString);
+    // await resolveDoc(dateRef);
+    // await addEntry(entry, dateRef, type);
+  } catch (e) {
+
+    console.dir(e);
+    console.error(e);
   }
 }
 
