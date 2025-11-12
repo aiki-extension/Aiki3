@@ -150,6 +150,7 @@ async function redirect(details) {
       if (toggled && shouldRedirect && !goalMet) {
         l("ShouldRedirect", shouldRedirect);
         const origin = await storage.origin.get();
+        l("one more log!");
         l("Checking against this: ", origin);
         if (origin) {
           l(details);

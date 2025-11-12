@@ -6,13 +6,13 @@ import { hash } from "./security";
 
 // If you want to enable logging, create a config and set the values below
 const firebaseConfig = {
-  apiKey: "",
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: "",
-  measurementId: "",
+  apiKey: "AIzaSyBi5aVAsIyr97vDlddg-PJ5YP5xlcf0q7w",
+  authDomain: "aiki-ecf9c.firebaseapp.com",
+  databaseURL: "https://aiki-ecf9c.firebaseio.com",
+  projectId: "aiki-ecf9c",
+  storageBucket: "aiki-ecf9c.firebasestorage.app",
+  messagingSenderId: "435184665385",
+  appId: "1:435184665385:web:71746ce5c75d20d42c6d38"
 };
 
 function hasConfig(cfg) {
@@ -25,7 +25,9 @@ function hasConfig(cfg) {
 }
 
 try {
+  console.log("trying to connect to the db")
   if (hasConfig(firebaseConfig) && (typeof navigator === "undefined" || navigator.onLine !== false)) {
+    console.log("inside has config");
     // Lazy require to avoid bundling when disabled
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     firebase = require("firebase/compat/app");
@@ -35,10 +37,15 @@ try {
     try {
       // Improve compatibility in service workers by avoiding WebChannel
       db.settings({ experimentalForceLongPolling: true, useFetchStreams: false });
-    } catch (_) {}
+    } catch (e) {
+      console.dir(e);
+    }
     enabled = true;
   }
 } catch (e) {
+
+  console.dir(e);
+
   enabled = false;
 }
 
@@ -67,6 +74,7 @@ async function resolveDoc(ref) {
  * @description Takes a document reference and adds the entry as a document within a collection specified by type.
  */
 async function addEntry(entry, reference, type) {
+  console.log("sending info... from add Entry")
   const entryRes = await reference
     .collection(type + "_logs")
     .doc("" + entry.date.timestamp)
@@ -83,10 +91,17 @@ async function addEntry(entry, reference, type) {
  * Finally adds entry at appropriate log type within the appropriate date collection.
  */
 async function addLog(entry, type) {
+  console.log("add entry....");
+  console.log(enabled);
+  console.log(db);
+
   if (!enabled || !db) return; // Firebase disabled or offline; skip logging
+  console.log("firebase not disabled or offline.");
   try {
     entry.user = `${hash(entry.user)}`;
+    console.log(entry.user);
     const userRef = db.collection("user_logs").doc(entry.user);
+    console.log(userRef);
     await resolveDoc(userRef);
     const dateRef = userRef.collection("dates").doc(entry.date.dateString);
     await resolveDoc(dateRef);
