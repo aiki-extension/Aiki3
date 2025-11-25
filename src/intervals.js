@@ -1,7 +1,7 @@
 import browser from "webextension-polyfill";
 import storage from "./util/storage";
-import firebase from "./util/firebase";
-import { parseUrl, makeDate } from "./util/utilities";
+import { logEvent } from "./util/logger";
+import { parseUrl } from "./util/utilities";
 import { learningSites } from "./util/constants";
 
 let list;
@@ -90,11 +90,27 @@ async function syncList() {
 }
 
 function storeData(data) {
-  if (user) {
-    storage.stats.storeSession(data);
-    const entry = { data: data, user: user, date: makeDate() };
-    firebase.addLog(entry, "session");
-  }
+  if (!user) return;
+  storage.stats.storeSession(data);
+
+  const perSiteSeconds = Object.entries(data).reduce((acc, [key, value]) => {
+    if (key !== "chromeActive" && key !== "chromeInactive" && typeof value === "number") {
+      acc[key] = value;
+    }
+    return acc;
+  }, {});
+
+  let procrastinationSeconds = 0;
+  let learningSeconds = 0;
+  Object.entries(perSiteSeconds).forEach(([name, seconds]) => {
+    if (list && list.includes(name)) {
+      procrastinationSeconds += seconds;
+    } else if (learningSites.find((site) => site.name === name)) {
+      learningSeconds += seconds;
+    }
+  });
+
+
 }
 
 function resetData() {

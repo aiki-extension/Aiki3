@@ -576,6 +576,67 @@ function clearPromptLocks() {
   storage.remove("promptLocks");
 }
 
+async function setParticipantRecord(record) {
+  if (record && typeof record === "object") {
+    storage.set({ participantRecord: record });
+  } else {
+    storage.remove("participantRecord");
+  }
+}
+
+async function getParticipantRecord() {
+  const result = await storage.get("participantRecord");
+  return result && result.participantRecord ? result.participantRecord : null;
+}
+
+function clearParticipantRecord() {
+  return storage.remove("participantRecord");
+}
+
+function normalizeSessionKey(tabId) {
+  if (tabId === null || tabId === undefined) return null;
+  return String(tabId);
+}
+
+async function setActiveSession(tabId, session) {
+  const key = normalizeSessionKey(tabId);
+  if (!key || !session) return;
+  const { activeSessions } = await storage.get("activeSessions");
+  const next =
+    activeSessions && typeof activeSessions === "object" ? { ...activeSessions } : {};
+  next[key] = session;
+  storage.set({ activeSessions: next });
+}
+
+async function getActiveSession(tabId) {
+  const key = normalizeSessionKey(tabId);
+  if (!key) return null;
+  const { activeSessions } = await storage.get("activeSessions");
+  if (activeSessions && typeof activeSessions === "object") {
+    return activeSessions[key] || null;
+  }
+  return null;
+}
+
+async function removeActiveSession(tabId) {
+  const key = normalizeSessionKey(tabId);
+  if (!key) return;
+  const { activeSessions } = await storage.get("activeSessions");
+  if (activeSessions && typeof activeSessions === "object" && key in activeSessions) {
+    const next = { ...activeSessions };
+    delete next[key];
+    if (Object.keys(next).length > 0) {
+      storage.set({ activeSessions: next });
+    } else {
+      storage.remove("activeSessions");
+    }
+  }
+}
+
+function clearActiveSessions() {
+  return storage.remove("activeSessions");
+}
+
 export default {
   timeSettings: {
     getAll: getUserTimes,
@@ -630,6 +691,17 @@ export default {
     get: getPromptLock,
     remove: removePromptLock,
     clear: clearPromptLocks,
+  },
+  participantRecord: {
+    get: getParticipantRecord,
+    set: setParticipantRecord,
+    clear: clearParticipantRecord,
+  },
+  activeSessions: {
+    set: setActiveSession,
+    get: getActiveSession,
+    remove: removeActiveSession,
+    clear: clearActiveSessions,
   },
   forgetOrigin: () => storage.remove("origin"),
 };

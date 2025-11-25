@@ -157,23 +157,29 @@ function renderRedirectPrompt(url, originUrl) {
     overlay.className = "aiki-overlay";
     overlay.setAttribute(
       "style",
-      `position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45); display: flex; align-items: center; justify-content: center; z-index: 2147483646;`
+      `all: initial; position: fixed; inset: 0; background: rgba(3, 7, 18, 0.98); display: flex; align-items: center; justify-content: center; z-index: 2147483646; font-family: 'Inter','Segoe UI',sans-serif; font-size: 16px;`
     );
 
     const card = document.createElement("div");
     card.setAttribute(
       "style",
-      `background: #ffffff; color: #111827; min-width: 320px; max-width: 360px; padding: 24px; border-radius: 16px; box-shadow: 0 20px 45px rgba(15, 23, 42, 0.25); font-family: 'Inter', 'Segoe UI', sans-serif; display: flex; flex-direction: column; gap: 16px; text-align: left;`
+      `background: #ffffff; color: #0f172a; min-width: min(360px, 92vw); padding: clamp(20px, 4vw, 28px); border-radius: 18px; box-shadow: 0 28px 55px rgba(15, 23, 42, 0.35); font-family: 'Inter', 'Segoe UI', sans-serif; display: flex; flex-direction: column; gap: 18px; text-align: left; font-size: 16px;`
     );
 
     const title = document.createElement("h2");
     title.textContent = "Redirect to learning?";
-    title.setAttribute("style", "margin: 0; font-size: 1.2rem; font-weight: 600;");
+    title.setAttribute("style", "margin: 0; font-size: clamp(1rem, 2vw, 1.35rem); font-weight: 700; color: #020617; line-height: 1.3;");
 
     let host = "";
     try {
-      host = originUrl ? new URL(originUrl).hostname : "";
-    } catch (_) {}
+      host = new URL(originUrl || window.location.href).hostname;
+    } catch (_) {
+      try {
+        host = window.location.hostname || "";
+      } catch (_) {
+        host = "";
+      }
+    }
 
     const description = document.createElement("p");
     description.textContent = host
@@ -181,7 +187,7 @@ function renderRedirectPrompt(url, originUrl) {
       : "You've reached a focus site. Do you want to jump to your learning platform?";
     description.setAttribute(
       "style",
-      "margin: 0; font-size: 0.95rem; line-height: 1.4; color: #4b5563;"
+      "margin: 0; font-size: clamp(0.95rem, 1.5vw, 1.1rem); line-height: 1.6; color: #1e293b;"
     );
 
     const actions = document.createElement("div");
@@ -227,9 +233,11 @@ function renderRedirectPrompt(url, originUrl) {
     const finalize = (action) => {
       if (done) return;
       done = true;
-      try {
-        removeOverlay();
-      } catch (_) {}
+      if (action !== "redirect") {
+        try {
+          removeOverlay();
+        } catch (_) {}
+      }
       resolve({ action });
     };
 
@@ -264,23 +272,23 @@ function renderLearningContent() {
     overlay.className = "aiki-overlay";
     overlay.setAttribute(
       "style",
-      `position: fixed; inset: 0; pointer-events: none; background: transparent; z-index: 2147483645; display: flex; justify-content: flex-end; align-items: flex-end;`
+      `all: initial; position: fixed; inset: 0; pointer-events: none; background: transparent; z-index: 2147483645; display: flex; justify-content: flex-end; align-items: flex-end; font-family: 'Inter','Segoe UI',sans-serif; font-size: 16px;`
     );
 
     const panel = document.createElement("div");
     panel.setAttribute(
       "style",
-      `pointer-events: auto; margin: 24px; padding: 18px 20px; min-width: 260px; background: rgba(15, 23, 42, 0.92); color: #f9fafb; border-radius: 14px; box-shadow: 0 18px 35px rgba(15, 23, 42, 0.35); font-family: 'Inter', 'Segoe UI', sans-serif; display: flex; flex-direction: column; gap: 12px; cursor: grab; position: relative;`
+      `pointer-events: auto; margin: 24px; padding: clamp(16px, 3vw, 22px); min-width: 260px; max-width: 320px; background: rgba(15, 23, 42, 0.96); color: #f8fafc; border-radius: 18px; box-shadow: 0 24px 45px rgba(15, 23, 42, 0.45); font-family: 'Inter', 'Segoe UI', sans-serif; display: flex; flex-direction: column; gap: 12px; cursor: grab; position: relative; font-size: 16px;`
     );
 
     const heading = document.createElement("strong");
     heading.textContent = "Learning progress";
-    heading.setAttribute("style", "font-size: 0.95rem; letter-spacing: 0.01em;");
+    heading.setAttribute("style", "font-size: 1rem; letter-spacing: 0.01em; font-weight: 600;");
 
     const progressLabel = document.createElement("span");
     progressLabel.setAttribute(
       "style",
-      "font-size: 0.85rem; color: rgba(226, 232, 240, 0.85);"
+      "font-size: 0.9rem; color: rgba(248, 250, 252, 0.88);"
     );
     progressLabel.textContent = "Getting things ready...";
 
@@ -300,7 +308,7 @@ function renderLearningContent() {
     const status = document.createElement("span");
     status.setAttribute(
       "style",
-      "font-size: 0.82rem; color: rgba(226, 232, 240, 0.75);"
+      "font-size: 0.88rem; color: rgba(248, 250, 252, 0.78);"
     );
     status.textContent = "Stay focused here to earn your time.";
 
@@ -456,25 +464,25 @@ function renderContentBlocker() {
   overlay.className = "aiki-overlay";
   overlay.setAttribute(
     "style",
-    `position: fixed; inset: 0; background: rgba(15, 23, 42, 0.55); display: flex; align-items: center; justify-content: center; z-index: 2147483647; padding: 24px;`
+    `all: initial; position: fixed; inset: 0; background: rgba(3, 7, 18, 0.98); display: flex; align-items: center; justify-content: center; z-index: 2147483647; padding: clamp(18px, 5vw, 32px); font-family: 'Inter','Segoe UI',sans-serif; font-size: 16px;`
   );
 
   const card = document.createElement("div");
   card.setAttribute(
     "style",
-    `width: min(420px, 90%); border-radius: 18px; background: rgba(15, 23, 42, 0.92); color: #f9fafb; box-shadow: 0 24px 55px rgba(15, 23, 42, 0.45); display: flex; flex-direction: column; gap: 16px; padding: 24px; font-family: 'Inter', 'Segoe UI', sans-serif;`
+    `width: min(420px, 96%); border-radius: 22px; background: rgba(15, 23, 42, 0.98); color: #f8fafc; box-shadow: 0 32px 70px rgba(15, 23, 42, 0.55); display: flex; flex-direction: column; gap: 18px; padding: clamp(22px, 4vw, 30px); font-family: 'Inter', 'Segoe UI', sans-serif;`
   );
 
   const title = document.createElement("h2");
   title.textContent = "Keep learning";
-  title.setAttribute("style", "margin: 0; font-size: 1.3rem; font-weight: 600; letter-spacing: 0.01em;");
+  title.setAttribute("style", "margin: 0; font-size: clamp(1.15rem, 1vw + 0.65rem, 1.45rem); font-weight: 700; letter-spacing: 0.01em; color: #f8fafc;");
 
   const description = document.createElement("p");
   description.textContent = "You're mid-session. Head back to your focus site to keep building momentum.";
-  description.setAttribute("style", "margin: 0; font-size: 0.95rem; line-height: 1.5; opacity: 0.85;");
+  description.setAttribute("style", "margin: 0; font-size: clamp(0.9rem, 1vw + 0.4rem, 1.05rem); line-height: 1.6; color: rgba(241, 245, 249, 0.9);");
 
   const progressLabel = document.createElement("span");
-  progressLabel.setAttribute("style", "font-size: 0.9rem; opacity: 0.8;");
+  progressLabel.setAttribute("style", "font-size: clamp(0.9rem, 1vw + 0.35rem, 1.05rem); color: rgba(241, 245, 249, 0.88);");
   progressLabel.textContent = "Syncing progress...";
 
   const barShell = document.createElement("div");
@@ -488,7 +496,7 @@ function renderContentBlocker() {
   barShell.appendChild(barFill);
 
   const status = document.createElement("span");
-  status.setAttribute("style", "font-size: 0.85rem; opacity: 0.75;");
+  status.setAttribute("style", "font-size: clamp(0.85rem, 1vw + 0.3rem, 1rem); color: rgba(241, 245, 249, 0.78);");
   status.textContent = "Stay focused a little longer to unlock breaks.";
 
   const actions = document.createElement("div");

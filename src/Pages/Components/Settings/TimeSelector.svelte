@@ -4,8 +4,7 @@
  -->
 <script>
   import storage from "../../../util/storage";
-  import firebase from "../../../util/firebase";
-  import { makeDate } from "../../../util/utilities";
+  import { logAuditEvent } from "../../../util/logger";
 
   let minuteOptions = Array.from({ length: 121 }, (_, i) => i); // 0 - 120 minutes
   let secondsOptions = [0, 15, 30, 45];
@@ -25,19 +24,24 @@
     }
   }
 
-  function setLearningTime() {
+  async function setLearningTime() {
     ensureMinThreshold();
+    const previous = { ...settings.learningTime };
     const learningTime = { min: learnMin, sec: learnSec };
     storage.timeSettings.learningTime.set(learningTime);
-    firebase.addLog(
-      {
-        user: user,
-        event: "User changed learning time in settings",
-        value: learningTime,
-        date: makeDate(),
+    const totalSeconds = learningTime.min * 60 + learningTime.sec;
+    const totalMinutes = learningTime.min + learningTime.sec / 60;
+    await logAuditEvent({
+      participantId: user,
+      action: "update_learning_time",
+      settingName: "learning_time",
+      oldValue: previous,
+      newValue: learningTime,
+      participantUpdates: {
+        current_daily_goal_min: totalMinutes,
+        current_timer_duration_sec: totalSeconds,
       },
-      "config"
-    );
+    });
     update();
   }
 </script>

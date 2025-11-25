@@ -1,12 +1,28 @@
 import storage from "./util/storage";
 import browser from "webextension-polyfill";
 import badge from "./badge";
-import { parseTimerDown, parseTime, parseUrl } from "./util/utilities";
+import { parseTime, parseUrl } from "./util/utilities";
 
 let learningTimeRemaining = 0;
 let learningTimeIntervalRef;
 let dailyGoal = 0;
 let dailyProgress = 0;
+
+function computeProgressPercent() {
+  if (dailyGoal <= 0) return 0;
+  return Math.min(1, dailyProgress / dailyGoal);
+}
+
+function getRemainingLabel() {
+  const minutes = Math.max(0, Math.ceil(learningTimeRemaining / 60000));
+  return `${minutes}m`;
+}
+
+function updateBadge() {
+  try {
+    badge.setProgress(getRemainingLabel(), computeProgressPercent());
+  } catch (_) {}
+}
 
 async function decrementLearningTime() {
   // Only tick when user is actively on the learning tab/window
@@ -18,9 +34,7 @@ async function decrementLearningTime() {
       }
       dailyProgress = Math.min(dailyGoal, dailyProgress + 1000);
       await storage.dailyProgress.set(dailyProgress);
-      try {
-        badge.setText(parseTimerDown(learningTimeRemaining));
-      } catch (_) {}
+      updateBadge();
       if (learningTimeRemaining === 0) {
         await handleGoalCompletion();
       }
@@ -37,8 +51,7 @@ async function handleGoalCompletion() {
   try {
     await storage.shouldRedirect.set(false);
   } catch (_) {}
-  badge.setDone();
-  badge.setText("Goal");
+  badge.setProgress("0m", 1);
   clearInterval(learningTimeIntervalRef);
   learningTimeIntervalRef = undefined;
   bonusTime = 0;
@@ -57,9 +70,7 @@ async function startLearningSession() {
   dailyGoal = goal;
   dailyProgress = Math.min(progress, goal);
   learningTimeRemaining = Math.max(goal - dailyProgress, 0);
-  try {
-    badge.setText(parseTimerDown(learningTimeRemaining));
-  } catch (_) {}
+  updateBadge();
   if (learningTimeRemaining > 0) {
     learningTimeIntervalRef = setInterval(decrementLearningTime, 1000);
   } else {
@@ -86,6 +97,7 @@ async function syncDailyState() {
   } else {
     rewardTimeRemaining = 0;
   }
+  updateBadge();
 }
 
 function stopLearningSession() {
@@ -177,8 +189,7 @@ async function incrementBonusTime() {
 
 function startBonusTime() {
   if (bonusTimeIntervalRef) stopBonusTime();
-  badge.setDone();
-  badge.setText("Done");
+  badge.setProgress("0m", 1);
   clearInterval(learningTimeIntervalRef);
   learningTimeIntervalRef = undefined;
   bonusTimeIntervalRef = setInterval(incrementBonusTime, 1000);

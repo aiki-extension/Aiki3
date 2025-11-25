@@ -5,8 +5,7 @@ import redirection from "./redirection";
 import timer from "./timer";
 import { setTheme } from "./util/themes";
 import badge from "./badge";
-import firebase from "./util/firebase";
-import { makeDate } from "./util/utilities";
+import { logAuditEvent } from "./util/logger";
 import { participantResource } from "./util/constants";
 
 // Manifest V3: No DOM access, no stray variables
@@ -99,27 +98,27 @@ async function killAiki() {
   timer.killAiki();
   badge.remove();
   const user = await storage.uid.get();
-  firebase.addLog(
-    {
-      user: user,
-      event: "User toggled redirection off",
-      date: makeDate(),
-    },
-    "config"
-  );
+  await logAuditEvent({
+    participantId: user,
+    action: "toggle_redirection",
+    settingName: "redirection",
+    oldValue: "on",
+    newValue: "off",
+    participantUpdates: { is_extension_active: false },
+  });
 }
 
 async function reviveAiki() {
   redirection.checkActiveTab();
   const user = await storage.uid.get();
-  firebase.addLog(
-    {
-      user: user,
-      event: "User toggled redirection on",
-      date: makeDate(),
-    },
-    "config"
-  );
+  await logAuditEvent({
+    participantId: user,
+    action: "toggle_redirection",
+    settingName: "redirection",
+    oldValue: "off",
+    newValue: "on",
+    participantUpdates: { is_extension_active: true },
+  });
 }
 
 async function gotoOriginTab() {

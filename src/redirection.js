@@ -1,6 +1,6 @@
 import storage from "./util/storage";
 import { learningSites } from "./util/constants";
-import firebase from "./util/firebase";
+import { logEvent, logSessionEvent } from "./util/logger";
 import browser from "webextension-polyfill";
 import timer from "./timer";
 import { parseUrl, makeDate, parseTime } from "./util/utilities";
@@ -9,6 +9,173 @@ const l = console.log;
 
 let shouldShowWelcome = true;
 const PROMPT_SUPPRESS_DURATION = 2 * 60 * 1000; // 2 minutes
+const PRELOAD_HIDE_CSS = `
+  html, body {
+    visibility: hidden !important;
+    opacity: 0 !important;
+    background: #030712 !important;
+  }
+`;
+const hiddenTabs = new Set();
+const pendingRevealTabs = new Set();
+const PREPROMPT_ID = "__aiki-preprompt";
+
+async function startTrackedSession(tabId, originUrl, learningUrl) {
+  if (tabId === undefined || tabId === null || !originUrl || !learningUrl) return;
+  const participantId = await storage.uid.get();
+  if (!participantId) return;
+  await storage.activeSessions.set(tabId, {
+    participantId,
+    sessionType: "intervention",
+    procrastinationUrl: originUrl,
+    learningUrl,
+    startedAt: Date.now(),
+  });
+}
+
+async function finalizeTrackedSession(tabId, outcome = "continue", metadata = {}) {
+  if (tabId === undefined || tabId === null) return;
+  const session = await storage.activeSessions.get(tabId);
+  if (!session) return;
+  await storage.activeSessions.remove(tabId);
+  const durationSeconds = Math.max(
+    0,
+    Math.round((Date.now() - (session.startedAt || Date.now())) / 1000)
+  );
+  await logSessionEvent({
+    participantId: session.participantId,
+    sessionType: session.sessionType || "intervention",
+    procrastinationSite: session.procrastinationUrl,
+    learningSite: session.learningUrl,
+    triggerSource: metadata.sourceType || "extension",
+    promptResponse: "redirect",
+    completedMicrolearning:
+      typeof metadata.completed === "boolean"
+        ? metadata.completed
+        : outcome === "continue",
+    actualDurationSeconds:
+      typeof metadata.durationSeconds === "number"
+        ? metadata.durationSeconds
+        : durationSeconds,
+    returnedToProcrastinationSite:
+      typeof metadata.returned === "boolean"
+        ? metadata.returned
+        : outcome !== "tab_closed",
+  });
+}
+
+async function migrateActiveSession(oldTabId, newTabId) {
+  if (
+    oldTabId === undefined ||
+    oldTabId === null ||
+    newTabId === undefined ||
+    newTabId === null
+  )
+    return;
+  const session = await storage.activeSessions.get(oldTabId);
+  if (!session) return;
+  await storage.activeSessions.remove(oldTabId);
+  await storage.activeSessions.set(newTabId, { ...session });
+}
+
+async function logDeclinedIntervention(originUrl, learningUrl) {
+  await logSessionEvent({
+    sessionType: "intervention",
+    procrastinationSite: originUrl,
+    learningSite: learningUrl,
+    triggerSource: "prompt",
+    promptResponse: "continue",
+    completedMicrolearning: false,
+    actualDurationSeconds: 0,
+    returnedToProcrastinationSite: true,
+  });
+}
+
+async function applyPreemptiveHide(tabId) {
+  if (!tabId || hiddenTabs.has(tabId)) return;
+  try {
+    await browser.scripting.insertCSS({
+      target: { tabId },
+      css: PRELOAD_HIDE_CSS,
+      origin: "USER",
+    });
+    hiddenTabs.add(tabId);
+  } catch (_) {}
+}
+
+async function removePreemptiveHide(tabId) {
+  if (!tabId || !hiddenTabs.has(tabId)) return;
+  try {
+    await browser.scripting.removeCSS({
+      target: { tabId },
+      css: PRELOAD_HIDE_CSS,
+      origin: "USER",
+    });
+  } catch (_) {}
+  hiddenTabs.delete(tabId);
+}
+
+async function showImmediatePrompt(tabId) {
+  if (!tabId) return;
+  try {
+    await browser.scripting.executeScript({
+      target: { tabId },
+      func: (overlayId) => {
+        if (document.getElementById(overlayId)) return;
+        const root = document.createElement("div");
+        root.id = overlayId;
+        root.setAttribute(
+          "style",
+          "position:fixed;inset:0;background:#030712;display:flex;align-items:center;justify-content:center;z-index:2147483645;font-family:'Inter','Segoe UI',sans-serif;color:#f8fafc;"
+        );
+        root.innerHTML = `
+          <div style="text-align:center;display:flex;flex-direction:column;gap:12px;padding:20px;max-width:280px;">
+            <div style="font-size:1rem;font-weight:600;">Preparing your focus prompt…</div>
+            <div style="font-size:0.85rem;opacity:0.8;">Hang tight while we block this site.</div>
+          </div>
+        `;
+        document.documentElement.appendChild(root);
+      },
+      args: [PREPROMPT_ID],
+    });
+  } catch (_) {}
+}
+
+async function hideImmediatePrompt(tabId) {
+  if (!tabId) return;
+  try {
+    await browser.scripting.executeScript({
+      target: { tabId },
+      func: (overlayId) => {
+        const overlay = document.getElementById(overlayId);
+        if (overlay && overlay.remove) overlay.remove();
+      },
+      args: [PREPROMPT_ID],
+    });
+  } catch (_) {}
+}
+
+function scheduleRevealOnLoad(tabId) {
+  if (!tabId) return;
+  pendingRevealTabs.add(tabId);
+}
+
+browser.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
+  if (changeInfo.status === "complete" && pendingRevealTabs.has(tabId)) {
+    pendingRevealTabs.delete(tabId);
+    await hideImmediatePrompt(tabId);
+    await removePreemptiveHide(tabId);
+  }
+});
+
+browser.webNavigation.onCommitted.addListener(async (details) => {
+  if (details.frameId !== 0) return;
+  if (pendingRevealTabs.has(details.tabId)) {
+    pendingRevealTabs.delete(details.tabId);
+    await hideImmediatePrompt(details.tabId);
+    await removePreemptiveHide(details.tabId);
+  }
+});
 
 async function addMirceaListener() {
   const url = learningSites.map((item) => {
@@ -17,16 +184,9 @@ async function addMirceaListener() {
   const filter = { url: url };
 
   async function mirceaListener(details) {
-    const user = await storage.uid.get();
-    firebase.addLog(
-      {
-        user: user,
-        event: `User went to ${details.url}`,
-        details: details,
-        date: makeDate(),
-      },
-      "learning_site"
-    );
+    const participantId = await storage.uid.get();
+    if (!participantId) return;
+
   }
 
   browser.webNavigation.onBeforeNavigate.addListener(mirceaListener, filter);
@@ -221,6 +381,7 @@ async function onOriginRemoved(details) {
               storage.origin.set({ url: replacement.url, tabId: replacement.id });
               addOriginUpdatedListener(replacement.id);
               setTimeout(() => triggerLearningOverlay(replacement.id), 150);
+              await migrateActiveSession(details, replacement.id);
               migrated = true;
             }
           } catch (error) {
@@ -234,6 +395,11 @@ async function onOriginRemoved(details) {
         removeOriginUpdatedListener();
         removeAllContentBlockers();
         storage.origin.remove();
+        await finalizeTrackedSession(details, "tab_closed", {
+          sourceType: "tab_removed",
+          completed: false,
+          returned: false,
+        });
         timer.stopBonusTime(); // Without this badge goes "Done". This is bad. Maybe I'll fix it later.
         timer.stopLearningSession(); // This is fine
         storage.shouldRedirect.set(true);
@@ -312,6 +478,8 @@ async function messageLearningResource(details) {
       return;
     }
 
+    await hideImmediatePrompt(details.tabId);
+    await removePreemptiveHide(details.tabId);
     shouldShowWelcome = false;
     const { action, source } = response;
     if (action === "continue") {
@@ -351,7 +519,13 @@ async function checkActiveTab() {
         addRedirectionLog(
           `Interception: initiating countdown`,
           tabSiteName,
-          parseUrl(learningUri).name
+          parseUrl(learningUri).name,
+          {
+            eventType: "redirection_prompt",
+            action: "prompt_shown",
+            procrastinationUrl: tab.url,
+            learningUrl: learningUri,
+          }
         );
         talkToContent(tab.id, learningUri, tab.url);
       }
@@ -430,6 +604,15 @@ async function gotoOrigin(event, sourceContext = {}) {
       const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
       targetTabId = activeTab?.id;
     } catch (_) {}
+  }
+
+  const sessionTabId = targetTabId !== undefined ? targetTabId : origin?.tabId;
+  if (sessionTabId !== undefined) {
+    await finalizeTrackedSession(sessionTabId, normalizedEvent, {
+      sourceType,
+      completed: normalizedEvent === "continue",
+      returned: normalizedEvent !== "tab_closed",
+    });
   }
 
   removeOriginUpdatedListener();
@@ -516,7 +699,12 @@ async function gotoOrigin(event, sourceContext = {}) {
       addRedirectionLog(
         `Go to origin: ${normalizedEvent}, source: ${sourceType || "unknown"}`,
         parseUrl(currentLearning).name,
-        parseUrl(destinationUrl).name
+        parseUrl(destinationUrl).name,
+        {
+          action: normalizedEvent,
+          source: sourceType,
+          procrastinationUrl: destinationUrl,
+        }
       );
     } catch (error) {
       l(error);
@@ -542,6 +730,8 @@ async function gotoOrigin(event, sourceContext = {}) {
 
 async function talkToContent(tabId, url, originUrl, attempt = 0) {
   try {
+    await applyPreemptiveHide(tabId);
+    await showImmediatePrompt(tabId);
     const result = await browser.tabs.sendMessage(tabId, {
       action: "display: redirectPrompt",
       url: url,
@@ -556,23 +746,43 @@ async function talkToContent(tabId, url, originUrl, attempt = 0) {
       try {
         await storage.stats.skip();
       } catch (_) {}
+      await logDeclinedIntervention(originUrl, url);
       addRedirectionLog(
         `Interception: continue on procrastination site`,
         parseUrl(originUrl).name,
-        parseUrl(url).name
+        parseUrl(url).name,
+        {
+          eventType: "redirection_decision",
+          action: "continue",
+          continueTap: true,
+          decision: "stay",
+          procrastinationUrl: originUrl,
+          learningUrl: url,
+        }
       );
+      await hideImmediatePrompt(tabId);
+      await removePreemptiveHide(tabId);
     } else if (result && result.action === "redirect") {
       addLearningSiteLoadedListener();
+      await startTrackedSession(tabId, originUrl, url);
       addRedirectionLog(
         `Interception: user redirected to learning platform`,
         parseUrl(originUrl).name,
-        parseUrl(url).name
+        parseUrl(url).name,
+        {
+          eventType: "redirection_decision",
+          action: "redirect",
+          decision: "accept",
+          procrastinationUrl: originUrl,
+          learningUrl: url,
+        }
       );
       await timer.startLearningSession();
       storage.origin.set({ url: originUrl, tabId: tabId });
       addOriginUpdatedListener(tabId);
       await storage.promptLocks.remove(tabId);
       try {
+        scheduleRevealOnLoad(tabId);
         await browser.tabs.update(tabId, {
           url: url,
         });
@@ -587,25 +797,31 @@ async function talkToContent(tabId, url, originUrl, attempt = 0) {
         talkToContent(tabId, url, originUrl, attempt + 1);
       }, 100);
     } else {
-      // console.log(error.message);
+      await hideImmediatePrompt(tabId);
+      await removePreemptiveHide(tabId);
     }
   }
 }
 
-async function addRedirectionLog(event, from, to) {
-  const user = await storage.uid.get();
+async function addRedirectionLog(event, from, to, details = {}) {
+  const participantId = await storage.uid.get();
+  if (!participantId) return;
   const timeSettings = await storage.timeSettings.getAll();
-  firebase.addLog(
-    {
-      user: user,
-      event: event,
-      from: from,
-      to: to,
-      timeSettings: timeSettings,
-      date: makeDate(),
-    },
-    "redirection"
-  );
+  const { eventType = "redirection", ...rest } = details || {};
+  const metadata = {
+    event,
+    decision: rest.decision,
+    continueTap: rest.continueTap,
+    timeSettings,
+  };
+
+  logEvent({
+    sessionType: eventType,
+    procrastinationSite: rest.procrastinationUrl || from,
+    learningSite: rest.learningUrl || to,
+    promptResponse: JSON.stringify(metadata),
+    participantId,
+  });
 }
 
 async function renderContentBlocker(details) {
@@ -617,10 +833,16 @@ async function renderContentBlocker(details) {
     }
     storage.promptLocks.remove(details.tabId);
     try {
+      await applyPreemptiveHide(details.tabId);
+      await showImmediatePrompt(details.tabId);
       l("Sending block request to content");
       await browser.tabs.sendMessage(details.tabId, {
         action: "inject blocker",
       });
+      setTimeout(() => {
+        hideImmediatePrompt(details.tabId).catch(() => {});
+        removePreemptiveHide(details.tabId).catch(() => {});
+      }, 150);
     } catch (error) {
       // l(error);
     }
@@ -630,6 +852,8 @@ async function renderContentBlocker(details) {
 async function removeContentBlocker(tabId) {
   l("Removing blocker on tab ", tabId);
   try {
+    await hideImmediatePrompt(tabId);
+    await removePreemptiveHide(tabId);
     await storage.blockedOrigins.remove(tabId);
     await storage.blockedTabs.remove(tabId);
     await storage.promptLocks.remove(tabId);

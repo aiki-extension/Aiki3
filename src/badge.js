@@ -1,36 +1,223 @@
-// Functions to control the badge on the extension toolbar icon.
+// Badge rendering helpers that keep the default icon visible,
+// add a remaining-minutes label, and overlay a slim progress strip.
 
-// Prefer Manifest V3 `chrome.action` API, with fallbacks for older namespaces.
-const actionApi = (typeof chrome !== 'undefined' && (chrome.action || chrome.browserAction));
+const actionApi = typeof chrome !== "undefined" && (chrome.action || chrome.browserAction);
+const ICON_SIZES = [32, 48, 64, 96, 128];
+const MAX_ICON_DIMENSION = 128;
+const BASE_ICON_PATH = (typeof chrome !== "undefined" && chrome.runtime?.getURL)
+  ? chrome.runtime.getURL("images/AikiLogo.png")
+  : "images/AikiLogo.png";
 
-function setText(value) {
-  if (actionApi && actionApi.setBadgeText) {
-    actionApi.setBadgeText({ text: String(value) });
+const STRIP_STOPS = [
+  { stop: 0, color: { r: 239, g: 68, b: 68 } }, // red
+  { stop: 0.5, color: { r: 234, g: 179, b: 8 } }, // yellow
+  { stop: 1, color: { r: 34, g: 197, b: 94 } }, // green
+];
+
+let lastLabel = "";
+let lastPercent = 0;
+let baseIconBitmapPromise = null;
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function lerpColor(stops, ratio) {
+  for (let i = 0; i < stops.length - 1; i++) {
+    const current = stops[i];
+    const next = stops[i + 1];
+    if (ratio >= current.stop && ratio <= next.stop) {
+      const localT = (ratio - current.stop) / (next.stop - current.stop || 1);
+      const r = Math.round(current.color.r + (next.color.r - current.color.r) * localT);
+      const g = Math.round(current.color.g + (next.color.g - current.color.g) * localT);
+      const b = Math.round(current.color.b + (next.color.b - current.color.b) * localT);
+      return `rgb(${r}, ${g}, ${b})`;
+    }
+  }
+  const last = stops[stops.length - 1].color;
+  return `rgb(${last.r}, ${last.g}, ${last.b})`;
+}
+
+function createSurface(size) {
+  const scale = (() => {
+    if (typeof devicePixelRatio === "number") {
+      const scaled = size * devicePixelRatio;
+      if (scaled <= MAX_ICON_DIMENSION) return devicePixelRatio;
+    }
+    return Math.min(2, MAX_ICON_DIMENSION / size);
+  })();
+  const width = Math.round(size * scale);
+  const CanvasCtor = typeof OffscreenCanvas !== "undefined" ? OffscreenCanvas : null;
+  let canvas = CanvasCtor ? new CanvasCtor(width, width) : null;
+
+  if (!canvas && typeof document !== "undefined") {
+    canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = width;
+  }
+
+  if (!canvas) return null;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  ctx.scale(scale, scale);
+  return { canvas, ctx, pixelSize: width };
+}
+
+async function loadBaseIcon() {
+  if (baseIconBitmapPromise) return baseIconBitmapPromise;
+  baseIconBitmapPromise = (async () => {
+    try {
+      const response = await fetch(BASE_ICON_PATH);
+      const blob = await response.blob();
+      if (typeof createImageBitmap === "function") {
+        return await createImageBitmap(blob);
+      }
+      // Fallback for environments without createImageBitmap (unlikely in MV3)
+      if (typeof Image !== "undefined") {
+        return await new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => resolve(img);
+          img.onerror = reject;
+          img.src = URL.createObjectURL(blob);
+        });
+      }
+    } catch (_) {}
+    return null;
+  })();
+  return baseIconBitmapPromise;
+}
+
+function roundRect(ctx, x, y, width, height, radius) {
+  const r = Math.min(radius, width / 2, height / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + width - r, y);
+  ctx.arcTo(x + width, y, x + width, y + r, r);
+  ctx.lineTo(x + width, y + height - r);
+  ctx.arcTo(x + width, y + height, x + width - r, y + height, r);
+  ctx.lineTo(x + r, y + height);
+  ctx.arcTo(x, y + height, x, y + height - r, r);
+  ctx.lineTo(x, y + r);
+  ctx.arcTo(x, y, x + r, y, r);
+  ctx.closePath();
+}
+
+function drawOverlay(ctx, size, label, percent) {
+  const stripHeight = Math.max(8, size * 0.32);
+  const stripInset = size * 0.06;
+  const stripWidth = size - stripInset * 2;
+  const stripY = size - stripHeight - stripInset * 0.1;
+
+  ctx.fillStyle = "rgba(15,23,42,0.65)";
+  roundRect(ctx, stripInset, stripY, stripWidth, stripHeight, stripHeight / 2);
+  ctx.fill();
+
+  const barWidth = Math.max(stripHeight * 0.4, stripWidth * clamp(percent, 0, 1));
+  if (barWidth > 0) {
+    const barRadius = stripHeight / 2;
+    ctx.fillStyle = "rgba(255,255,255,0.08)";
+    roundRect(ctx, stripInset, stripY, barWidth, stripHeight, barRadius);
+    ctx.fill();
+
+    ctx.fillStyle = lerpColor(STRIP_STOPS, percent);
+    roundRect(ctx, stripInset, stripY, barWidth, stripHeight, barRadius);
+    ctx.fill();
+  }
+
+  const fontSize = Math.max(14, size * 0.5);
+  ctx.font = `600 ${fontSize}px 'Inter', 'Segoe UI', sans-serif`;
+  ctx.fillStyle = "#ffffff";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  const textY = size / 2 - stripHeight * 0.3;
+
+  ctx.shadowColor = "rgba(0,0,0,0.35)";
+  ctx.shadowBlur = 3;
+  ctx.fillText(label, size / 2, textY);
+  ctx.shadowBlur = 0;
+}
+
+async function renderIcon(label, percent) {
+  if (!actionApi || !actionApi.setIcon) {
+    actionApi?.setBadgeText?.({ text: label });
+    return;
+  }
+
+  const baseBitmap = await loadBaseIcon();
+  if (!baseBitmap) {
+    actionApi?.setBadgeText?.({ text: label });
+    return;
+  }
+
+  const imageDataMap = {};
+  for (const size of ICON_SIZES) {
+    const surface = createSurface(size);
+    if (!surface) {
+      actionApi?.setBadgeText?.({ text: label });
+      return;
+    }
+    const { ctx, pixelSize } = surface;
+    ctx.clearRect(0, 0, size, size);
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.drawImage(baseBitmap, 0, 0, size, size);
+    ctx.restore();
+
+    drawOverlay(ctx, size, label, percent);
+    try {
+      const data = ctx.getImageData(0, 0, pixelSize, pixelSize);
+      imageDataMap[pixelSize] = data;
+    } catch (_) {
+      actionApi?.setBadgeText?.({ text: label });
+      return;
+    }
+  }
+
+  try {
+    actionApi.setIcon({ imageData: imageDataMap });
+  } catch (_) {
+    actionApi?.setBadgeText?.({ text: label });
   }
 }
 
-function setBusy() {
-  if (actionApi && actionApi.setBadgeBackgroundColor) {
-    actionApi.setBadgeBackgroundColor({ color: 'limegreen' });
-  }
+function setProgress(label, percent = 0) {
+  lastLabel = label;
+  lastPercent = percent;
+  renderIcon(label, percent).catch(() => {
+    actionApi?.setBadgeText?.({ text: label });
+  });
+}
+
+function setText(value) {
+  setProgress(String(value), lastPercent);
+}
+
+function setBusy(totalMillis = 0, remainingMillis = 0) {
+  const percent = totalMillis > 0 ? 1 - remainingMillis / totalMillis : lastPercent;
+  setProgress(lastLabel || "--", percent);
 }
 
 function setDone() {
-  if (actionApi && actionApi.setBadgeBackgroundColor) {
-    actionApi.setBadgeBackgroundColor({ color: 'deepskyblue' });
-  }
+  setProgress("✓", 1);
 }
 
 function remove() {
-  if (actionApi && actionApi.setBadgeText) {
-    actionApi.setBadgeText({ text: '' });
+  lastLabel = "";
+  lastPercent = 0;
+  if (actionApi && actionApi.setIcon) {
+    try {
+      actionApi.setIcon({ imageData: {} });
+    } catch (_) {}
   }
+  actionApi?.setBadgeText?.({ text: "" });
 }
 
 export default {
+  setProgress,
   setText,
   setBusy,
   setDone,
   remove,
-}
-  
+};

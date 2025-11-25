@@ -5,8 +5,7 @@
 <script>
   import Container from "./Container.svelte";
   import storage from "../../../util/storage";
-  import firebase from "../../../util/firebase";
-  import { makeDate } from "../../../util/utilities";
+  import { logAuditEvent, resetParticipantCache } from "../../../util/logger";
   import Fa from "svelte-fa";
   import { faUserSlash, faUserPlus } from "@fortawesome/free-solid-svg-icons";
   import { toast } from "@zerodevx/svelte-toast";
@@ -16,27 +15,31 @@
   export let userIsRegistered;
   export let port;
   let toastCoords = { y: "id-input-field", x: "user-settings" };
+  let previousUser = "";
 
   async function setup() {
     user = await storage.uid.get();
     userIsRegistered = user !== "" ? true : false;
+    previousUser = user || "";
   }
 
-  function confirmUid() {
+  async function confirmUid() {
     const confirmation = confirm(
       "Are you certain the provided email is correct?"
     );
     if (confirmation) {
+      const oldValue = previousUser || "";
+      await resetParticipantCache();
       storage.uid.set(user);
-      let date = makeDate();
-      firebase.addLog(
-        {
-          user: user,
-          event: "Added user ID to storage",
-          date: date,
-        },
-        "config"
-      );
+      previousUser = user;
+      await logAuditEvent({
+        participantId: user,
+        action: "register_participant",
+        settingName: "participant_id",
+        oldValue,
+        newValue: user,
+        participantUpdates: { is_extension_active: true },
+      });
       userIsRegistered = true;
       port.postMessage(`Update: user`);
       setTimeout(() => {
@@ -47,22 +50,25 @@
     }
   }
 
-  function resetUid() {
+  async function resetUid() {
     const confirmation = confirm(
       "Are you certain you want to reset your email?"
     );
     if (confirmation) {
-      firebase.addLog(
-        {
-          user: user,
-          event: "Reset user ID in storage",
-          date: makeDate(),
-        },
-        "config"
-      );
+      const oldValue = previousUser || user;
+      await logAuditEvent({
+        participantId: user,
+        action: "reset_participant",
+        settingName: "participant_id",
+        oldValue,
+        newValue: "",
+        participantUpdates: { is_extension_active: false },
+      });
+      await resetParticipantCache();
       storage.uid.set("");
       userIsRegistered = false;
       user = "";
+      previousUser = "";
       port.postMessage(`Update: user`);
     }
   }

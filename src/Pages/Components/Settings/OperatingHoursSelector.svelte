@@ -4,8 +4,7 @@
  -->
 <script>
   import storage from "../../../util/storage";
-  import firebase from "../../../util/firebase";
-  import { makeDate } from "../../../util/utilities";
+  import { logAuditEvent } from "../../../util/logger";
 
   let hourOptions = Array.from({ length: 25 }, (_, i) => i);
   let minuteOptions = [0, 15, 30, 45];
@@ -21,38 +20,38 @@
     return number < 10 ? `0${number}` : number;
   }
 
-  function setActiveTo() {
+  async function setActiveTo() {
+    const previous = settings.activeTo ? { ...settings.activeTo } : { hrs: hrsTo, min: minTo };
     const setting = { hrs: hrsTo, min: minTo };
     storage.operatingHours.to.set(setting);
-    firebase.addLog(
-      {
-        user: user,
-        event: "User changed operating hours in settings",
-        operatingHoursTo: setting,
-        date: makeDate(),
-      },
-      "config"
-    );
+    await logAuditEvent({
+      participantId: user,
+      action: "update_operating_hours",
+      settingName: "active_to",
+      oldValue: previous,
+      newValue: setting,
+    });
     update();
   }
 
-  function setActiveFrom() {
+  async function setActiveFrom() {
     if (hrsTo < hrsFrom) {
       hrsTo = hrsFrom === 24 ? hrsFrom : hrsFrom + 1;
 
       storage.operatingHours.from.set({ hrs: hrsTo, min: minTo });
     }
+    const previous = settings.activeFrom
+      ? { ...settings.activeFrom }
+      : { hrs: hrsFrom, min: minFrom };
     const setting = { hrs: hrsFrom, min: minFrom };
     storage.operatingHours.from.set(setting);
-    firebase.addLog(
-      {
-        user: user,
-        event: "User changed operating hours in settings",
-        operatingHoursFrom: setting,
-        date: makeDate(),
-      },
-      "config"
-    );
+    await logAuditEvent({
+      participantId: user,
+      action: "update_operating_hours",
+      settingName: "active_from",
+      oldValue: previous,
+      newValue: setting,
+    });
     update();
   }
 

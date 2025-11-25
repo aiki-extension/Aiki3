@@ -1,1 +1,31 @@
-/* Blocker */ .aiki-button.svelte-2gjqkm:hover { background-color: #208934 !important; border-color: #208934 !important; } /* Learning */ .aiki-button.svelte-fugj2p.svelte-fugj2p:hover { background-color: #208934 !important; border-color: #208934 !important; } .aiki-button.svelte-fugj2p.svelte-fugj2p:disabled { opacity: 0.5; background-color: #6c757d !important; border-color: #6c757d !important; cursor: not-allowed !important; } .aiki-button.svelte-fugj2p.svelte-fugj2p:disabled:hover { background-color: #6c757d !important; border-color: #6c757d !important; cursor: not-allowed !important; } .aiki-close-container.svelte-fugj2p:hover .aiki-leftright.svelte-fugj2p { transform: rotate(-45deg) !important; background-color: #dc3545 !important; } .aiki-close-container.svelte-fugj2p:hover .aiki-rightleft.svelte-fugj2p { transform: rotate(45deg) !important; background-color: #dc3545 !important; } /* Proc warning */ .aiki-button.svelte-olfdf2:hover { background-color: #0068d6 !important; }
+/* Blocker */
+.aiki-button.svelte-2gjqkm:hover {
+  background-color: #208934 !important;
+  border-color: #208934 !important;
+} /* Learning */
+.aiki-button.svelte-fugj2p.svelte-fugj2p:hover {
+  background-color: #208934 !important;
+  border-color: #208934 !important;
+}
+.aiki-button.svelte-fugj2p.svelte-fugj2p:disabled {
+  opacity: 0.5;
+  background-color: #6c757d !important;
+  border-color: #6c757d !important;
+  cursor: not-allowed !important;
+}
+.aiki-button.svelte-fugj2p.svelte-fugj2p:disabled:hover {
+  background-color: #6c757d !important;
+  border-color: #6c757d !important;
+  cursor: not-allowed !important;
+}
+.aiki-close-container.svelte-fugj2p:hover .aiki-leftright.svelte-fugj2p {
+  transform: rotate(-45deg) !important;
+  background-color: #dc3545 !important;
+}
+.aiki-close-container.svelte-fugj2p:hover .aiki-rightleft.svelte-fugj2p {
+  transform: rotate(45deg) !important;
+  background-color: #dc3545 !important;
+} /* Proc warning */
+.aiki-button.svelte-olfdf2:hover {
+  background-color: #0068d6 !important;
+}

@@ -5,8 +5,8 @@
 <script>
   import Container from "./Container.svelte";
   import storage from "../../../util/storage";
-  import firebase from "../../../util/firebase";
-  import { parseUrl, makeDate } from "../../../util/utilities";
+  import { logAuditEvent } from "../../../util/logger";
+  import { parseUrl } from "../../../util/utilities";
   import Fa from "svelte-fa";
   import {
     faTrashAlt,
@@ -55,20 +55,19 @@
   setup();
   let addItemValue = "";
 
-  function removeItem(index) {
-    firebase.addLog(
-      {
-        user: user,
-        event: "User removed procrastination site",
-        site: list[index],
-        date: makeDate(),
-      },
-      "config"
-    );
+  async function removeItem(index) {
+    const removedHost = list[index]?.host || "";
     let newList = [...list];
     newList.splice(index, 1);
     list = newList;
     storage.list.set(list);
+    await logAuditEvent({
+      participantId: user,
+      action: "remove_site",
+      settingName: "procrastination_site",
+      oldValue: removedHost,
+      newValue: "",
+    });
     port.postMessage(`Update: list`);
     toast.pop();
     toast.push("Website removed!", {
@@ -94,15 +93,13 @@
       newList.push(site);
       list = newList;
       storage.list.set(list);
-      firebase.addLog(
-        {
-          user: user,
-          event: "User added procrastination site",
-          site: site,
-          date: makeDate(),
-        },
-        "config"
-      );
+      await logAuditEvent({
+        participantId: user,
+        action: "add_site",
+        settingName: "procrastination_site",
+        oldValue: "",
+        newValue: site?.host || "",
+      });
       port.postMessage(`Update: list`);
       addItemValue = "";
       toast.pop();
