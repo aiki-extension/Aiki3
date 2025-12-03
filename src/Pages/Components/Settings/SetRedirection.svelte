@@ -6,6 +6,7 @@
   // Functional and module imports
   import storage from "../../../util/storage";
   import { onMount, tick } from "svelte";
+  import { saveUserPreferences } from "../../../util/logger";
   import { toast } from "@zerodevx/svelte-toast";
   import * as themes from "./util/toastThemes";
 
@@ -63,6 +64,18 @@
 
     learningUri = uri;
     await storage.learningUri.set(uri);
+    
+    // Sync to backend
+    try {
+      const participantId = user || (await storage.uid.get());
+      await saveUserPreferences({
+        participantId,
+        learning_sites: [uri],
+      });
+    } catch (e) {
+      console.warn("Failed to sync learning site preference", e);
+    }
+
     hasSaved = true;
     isEditing = false;
     toast.pop();

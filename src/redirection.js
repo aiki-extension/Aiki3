@@ -38,10 +38,11 @@ async function finalizeTrackedSession(tabId, outcome = "continue", metadata = {}
   const session = await storage.activeSessions.get(tabId);
   if (!session) return;
   await storage.activeSessions.remove(tabId);
-  const durationSeconds = Math.max(
-    0,
-    Math.round((Date.now() - (session.startedAt || Date.now())) / 1000)
-  );
+  
+  const now = Date.now();
+  const startedAt = session.startedAt || now;
+  const durationSeconds = Math.max(0, Math.round((now - startedAt) / 1000));
+  
   await logSessionEvent({
     participantId: session.participantId,
     sessionType: session.sessionType || "intervention",
@@ -49,6 +50,9 @@ async function finalizeTrackedSession(tabId, outcome = "continue", metadata = {}
     learningSite: session.learningUrl,
     triggerSource: metadata.sourceType || "extension",
     promptResponse: "redirect",
+    decision: "accept",
+    sessionStart: new Date(startedAt),
+    sessionEnd: new Date(now),
     completedMicrolearning:
       typeof metadata.completed === "boolean"
         ? metadata.completed
@@ -85,6 +89,7 @@ async function logDeclinedIntervention(originUrl, learningUrl) {
     learningSite: learningUrl,
     triggerSource: "prompt",
     promptResponse: "continue",
+    decision: "stay",
     completedMicrolearning: false,
     actualDurationSeconds: 0,
     returnedToProcrastinationSite: true,

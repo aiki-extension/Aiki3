@@ -598,6 +598,19 @@ function normalizeSessionKey(tabId) {
   return String(tabId);
 }
 
+async function setUserPreferencesId(id) {
+  if (id && typeof id === "string") {
+    storage.set({ userPreferencesId: id });
+  } else {
+    storage.remove("userPreferencesId");
+  }
+}
+
+async function getUserPreferencesId() {
+  const result = await storage.get("userPreferencesId");
+  return result && result.userPreferencesId ? result.userPreferencesId : null;
+}
+
 async function setActiveSession(tabId, session) {
   const key = normalizeSessionKey(tabId);
   if (!key || !session) return;
@@ -696,6 +709,10 @@ export default {
     get: getParticipantRecord,
     set: setParticipantRecord,
     clear: clearParticipantRecord,
+  },
+  userPreferencesId: {
+    get: getUserPreferencesId,
+    set: setUserPreferencesId,
   },
   activeSessions: {
     set: setActiveSession,

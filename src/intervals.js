@@ -1,6 +1,6 @@
 import browser from "webextension-polyfill";
 import storage from "./util/storage";
-import { logEvent } from "./util/logger";
+import { logEvent, logSessionEvent } from "./util/logger";
 import { parseUrl } from "./util/utilities";
 import { learningSites } from "./util/constants";
 
@@ -89,6 +89,20 @@ async function syncList() {
   list = result ? result.map((item) => item.name) : [];
 }
 
+function calculateCategoryTime(data, siteList) {
+  let totalSeconds = 0;
+  const siteDetails = [];
+
+  Object.entries(data).forEach(([name, seconds]) => {
+    if (typeof seconds === "number" && siteList.includes(name)) {
+      totalSeconds += seconds;
+      siteDetails.push({ name, seconds });
+    }
+  });
+
+  return { totalSeconds, siteDetails };
+}
+
 function storeData(data) {
   if (!user) return;
   storage.stats.storeSession(data);
@@ -100,18 +114,23 @@ function storeData(data) {
     return acc;
   }, {});
 
-  let procrastinationSeconds = 0;
-  let learningSeconds = 0;
-  Object.entries(perSiteSeconds).forEach(([name, seconds]) => {
-    if (list && list.includes(name)) {
-      procrastinationSeconds += seconds;
-    } else if (learningSites.find((site) => site.name === name)) {
-      learningSeconds += seconds;
-    }
+  const learningList = learningSites.map((s) => s.name);
+  
+  const procrastination = calculateCategoryTime(perSiteSeconds, list || []);
+  const learning = calculateCategoryTime(perSiteSeconds, learningList);
+
+  procrastination.siteDetails.forEach((site) => {
+    logSessionEvent({
+      participantId: user,
+      sessionType: "procrastination",
+      siteVisited: site.name,
+      durationSeconds: site.seconds,
+      timestamp: Date.now(),
+      triggeredBySite: null, 
+    });
   });
 
 
-}
 
 function resetData() {
   data = {

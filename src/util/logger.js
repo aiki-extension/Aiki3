@@ -2,14 +2,7 @@ import { BACK4APP_CONFIG } from "./back4appConfig";
 import storage from "./storage";
 import { parseUrl } from "./utilities";
 
-const EXT_VERSION = (() => {
-  try {
-    if (typeof chrome !== "undefined" && chrome.runtime?.getManifest) {
-      return chrome.runtime.getManifest().version || "unknown";
-    }
-  } catch (_) {}
-  return "unknown";
-})();
+const EXT_VERSION = "decision-based-redirection";
 
 const PARSE_BASE_URL = BACK4APP_CONFIG?.serverURL || "https://parseapi.back4app.com";
 const participantCache = new Map();
@@ -23,8 +16,19 @@ function toParseDate(value) {
   return { __type: "Date", iso: date.toISOString() };
 }
 
+function toIso(value) {
+  if (!value) return null;
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === "number") return new Date(value).toISOString();
+  if (typeof value === "string") return value;
+  if (typeof value === "object" && value.iso) return value.iso;
+  return null;
+}
+
 async function getParticipantId(explicit) {
-  if (explicit && explicit.trim().length > 0) return explicit.trim();
+  if (explicit && typeof explicit === "string" && explicit.trim().length > 0) {
+    return explicit.trim();
+  }
   try {
     const stored = await storage.uid.get();
     if (stored && typeof stored === "string" && stored.trim().length > 0) {
@@ -32,41 +36,6 @@ async function getParticipantId(explicit) {
     }
   } catch (_) {}
   return null;
-}
-
-function domainFromUrl(value) {
-  if (typeof value !== "string" || value.trim().length === 0) return undefined;
-  try {
-    const parsed = parseUrl(value);
-    if (parsed?.host) return parsed.host;
-    if (parsed?.name) return parsed.name;
-  } catch (_) {}
-  try {
-    const url = new URL(value);
-    return url.host;
-  } catch (error) {
-    return value;
-  }
-}
-
-function pruneUndefined(object) {
-  return Object.entries(object).reduce((acc, [key, value]) => {
-    if (value !== undefined) acc[key] = value;
-    return acc;
-  }, {});
-}
-
-function stringifyValue(value) {
-  if (value === undefined) return undefined;
-  if (typeof value === "string") return value;
-  try {
-    return JSON.stringify(value);
-  } catch (_) {
-    if (typeof value === "number" || typeof value === "boolean") {
-      return String(value);
-    }
-  }
-  return undefined;
 }
 
 async function parseRequest(path, options = {}) {
@@ -96,32 +65,18 @@ async function parseRequest(path, options = {}) {
 }
 
 function toParticipantPointer(record) {
-  if (!record?.objectId) return undefined;
-  return {
-    __type: "Pointer",
-    className: "Participants",
-    objectId: record.objectId,
-  };
+  if (!record?.objectId) return null;
+  return { __type: "Pointer", className: "Participants", objectId: record.objectId };
 }
 
 function normalizeParticipantRecord(record, participantId) {
-  if (!record || !record.objectId) return null;
-  const installDate =
-    (record.install_date && record.install_date.iso) || record.install_date || null;
+  if (!record) return null;
   return {
     objectId: record.objectId,
-    participant_id: participantId,
-    install_date: installDate,
+    participant_id: record.participant_id || record.participantId || participantId,
+    assigned_version: record.assigned_version || record.assignedVersion,
+    install_date: toIso(record.install_date || record.installDate),
   };
-}
-
-async function findParticipant(participantId) {
-  const where = encodeURIComponent(JSON.stringify({ participant_id: participantId }));
-  const response = await parseRequest(`/classes/Participants?where=${where}&limit=1`);
-  if (response && Array.isArray(response.results) && response.results.length > 0) {
-    return response.results[0];
-  }
-  return null;
 }
 
 async function createParticipant(participantId) {
@@ -130,78 +85,85 @@ async function createParticipant(participantId) {
     participant_id: participantId,
     assigned_version: EXT_VERSION,
     install_date: now,
-    last_active_date: now,
-    is_extension_active: true,
   };
   const response = await parseRequest("/classes/Participants", {
     method: "POST",
     body: JSON.stringify(payload),
   });
-  if (response?.objectId) {
-    return {
-      objectId: response.objectId,
-      participant_id: participantId,
-      install_date: now.iso,
-    };
+  if (!response?.objectId) return null;
+  
+  // Initialize default preferences
+  const participantRecord = normalizeParticipantRecord({ ...payload, ...response }, participantId);
+  try {
+    const pointer = toParticipantPointer(participantRecord);
+    if (pointer) {
+      const prefsPayload = sanitizeUserPreferences({
+        is_active: true,
+        learning_time_minutes: 30,
+        procrastination_reward_minutes: 5,
+      }, pointer);
+      
+      if (prefsPayload) {
+        const prefsResponse = await parseRequest("/classes/UserPreferences", {
+          method: "POST",
+          body: JSON.stringify(prefsPayload),
+        });
+        if (prefsResponse?.objectId) {
+          await storage.userPreferencesId.set(prefsResponse.objectId);
+        }
+      }
+    }
+  } catch (e) {
+    console.warn("Failed to initialize default preferences", e);
   }
-  return null;
+
+  return participantRecord;
 }
 
 async function cacheParticipant(record) {
-  if (!record?.participant_id) return record;
-  participantCache.set(record.participant_id, record);
-  await storage.participantRecord.set(record);
+  const key = record?.participant_id || record?.participantId;
+  if (!key) return record;
+  const normalized = normalizeParticipantRecord(
+    { ...record, participant_id: key },
+    key
+  );
+  if (!normalized) return record;
+  participantCache.set(key, normalized);
+  await storage.participantRecord.set(normalized);
   return record;
 }
 
 async function ensureParticipant(participantId) {
   if (!participantId) return null;
+  
+  // 1. Check Memory Cache
   if (participantCache.has(participantId)) {
-    return participantCache.get(participantId);
+    const cached = participantCache.get(participantId);
+    if (cached?.objectId) return cached;
   }
 
+  // 2. Check Local Storage
   const stored = await storage.participantRecord.get();
-  if (stored?.participant_id === participantId && stored.objectId) {
-    participantCache.set(participantId, stored);
-    return stored;
-  }
-
-  const existing = await findParticipant(participantId);
-  if (existing) {
-    const normalized = normalizeParticipantRecord(existing, participantId);
-    if (normalized) {
-      return cacheParticipant(normalized);
+  const storedId = stored?.participant_id || stored?.participantId;
+  
+  // We must have both the matching ID and the Parse objectId
+  if (storedId === participantId && stored?.objectId) {
+    const normalized = normalizeParticipantRecord(stored, participantId);
+    if (normalized?.objectId) {
+      participantCache.set(participantId, normalized);
+      return normalized;
     }
   }
 
+  // 3. Fallback: Create New (Registration)
+  // We do NOT query (findParticipant) because public find access is disabled.
+  // If the ID exists but we lost the objectId, we just create a new record (or duplicate).
   const created = await createParticipant(participantId);
-  if (created) {
+  if (created?.objectId) {
     return cacheParticipant(created);
   }
+  
   return null;
-}
-
-async function updateParticipantRecord(record, updates = {}) {
-  if (!record?.objectId || !updates || Object.keys(updates).length === 0) return;
-  await parseRequest(`/classes/Participants/${record.objectId}`, {
-    method: "PUT",
-    body: JSON.stringify(updates),
-  });
-}
-
-function getStudyDay(record) {
-  const iso = record?.install_date?.iso || record?.install_date;
-  if (!iso) return undefined;
-  try {
-    const installDate = new Date(iso);
-    installDate.setHours(0, 0, 0, 0);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const diff = Math.floor((today - installDate) / (24 * 60 * 60 * 1000));
-    return diff >= 0 ? diff + 1 : undefined;
-  } catch (_) {
-    return undefined;
-  }
 }
 
 export async function resetParticipantCache() {
@@ -209,150 +171,224 @@ export async function resetParticipantCache() {
   await storage.participantRecord.clear();
 }
 
-function shouldLogAsAudit(eventType) {
-  return eventType === "config";
-}
-
-function buildPromptResponse(event) {
-  // If it's already a string, return it
-  if (typeof event.promptResponse === "string") return event.promptResponse;
-  
-  // If it's an object, try to stringify it
-  if (event.promptResponse && typeof event.promptResponse === "object") {
-    try {
-      return JSON.stringify(event.promptResponse);
-    } catch (_) {}
+function toDomainOnly(urlValue) {
+  if (!urlValue || typeof urlValue !== "string") return undefined;
+  try {
+    const parsed = parseUrl(urlValue);
+    if (parsed?.host) return parsed.host;
+    if (parsed?.name) return parsed.name;
+  } catch (_) {}
+  try {
+    const u = new URL(urlValue);
+    return u.host;
+  } catch (_) {
+    return urlValue;
   }
-  
-  return undefined;
 }
 
-function buildSessionPayload(event = {}) {
-  return pruneUndefined({
-    participantId: event.participantId,
-    sessionType: event.sessionType || "event",
-    learningSite: event.learningSite,
-    procrastinationSite: event.procrastinationSite,
-    triggerSource: event.triggerSource,
-    promptResponse: buildPromptResponse(event),
-    completedMicrolearning: event.completedMicrolearning,
-    actualDurationSeconds: event.actualDurationSeconds,
-    returnedToProcrastinationSite: event.returnedToProcrastinationSite,
-  });
+function sanitizeEventPayload(event, participantPointer) {
+  if (!participantPointer) return null;
+
+  const eventType =
+    (typeof event.eventType === "string" && event.eventType.trim()) ||
+    (typeof event.sessionType === "string" && event.sessionType.trim()) ||
+    (typeof event.action === "string" && event.action.trim()) ||
+    "event";
+
+  const payload = {
+    participant_id: participantPointer,
+    event_type: eventType,
+    timestamp: toParseDate(event.timestamp || Date.now()),
+  };
+
+  if (typeof event.decision === "string" && event.decision.trim()) {
+    payload.decision = event.decision.trim();
+  }
+  if (event.sessionPointer) {
+    payload.session_id = event.sessionPointer;
+  }
+
+  return payload;
 }
 
-function buildAuditPayload(event = {}) {
-  return pruneUndefined({
-    participantId: event.participantId,
-    action: event.action || "config_update",
-    settingName: event.settingName,
-    oldValue: event.oldValue,
-    newValue: event.newValue,
-  });
+function sanitizeSessionPayload(details, participantPointer) {
+  if (!participantPointer) return null;
+  const completedFlag =
+    details.completed === true || details.completedMicrolearning === true
+      ? true
+      : details.completed === false || details.completedMicrolearning === false
+      ? false
+      : undefined;
+  const payload = {
+    participant_id: participantPointer,
+    session_type: typeof details.sessionType === "string" ? details.sessionType : "session",
+  };
+
+  if (details.sessionStart) payload.session_start = toParseDate(new Date(details.sessionStart));
+  if (details.sessionEnd) payload.session_end = toParseDate(new Date(details.sessionEnd));
+  if (typeof details.durationSeconds === "number") {
+    payload.duration_seconds = Math.max(0, Math.round(details.durationSeconds));
+  }
+  if (typeof completedFlag === "boolean") {
+    payload.completed = completedFlag;
+  } else {
+    payload.completed = false;
+  }
+  if (details.siteVisited) {
+    payload.site_visited = toDomainOnly(details.siteVisited);
+  } else if (details.learningSite) {
+    payload.site_visited = toDomainOnly(details.learningSite);
+  }
+  if (details.triggeredBySite) {
+    payload.triggered_by_site = toDomainOnly(details.triggeredBySite);
+  } else if (details.procrastinationSite) {
+    payload.triggered_by_site = toDomainOnly(details.procrastinationSite);
+  }
+
+  return payload;
+}
+
+function sanitizeUserPreferences(payload, participantPointer) {
+  if (!participantPointer) return null;
+  const toArray = (value) => {
+    if (!value) return [];
+    if (Array.isArray(value)) return value;
+    if (typeof value === "string") return value.split(",").map((v) => v.trim()).filter(Boolean);
+    return [];
+  };
+
+  return {
+    participant_id: participantPointer,
+    timestamp: toParseDate(payload.timestamp || Date.now()),
+    learning_time_minutes:
+      typeof payload.learning_time_minutes === "number" ? payload.learning_time_minutes : undefined,
+    operating_hours_start:
+      typeof payload.operating_hours_start === "number"
+        ? payload.operating_hours_start
+        : undefined,
+    operating_hours_end:
+      typeof payload.operating_hours_end === "number" ? payload.operating_hours_end : undefined,
+    procrastination_reward_minutes:
+      typeof payload.procrastination_reward_minutes === "number"
+        ? payload.procrastination_reward_minutes
+        : undefined,
+    procrastination_sites: toArray(payload.procrastination_sites),
+    learning_sites: toArray(payload.learning_sites),
+    is_active: typeof payload.is_active === "boolean" ? payload.is_active : undefined,
+  };
 }
 
 export async function logEvent(event = {}) {
-  const eventType = event.eventType || "";
-  try {
-    if (shouldLogAsAudit(eventType)) {
-      const auditPayload = buildAuditPayload(event);
-      if (auditPayload) {
-        await logAuditEvent(auditPayload);
-      }
-      return;
-    }
-
-    const sessionPayload = buildSessionPayload(event);
-    if (sessionPayload) {
-      await logSessionEvent(sessionPayload);
-    }
-  } catch (error) {
-    console.warn("[Aiki] Unable to route event", error);
-  }
-}
-
-export async function logSessionEvent(details = {}) {
   if (!isConfigured()) return;
   try {
-    const participantId = details.participantId || (await getParticipantId());
+    const participantId = await getParticipantId(event.participantId);
     if (!participantId) return;
     const participant = await ensureParticipant(participantId);
     if (!participant) return;
 
-    const payload = pruneUndefined({
-      participant: toParticipantPointer(participant),
-      session_type: details.sessionType || "intervention",
-      domain: details.domain || domainFromUrl(details.learningSite),
-      triggered_by_domain:
-        details.triggeredByDomain || domainFromUrl(details.procrastinationSite),
-      trigger_source: details.triggerSource || "extension",
-      prompt_response: details.promptResponse,
-      completed_microlearning: details.completedMicrolearning,
-      actual_duration_seconds:
-        typeof details.actualDurationSeconds === "number"
-          ? Math.max(0, Math.round(details.actualDurationSeconds))
-          : undefined,
-      returned_to_procrastination_site: details.returnedToProcrastinationSite,
-    });
+    const pointer = toParticipantPointer(participant);
+    const payload = sanitizeEventPayload(event, pointer);
+    if (!payload?.event_type) return;
 
-    await parseRequest("/classes/Sessions", {
+    await parseRequest("/classes/Events", {
       method: "POST",
       body: JSON.stringify(payload),
     });
-
-    const participantUpdates = {
-      last_active_date: toParseDate(Date.now()),
-      total_interventions: { __op: "Increment", amount: 1 },
-    };
-    if (payload.prompt_response === "redirect") {
-      participantUpdates.total_accepts = { __op: "Increment", amount: 1 };
-    } else if (payload.prompt_response) {
-      participantUpdates.total_declines = { __op: "Increment", amount: 1 };
-    }
-    if (payload.actual_duration_seconds && payload.actual_duration_seconds > 0) {
-      participantUpdates.total_learning_time_min = {
-        __op: "Increment",
-        amount: payload.actual_duration_seconds / 60,
-      };
-    }
-    await updateParticipantRecord(participant, participantUpdates);
   } catch (error) {
-    console.warn("[Aiki] Unable to log session to Back4App", error);
+    console.warn("[Aiki] Unable to log event to Back4App", error);
   }
 }
 
-export async function logAuditEvent(audit = {}) {
-  if (!isConfigured()) return;
+// Compatibility wrapper to keep callers but route to the Event class only.
+export async function logSessionEvent(details = {}) {
+  if (!isConfigured()) return null;
   try {
-    const participantId = audit.participantId || (await getParticipantId());
-    if (!participantId) return;
+    const participantId = await getParticipantId(details.participantId);
+    if (!participantId) return null;
     const participant = await ensureParticipant(participantId);
-    if (!participant) return;
+    if (!participant) return null;
+    const pointer = toParticipantPointer(participant);
+    if (!pointer) return null;
 
-    const payload = pruneUndefined({
-      participant: toParticipantPointer(participant),
-      study_day: getStudyDay(participant),
-      action: audit.action || "update",
-      setting_name: audit.settingName,
-      old_value: stringifyValue(audit.oldValue),
-      new_value: stringifyValue(audit.newValue),
+    const durationSeconds =
+      typeof details.actualDurationSeconds === "number"
+        ? details.actualDurationSeconds
+        : typeof details.durationSeconds === "number"
+        ? details.durationSeconds
+        : 0;
+
+    const sessionPayload = sanitizeSessionPayload(
+      {
+        ...details,
+        durationSeconds,
+      },
+      pointer
+    );
+    if (!sessionPayload) return null;
+
+    const sessionResponse = await parseRequest("/classes/Sessions", {
+      method: "POST",
+      body: JSON.stringify(sessionPayload),
     });
 
-    if (payload.participant && (payload.setting_name || payload.action)) {
-      await parseRequest("/classes/AuditLog", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
-    }
+    const sessionPointer =
+      sessionResponse?.objectId && sessionResponse?.objectId.length > 0
+        ? { __type: "Pointer", className: "Sessions", objectId: sessionResponse.objectId }
+        : null;
 
-    const participantUpdates = {
-      last_active_date: toParseDate(Date.now()),
-    };
-    if (audit.participantUpdates && typeof audit.participantUpdates === "object") {
-      Object.assign(participantUpdates, audit.participantUpdates);
-    }
-    await updateParticipantRecord(participant, participantUpdates);
+    await logEvent({
+      participantId,
+      eventType: details.sessionType || "session",
+      timestamp: details.timestamp,
+      decision: details.decision,
+      sessionPointer,
+    });
+
+    return sessionResponse;
   } catch (error) {
-    console.warn("[Aiki] Unable to log audit event to Back4App", error);
+    console.warn("[Aiki] Unable to log session to Back4App", error);
+    return null;
+  }
+}
+
+// Compatibility wrapper to keep callers but route to the Event class only.
+export async function logAuditEvent(audit = {}) {
+  const suffix = audit.settingName ? `:${audit.settingName}` : "";
+  const eventType = audit.action ? `audit:${audit.action}${suffix}` : `audit${suffix}`;
+  return logEvent({
+    participantId: audit.participantId,
+    eventType,
+    timestamp: audit.timestamp,
+  });
+}
+
+export async function saveUserPreferences(preferences = {}) {
+  if (!isConfigured()) return null;
+  try {
+    const participantId = await getParticipantId(preferences.participantId);
+    if (!participantId) return null;
+    const participant = await ensureParticipant(participantId);
+    if (!participant) return null;
+    const pointer = toParticipantPointer(participant);
+    const payload = sanitizeUserPreferences(preferences, pointer);
+    if (!payload) return null;
+
+    const existingId = await storage.userPreferencesId.get();
+    const method = existingId ? "PUT" : "POST";
+    const path = existingId ? `/classes/UserPreferences/${existingId}` : "/classes/UserPreferences";
+
+    const response = await parseRequest(path, {
+      method,
+      body: JSON.stringify(payload),
+    });
+
+    if (response?.objectId) {
+      await storage.userPreferencesId.set(response.objectId);
+    }
+    
+    return response;
+  } catch (error) {
+    console.warn("[Aiki] Unable to save user preferences to Back4App", error);
+    return null;
   }
 }
