@@ -1,43 +1,52 @@
 import browser from "webextension-polyfill";
 import storage from "./util/storage";
-import { logEvent, logSessionEvent } from "./util/logger";
+import { logSessionEvent } from "./util/logger";
 import { parseUrl } from "./util/utilities";
 import { learningSites } from "./util/constants";
 
-let list;
-let user;
+let list = [];
+let user = null;
 let data = {
   chromeActive: 0,
   chromeInactive: 0,
 };
-let counterId;
-let loggerId;
+let counterId = null;
+let loggerId = null;
 
-function intervalSetup() {
-  syncUser();
-  syncList();
+const learningNames = learningSites.map((s) => s.name);
+
+async function intervalSetup() {
+  await Promise.all([syncUser(), syncList()]);
   startCounter();
   startLogger();
   addOnWindowsCloseListener();
 }
 
 async function counter() {
-  const window = await browser.windows.getCurrent();
-  const views = (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.getViews)
-    ? chrome.runtime.getViews({ type: "popup" })
-    : [];
-  if (window.focused || views.length > 0) {
+  const currentWindow = await browser.windows.getCurrent();
+
+  const views =
+    typeof chrome !== "undefined" && chrome.runtime?.getViews
+      ? chrome.runtime.getViews({ type: "popup" })
+      : [];
+
+  if (currentWindow.focused || views.length > 0) {
     data.chromeActive++;
-    const result = await browser.tabs.query({
+
+    const [activeTab] = await browser.tabs.query({
       active: true,
       currentWindow: true,
     });
-    const name = parseUrl(result[0].url).name;
-    if (
-      list.includes(name) ||
-      learningSites.find((site) => site.name === name) !== undefined
-    ) {
-      data[name] = data[name] ? data[name] + 1 : 1;
+
+    if (!activeTab || !activeTab.url) return;
+
+    const { name } = parseUrl(activeTab.url);
+
+    const isProcrastinationSite = list.includes(name);
+    const isLearningSite = learningNames.includes(name);
+
+    if (isProcrastinationSite || isLearningSite) {
+      data[name] = (data[name] ?? 0) + 1;
     }
   } else {
     data.chromeInactive++;
@@ -45,7 +54,8 @@ async function counter() {
 }
 
 function logger() {
-  storeData(data);
+  const snapshot = { ...data };
+  storeData(snapshot);
   resetData();
 }
 
@@ -73,7 +83,8 @@ async function restartCounter() {
 
 async function restartLogger() {
   stopLogger();
-  storeData(data);
+  const snapshot = { ...data };
+  storeData(snapshot);
   resetData();
   await syncUser();
   startLogger();
@@ -103,21 +114,20 @@ function calculateCategoryTime(data, siteList) {
   return { totalSeconds, siteDetails };
 }
 
-function storeData(data) {
+function storeData(snapshot) {
   if (!user) return;
-  storage.stats.storeSession(data);
 
-  const perSiteSeconds = Object.entries(data).reduce((acc, [key, value]) => {
+  storage.stats.storeSession(snapshot);
+
+  const perSiteSeconds = Object.entries(snapshot).reduce((acc, [key, value]) => {
     if (key !== "chromeActive" && key !== "chromeInactive" && typeof value === "number") {
       acc[key] = value;
     }
     return acc;
   }, {});
 
-  const learningList = learningSites.map((s) => s.name);
-  
   const procrastination = calculateCategoryTime(perSiteSeconds, list || []);
-  const learning = calculateCategoryTime(perSiteSeconds, learningList);
+  const learning = calculateCategoryTime(perSiteSeconds, learningNames);
 
   procrastination.siteDetails.forEach((site) => {
     logSessionEvent({
@@ -126,11 +136,22 @@ function storeData(data) {
       siteVisited: site.name,
       durationSeconds: site.seconds,
       timestamp: Date.now(),
-      triggeredBySite: null, 
+      triggeredBySite: null,
     });
   });
 
 
+  learning.siteDetails.forEach((site) => {
+    logSessionEvent({
+      participantId: user,
+      sessionType: "learning",
+      siteVisited: site.name,
+      durationSeconds: site.seconds,
+      timestamp: Date.now(),
+      triggeredBySite: null,
+   });
+ });
+}
 
 function resetData() {
   data = {
@@ -140,8 +161,9 @@ function resetData() {
 }
 
 function addOnWindowsCloseListener() {
-  browser.windows.onRemoved.addListener((details) => {
-    storeData(data);
+  browser.windows.onRemoved.addListener(() => {
+    const snapshot = { ...data };
+    storeData(snapshot);
     resetData();
   });
 }

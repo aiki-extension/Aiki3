@@ -198,11 +198,15 @@ function sanitizeEventPayload(event, participantPointer) {
   const payload = {
     participant_id: participantPointer,
     event_type: eventType,
-    timestamp: toParseDate(event.timestamp || Date.now()),
   };
 
-  if (typeof event.decision === "string" && event.decision.trim()) {
-    payload.decision = event.decision.trim();
+  const data = typeof event.eventData === "string" && event.eventData.trim()
+    ? event.eventData.trim()
+    : typeof event.decision === "string" && event.decision.trim()
+    ? event.decision.trim()
+    : null;
+  if (data) {
+    payload.eventData = data;
   }
   if (event.sessionPointer) {
     payload.session_id = event.sessionPointer;
@@ -229,6 +233,9 @@ function sanitizeSessionPayload(details, participantPointer) {
   if (typeof details.durationSeconds === "number") {
     payload.duration_seconds = Math.max(0, Math.round(details.durationSeconds));
   }
+  if (typeof details.goalSeconds === "number") {
+    payload.goal_seconds = Math.max(0, Math.round(details.goalSeconds));
+  }
   if (typeof completedFlag === "boolean") {
     payload.completed = completedFlag;
   } else {
@@ -250,32 +257,69 @@ function sanitizeSessionPayload(details, participantPointer) {
 
 function sanitizeUserPreferences(payload, participantPointer) {
   if (!participantPointer) return null;
+
+  const normalizeSite = (value) => {
+    if (!value || typeof value !== "string") return null;
+    return toDomainOnly(value);
+  };
+
   const toArray = (value) => {
     if (!value) return [];
     if (Array.isArray(value)) return value;
-    if (typeof value === "string") return value.split(",").map((v) => v.trim()).filter(Boolean);
+    if (typeof value === "string") {
+      return value
+        .split(",")
+        .map((v) => v.trim())
+        .filter(Boolean);
+    }
     return [];
   };
 
-  return {
+  const normalizeSites = (value) =>
+    toArray(value)
+      .map((v) => normalizeSite(v) || v)
+      .filter(Boolean);
+
+  const normalizedPrefs = {
     participant_id: participantPointer,
-    timestamp: toParseDate(payload.timestamp || Date.now()),
     learning_time_minutes:
-      typeof payload.learning_time_minutes === "number" ? payload.learning_time_minutes : undefined,
+      typeof payload?.learning_time_minutes === "number"
+        ? payload.learning_time_minutes
+        : undefined,
     operating_hours_start:
-      typeof payload.operating_hours_start === "number"
+      typeof payload?.operating_hours_start === "number"
         ? payload.operating_hours_start
         : undefined,
     operating_hours_end:
-      typeof payload.operating_hours_end === "number" ? payload.operating_hours_end : undefined,
+      typeof payload?.operating_hours_end === "number"
+        ? payload.operating_hours_end
+        : undefined,
     procrastination_reward_minutes:
-      typeof payload.procrastination_reward_minutes === "number"
+      typeof payload?.procrastination_reward_minutes === "number"
         ? payload.procrastination_reward_minutes
         : undefined,
-    procrastination_sites: toArray(payload.procrastination_sites),
-    learning_sites: toArray(payload.learning_sites),
-    is_active: typeof payload.is_active === "boolean" ? payload.is_active : undefined,
+    is_active:
+      typeof payload?.is_active === "boolean" ? payload.is_active : undefined,
   };
+
+  if (payload && "procrastination_sites" in payload) {
+    normalizedPrefs.procrastination_sites = normalizeSites(payload.procrastination_sites);
+  }
+
+  if (payload && "learning_sites" in payload) {
+    normalizedPrefs.learning_sites = normalizeSites(payload.learning_sites);
+  }
+
+  return normalizedPrefs;
+}
+
+function pruneUndefined(obj) {
+  if (!obj || typeof obj !== "object") return obj;
+  const next = {};
+  Object.entries(obj).forEach(([k, v]) => {
+    if (v !== undefined) next[k] = v;
+  });
+  return next;
 }
 
 export async function logEvent(event = {}) {
@@ -339,8 +383,7 @@ export async function logSessionEvent(details = {}) {
     await logEvent({
       participantId,
       eventType: details.sessionType || "session",
-      timestamp: details.timestamp,
-      decision: details.decision,
+      eventData: details.eventData,
       sessionPointer,
     });
 
@@ -355,10 +398,22 @@ export async function logSessionEvent(details = {}) {
 export async function logAuditEvent(audit = {}) {
   const suffix = audit.settingName ? `:${audit.settingName}` : "";
   const eventType = audit.action ? `audit:${audit.action}${suffix}` : `audit${suffix}`;
+  const auditData = (() => {
+    // Prefer caller-provided eventData when present.
+    if (typeof audit.eventData === "string" && audit.eventData.trim()) {
+      return audit.eventData.trim();
+    }
+    const payload = pruneUndefined({
+      old: "oldValue" in audit ? audit.oldValue ?? null : undefined,
+      new: "newValue" in audit ? audit.newValue ?? null : undefined,
+      participantUpdates: audit.participantUpdates,
+    });
+    return Object.keys(payload).length ? JSON.stringify(payload) : null;
+  })();
   return logEvent({
     participantId: audit.participantId,
     eventType,
-    timestamp: audit.timestamp,
+    eventData: auditData,
   });
 }
 
@@ -373,17 +428,93 @@ export async function saveUserPreferences(preferences = {}) {
     const payload = sanitizeUserPreferences(preferences, pointer);
     if (!payload) return null;
 
-    const existingId = await storage.userPreferencesId.get();
+    let existingId = await storage.userPreferencesId.get();
+    let existing = null;
+
+    if (!existingId) {
+      // Try to find existing preferences by participant pointer
+      try {
+        const where = encodeURIComponent(JSON.stringify({ participant_id: pointer }));
+        const found = await parseRequest(`/classes/UserPreferences?where=${where}&limit=1`);
+        if (found?.results?.[0]) {
+          existing = found.results[0];
+          existingId = existing.objectId;
+          await storage.userPreferencesId.set(existingId);
+        }
+      } catch (_) {}
+    }
+
+    if (existingId && !existing) {
+      try {
+        existing = await parseRequest(`/classes/UserPreferences/${existingId}`, { method: "GET" });
+      } catch (_) {}
+    }
+
+    const hasChanged = (before, after) => JSON.stringify(before) !== JSON.stringify(after);
+    const logPrefChange = async (key, before, after) => {
+      if (!hasChanged(before, after)) return;
+      await logEvent({
+        participantId,
+        eventType: `audit:user_prefs:${key}`,
+        eventData: JSON.stringify({ key, old: before ?? null, new: after ?? null }),
+      });
+    };
+
+    const mergedPayload = pruneUndefined({
+      ...payload,
+      procrastination_sites:
+        "procrastination_sites" in payload
+          ? payload.procrastination_sites
+          : existing?.procrastination_sites || [],
+      learning_sites:
+        "learning_sites" in payload ? payload.learning_sites : existing?.learning_sites || [],
+    });
+
     const method = existingId ? "PUT" : "POST";
     const path = existingId ? `/classes/UserPreferences/${existingId}` : "/classes/UserPreferences";
 
     const response = await parseRequest(path, {
       method,
-      body: JSON.stringify(payload),
+      body: JSON.stringify(mergedPayload),
     });
 
     if (response?.objectId) {
       await storage.userPreferencesId.set(response.objectId);
+    }
+
+    // Log detailed preference updates (old vs new) to Events
+    try {
+      const before = existing || {};
+      const after = { ...before, ...mergedPayload };
+      await logPrefChange(
+        "learning_time_minutes",
+        before.learning_time_minutes ?? null,
+        after.learning_time_minutes ?? null
+      );
+      await logPrefChange(
+        "operating_hours_start",
+        before.operating_hours_start ?? null,
+        after.operating_hours_start ?? null
+      );
+      await logPrefChange(
+        "operating_hours_end",
+        before.operating_hours_end ?? null,
+        after.operating_hours_end ?? null
+      );
+      await logPrefChange(
+        "procrastination_reward_minutes",
+        before.procrastination_reward_minutes ?? null,
+        after.procrastination_reward_minutes ?? null
+      );
+      await logPrefChange(
+        "procrastination_sites",
+        before.procrastination_sites || [],
+        after.procrastination_sites || []
+      );
+      await logPrefChange("learning_sites", before.learning_sites || [], after.learning_sites || []);
+      await logPrefChange("is_active", before.is_active ?? null, after.is_active ?? null);
+    } catch (e) {
+      console.warn("[Aiki] Unable to log preference update", e);
     }
     
     return response;

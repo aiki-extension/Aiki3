@@ -1,5 +1,4 @@
 import storage from "./util/storage";
-import { learningSites } from "./util/constants";
 import { logEvent, logSessionEvent } from "./util/logger";
 import browser from "webextension-polyfill";
 import timer from "./timer";
@@ -19,18 +18,23 @@ const PRELOAD_HIDE_CSS = `
 const hiddenTabs = new Set();
 const pendingRevealTabs = new Set();
 const PREPROMPT_ID = "__aiki-preprompt";
+let lastActiveTabId = null;
+let procrastinationGuardsRegistered = false;
+let activeLearningTabId = null;
+let cachedGoalSeconds = null;
+let lastGoalFetch = 0;
 
-async function startTrackedSession(tabId, originUrl, learningUrl) {
-  if (tabId === undefined || tabId === null || !originUrl || !learningUrl) return;
-  const participantId = await storage.uid.get();
-  if (!participantId) return;
-  await storage.activeSessions.set(tabId, {
-    participantId,
-    sessionType: "intervention",
-    procrastinationUrl: originUrl,
-    learningUrl,
-    startedAt: Date.now(),
-  });
+function buildProcrastinationUrlFilters(list = []) {
+  const seen = new Set();
+  return list
+    .map((item) => {
+      const parsed = parseUrl(item?.host || item?.name || "");
+      const host = (parsed.host || item?.host || "").trim().toLowerCase();
+      if (!host || seen.has(host)) return null;
+      seen.add(host);
+      return { hostSuffix: host };
+    })
+    .filter(Boolean);
 }
 
 async function finalizeTrackedSession(tabId, outcome = "continue", metadata = {}) {
@@ -45,12 +49,12 @@ async function finalizeTrackedSession(tabId, outcome = "continue", metadata = {}
   
   await logSessionEvent({
     participantId: session.participantId,
-    sessionType: session.sessionType || "intervention",
+    sessionType: session.sessionType || "learning",
     procrastinationSite: session.procrastinationUrl,
     learningSite: session.learningUrl,
     triggerSource: metadata.sourceType || "extension",
     promptResponse: "redirect",
-    decision: "accept",
+    eventData: "accept",
     sessionStart: new Date(startedAt),
     sessionEnd: new Date(now),
     completedMicrolearning:
@@ -68,6 +72,104 @@ async function finalizeTrackedSession(tabId, outcome = "continue", metadata = {}
   });
 }
 
+async function startProcrastinationSession(tabId, procrastinationUrl) {
+  if (tabId === undefined || tabId === null || !procrastinationUrl) return;
+  const participantId = await storage.uid.get();
+  if (!participantId) return;
+  lastActiveTabId = tabId;
+  await storage.activeSessions.set(tabId, {
+    participantId,
+    sessionType: "procrastination",
+    procrastinationUrl,
+    startedAt: Date.now(),
+  });
+}
+
+async function finalizeProcrastinationSession(tabId, reason = "switch") {
+  if (tabId === undefined || tabId === null) return;
+  const session = await storage.activeSessions.get(tabId);
+  if (!session || session.sessionType !== "procrastination") return;
+  await storage.activeSessions.remove(tabId);
+
+  const now = Date.now();
+  const startedAt = session.startedAt || now;
+  const durationSeconds = Math.max(0, Math.round((now - startedAt) / 1000));
+
+  await logSessionEvent({
+    participantId: session.participantId,
+    sessionType: "procrastination",
+    procrastinationSite: session.procrastinationUrl,
+    sessionStart: new Date(startedAt),
+    sessionEnd: new Date(now),
+    actualDurationSeconds: durationSeconds,
+    durationSeconds,
+    completed: false,
+    eventData: reason,
+  });
+}
+
+async function startLearningSession(tabId, learningUrl, procrastinationUrl) {
+  if (tabId === undefined || tabId === null || !learningUrl) return;
+  const participantId = await storage.uid.get();
+  if (!participantId) return;
+  lastActiveTabId = tabId;
+  activeLearningTabId = tabId;
+  await storage.activeSessions.set(tabId, {
+    participantId,
+    sessionType: "learning",
+    procrastinationUrl: procrastinationUrl || null,
+    learningUrl,
+    startedAt: Date.now(),
+  });
+}
+
+async function finalizeLearningSession(tabId, reason = "switch") {
+  if (tabId === undefined || tabId === null) return;
+  const session = await storage.activeSessions.get(tabId);
+  if (!session || session.sessionType !== "learning") return;
+  await storage.activeSessions.remove(tabId);
+  if (activeLearningTabId === tabId) {
+    activeLearningTabId = null;
+  }
+
+  const now = Date.now();
+  const startedAt = session.startedAt || now;
+  const durationSeconds = Math.max(0, Math.round((now - startedAt) / 1000));
+  const goalSeconds = await getGoalSeconds();
+
+  await logSessionEvent({
+    participantId: session.participantId,
+    sessionType: "learning",
+    procrastinationSite: session.procrastinationUrl,
+    learningSite: session.learningUrl,
+    sessionStart: new Date(startedAt),
+    sessionEnd: new Date(now),
+    actualDurationSeconds: durationSeconds,
+    durationSeconds,
+    goalSeconds,
+    completed: false,
+    eventData: reason,
+  });
+}
+
+async function getGoalSeconds() {
+  const now = Date.now();
+  if (cachedGoalSeconds !== null && now - lastGoalFetch < 60 * 1000) {
+    return cachedGoalSeconds;
+  }
+  try {
+    const timeSetting = await storage.timeSettings.learningTime.get();
+    if (timeSetting && typeof timeSetting.min === "number" && typeof timeSetting.sec === "number") {
+      cachedGoalSeconds = Math.max(0, Math.round(timeSetting.min * 60 + timeSetting.sec));
+      lastGoalFetch = now;
+      return cachedGoalSeconds;
+    }
+  } catch (_) {}
+  cachedGoalSeconds = 0;
+  lastGoalFetch = now;
+  return cachedGoalSeconds;
+}
+
 async function migrateActiveSession(oldTabId, newTabId) {
   if (
     oldTabId === undefined ||
@@ -82,17 +184,78 @@ async function migrateActiveSession(oldTabId, newTabId) {
   await storage.activeSessions.set(newTabId, { ...session });
 }
 
+async function handleTabNavigation(tabId, nextUrl) {
+  if (!tabId || !nextUrl) return;
+  const session = await storage.activeSessions.get(tabId);
+  if (!session) return;
+
+  const extractName = (value) => {
+    try {
+      return parseUrl(value || "").name;
+    } catch (_) {
+      return "";
+    }
+  };
+
+  const nextName = extractName(nextUrl);
+
+  if (session.sessionType === "procrastination") {
+    const currentName = extractName(session.procrastinationUrl);
+    if (currentName && nextName && currentName === nextName) {
+      await storage.activeSessions.set(tabId, { ...session, procrastinationUrl: nextUrl });
+      return;
+    }
+    await finalizeProcrastinationSession(tabId, "navigation");
+    return;
+  }
+
+  if (session.sessionType === "learning") {
+    const currentName = extractName(session.learningUrl);
+    if (currentName && nextName && currentName === nextName) {
+      await storage.activeSessions.set(tabId, { ...session, learningUrl: nextUrl });
+      return;
+    }
+    await finalizeLearningSession(tabId, "navigation");
+  }
+}
+
+function registerProcrastinationGuards() {
+  if (procrastinationGuardsRegistered) return;
+  procrastinationGuardsRegistered = true;
+
+  browser.tabs.onActivated.addListener(async ({ tabId }) => {
+    if (lastActiveTabId !== null && lastActiveTabId !== tabId) {
+      await finalizeProcrastinationSession(lastActiveTabId, "tab_switch");
+      await finalizeLearningSession(lastActiveTabId, "tab_switch");
+    }
+    lastActiveTabId = tabId;
+  });
+
+  browser.tabs.onRemoved.addListener(async (tabId) => {
+    await finalizeProcrastinationSession(tabId, "tab_closed");
+    await finalizeLearningSession(tabId, "tab_closed");
+  });
+
+  browser.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
+    if (changeInfo.url) {
+      await handleTabNavigation(tabId, changeInfo.url);
+    }
+  });
+}
+
 async function logDeclinedIntervention(originUrl, learningUrl) {
   await logSessionEvent({
-    sessionType: "intervention",
+    sessionType: "learning",
     procrastinationSite: originUrl,
     learningSite: learningUrl,
     triggerSource: "prompt",
     promptResponse: "continue",
-    decision: "stay",
+    eventData: "stay",
     completedMicrolearning: false,
     actualDurationSeconds: 0,
     returnedToProcrastinationSite: true,
+    sessionStart: Date.now(),
+    sessionEnd: Date.now(),
   });
 }
 
@@ -182,43 +345,26 @@ browser.webNavigation.onCommitted.addListener(async (details) => {
   }
 });
 
-async function addMirceaListener() {
-  const url = learningSites.map((item) => {
-    return { hostContains: `${item.name}.` };
-  });
-  const filter = { url: url };
-
-  async function mirceaListener(details) {
-    const participantId = await storage.uid.get();
-    if (!participantId) return;
-
-  }
-
-  browser.webNavigation.onBeforeNavigate.addListener(mirceaListener, filter);
-}
-
 async function createFilter() {
   const procList = await storage.list.get();
-  const url = procList.map((item) => {
-    return { hostContains: `${item.name}.` };
-  });
-  const filter = { url: url };
-  return filter;
+  const url = buildProcrastinationUrlFilters(procList || []);
+  if (!url.length) return null;
+  return { url };
 }
 
 async function addNavigationListener() {
   const filter = await createFilter();
+  if (!filter) return;
   browser.webNavigation.onBeforeNavigate.addListener(redirect, filter);
 }
 
 async function removeNavigationListener() {
-  const filter = await createFilter();
-  browser.webNavigation.onBeforeNavigate.removeListener(redirect, filter);
+  browser.webNavigation.onBeforeNavigate.removeListener(redirect);
 }
 
 async function restartNavigationListener() {
   await removeNavigationListener();
-  addNavigationListener();
+  await addNavigationListener();
 }
 
 function addTabChangeListener() {
@@ -330,7 +476,7 @@ async function redirect(details) {
             promptLock.host === hostName &&
             now - promptLock.timestamp < PROMPT_SUPPRESS_DURATION
           ) {
-            l("Skipping prompt due to recent decision for tab", details.tabId);
+            l("Skipping prompt due to recent eventData for tab", details.tabId);
             return;
           }
           await storage.promptLocks.set(details.tabId, {
@@ -751,6 +897,17 @@ async function talkToContent(tabId, url, originUrl, attempt = 0) {
       try {
         await storage.stats.skip();
       } catch (_) {}
+      registerProcrastinationGuards();
+      await startProcrastinationSession(tabId, originUrl);
+      // Log immediate event for continue decision
+      await logEvent({
+        participantId: await storage.uid.get(),
+        eventType: "redirection_decision",
+        procrastinationSite: originUrl,
+        learningSite: url,
+        eventData: "stay",
+        timestamp: Date.now(),
+      });
       await logDeclinedIntervention(originUrl, url);
       addRedirectionLog(
         `Interception: continue on procrastination site`,
@@ -760,16 +917,17 @@ async function talkToContent(tabId, url, originUrl, attempt = 0) {
           eventType: "redirection_decision",
           action: "continue",
           continueTap: true,
-          decision: "stay",
+          eventData: "stay",
           procrastinationUrl: originUrl,
           learningUrl: url,
-        }
-      );
+    }
+  );
       await hideImmediatePrompt(tabId);
       await removePreemptiveHide(tabId);
     } else if (result && result.action === "redirect") {
       addLearningSiteLoadedListener();
-      await startTrackedSession(tabId, originUrl, url);
+      registerProcrastinationGuards();
+      await startLearningSession(tabId, url, originUrl);
       addRedirectionLog(
         `Interception: user redirected to learning platform`,
         parseUrl(originUrl).name,
@@ -777,7 +935,7 @@ async function talkToContent(tabId, url, originUrl, attempt = 0) {
         {
           eventType: "redirection_decision",
           action: "redirect",
-          decision: "accept",
+          eventData: "accept",
           procrastinationUrl: originUrl,
           learningUrl: url,
         }
@@ -815,7 +973,7 @@ async function addRedirectionLog(event, from, to, details = {}) {
   const { eventType = "redirection", ...rest } = details || {};
   const metadata = {
     event,
-    decision: rest.decision,
+    eventData: rest.eventData,
     continueTap: rest.continueTap,
     timeSettings,
   };
@@ -881,6 +1039,7 @@ async function addProcsiteLoadedListener() {
   l("Adding listener");
   const filter = await createFilter();
   l(filter);
+  if (!filter) return;
   browser.webNavigation.onCompleted.addListener(renderContentBlocker, filter);
 }
 
@@ -909,5 +1068,4 @@ export default {
   addOriginTabCloseListener,
   removeLearningSiteLoadedListener,
   checkActiveTab,
-  addMirceaListener,
 };

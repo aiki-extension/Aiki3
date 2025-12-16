@@ -4,7 +4,7 @@
  -->
 <script>
   import storage from "../../../util/storage";
-  import { logAuditEvent } from "../../../util/logger";
+  import { saveUserPreferences } from "../../../util/logger";
 
   let hourOptions = Array.from({ length: 25 }, (_, i) => i);
   let minuteOptions = [0, 15, 30, 45];
@@ -21,16 +21,20 @@
   }
 
   async function setActiveTo() {
-    const previous = settings.activeTo ? { ...settings.activeTo } : { hrs: hrsTo, min: minTo };
     const setting = { hrs: hrsTo, min: minTo };
     storage.operatingHours.to.set(setting);
-    await logAuditEvent({
-      participantId: user,
-      action: "update_operating_hours",
-      settingName: "active_to",
-      oldValue: previous,
-      newValue: setting,
-    });
+    try {
+      const participantId = user || (await storage.uid.get());
+      const startMinutes = hrsFrom * 60 + minFrom;
+      const endMinutes = hrsTo * 60 + minTo;
+      await saveUserPreferences({
+        participantId,
+        operating_hours_start: startMinutes,
+        operating_hours_end: endMinutes,
+      });
+    } catch (e) {
+      console.warn("Failed to sync operating hours preference", e);
+    }
     update();
   }
 
@@ -40,18 +44,20 @@
 
       storage.operatingHours.from.set({ hrs: hrsTo, min: minTo });
     }
-    const previous = settings.activeFrom
-      ? { ...settings.activeFrom }
-      : { hrs: hrsFrom, min: minFrom };
     const setting = { hrs: hrsFrom, min: minFrom };
     storage.operatingHours.from.set(setting);
-    await logAuditEvent({
-      participantId: user,
-      action: "update_operating_hours",
-      settingName: "active_from",
-      oldValue: previous,
-      newValue: setting,
-    });
+    try {
+      const participantId = user || (await storage.uid.get());
+      const startMinutes = hrsFrom * 60 + minFrom;
+      const endMinutes = hrsTo * 60 + minTo;
+      await saveUserPreferences({
+        participantId,
+        operating_hours_start: startMinutes,
+        operating_hours_end: endMinutes,
+      });
+    } catch (e) {
+      console.warn("Failed to sync operating hours preference", e);
+    }
     update();
   }
 

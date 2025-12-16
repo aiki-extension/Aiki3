@@ -5,8 +5,7 @@ import redirection from "./redirection";
 import timer from "./timer";
 import { setTheme } from "./util/themes";
 import badge from "./badge";
-import { logAuditEvent } from "./util/logger";
-import { participantResource } from "./util/constants";
+import { logAuditEvent, saveUserPreferences } from "./util/logger";
 
 // Manifest V3: No DOM access, no stray variables
 
@@ -74,7 +73,6 @@ async function installationSetup() {
 }
 
 async function setup() {
-  redirection.addMirceaListener();
   intervals.intervalSetup();
   storage.shouldRedirect.set(true);
   redirection.navigationListener.start();
@@ -106,6 +104,9 @@ async function killAiki() {
     newValue: "off",
     participantUpdates: { is_extension_active: false },
   });
+  try {
+    await saveUserPreferences({ participantId: user, is_active: false });
+  } catch (_) {}
 }
 
 async function reviveAiki() {
@@ -119,6 +120,9 @@ async function reviveAiki() {
     newValue: "on",
     participantUpdates: { is_extension_active: true },
   });
+  try {
+    await saveUserPreferences({ participantId: user, is_active: true });
+  } catch (_) {}
 }
 
 async function gotoOriginTab() {

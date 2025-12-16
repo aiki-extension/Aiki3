@@ -5,7 +5,7 @@
 <script>
   import Container from "./Container.svelte";
   import storage from "../../../util/storage";
-  import { logAuditEvent, saveUserPreferences } from "../../../util/logger";
+  import { saveUserPreferences } from "../../../util/logger";
   import { parseUrl } from "../../../util/utilities";
   import Fa from "svelte-fa";
   import {
@@ -57,19 +57,11 @@
   let addItemValue = "";
 
   async function removeItem(index) {
-    const removedHost = list[index]?.host || "";
     let newList = [...list];
     newList.splice(index, 1);
     list = newList;
     storage.list.set(list);
     syncPreferences();
-    await logAuditEvent({
-      participantId: user,
-      action: "remove_site",
-      settingName: "procrastination_site",
-      oldValue: removedHost,
-      newValue: "",
-    });
     port.postMessage(`Update: list`);
     toast.pop();
     toast.push("Website removed!", {
@@ -96,13 +88,6 @@
       list = newList;
       storage.list.set(list);
       syncPreferences();
-      await logAuditEvent({
-        participantId: user,
-        action: "add_site",
-        settingName: "procrastination_site",
-        oldValue: "",
-        newValue: site?.host || "",
-      });
       port.postMessage(`Update: list`);
       addItemValue = "";
       toast.pop();

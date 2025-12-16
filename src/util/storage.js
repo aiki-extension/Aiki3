@@ -1,6 +1,5 @@
 import browser from "webextension-polyfill";
-import { makeDate } from "./utilities";
-import { learningSites, participantResource } from "./constants";
+import { participantResource } from "./constants";
 const storage = browser.storage.local;
 
 /**
@@ -26,11 +25,6 @@ function toggleRedirection() {
  * @async @function
  * @returns {object} userData that includes a list of procrastination websites as defined by the user, as well as the user ID.
  * @description Returns the user ID and a list of procrastination websites wrapped in an object. */
-async function getUserData() {
-  const result = await storage.get(["list", "uid"]);
-  return result;
-}
-
 /**
  * @async @function
  * @returns {Boolean} Determines whether user should be redirected.
@@ -668,7 +662,6 @@ export default {
   },
   shouldRedirect: { get: getShouldRedirect, set: setShouldRedirect },
   clearStorage,
-  getUserData,
   origin: { get: getOrigin, set: setOrigin, remove: removeOrigin },
   learningUri: { get: getLearningUri, set: setLearningUri },
   list: { set: setList, get: getList },

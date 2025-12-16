@@ -4,7 +4,7 @@
  -->
 <script>
   import storage from "../../../util/storage";
-  import { logAuditEvent } from "../../../util/logger";
+  import { saveUserPreferences } from "../../../util/logger";
 
   let minuteOptions = Array.from({ length: 121 }, (_, i) => i); // 0 - 120 minutes
   let secondsOptions = [0, 15, 30, 45];
@@ -26,22 +26,18 @@
 
   async function setLearningTime() {
     ensureMinThreshold();
-    const previous = { ...settings.learningTime };
     const learningTime = { min: learnMin, sec: learnSec };
     storage.timeSettings.learningTime.set(learningTime);
-    const totalSeconds = learningTime.min * 60 + learningTime.sec;
     const totalMinutes = learningTime.min + learningTime.sec / 60;
-    await logAuditEvent({
-      participantId: user,
-      action: "update_learning_time",
-      settingName: "learning_time",
-      oldValue: previous,
-      newValue: learningTime,
-      participantUpdates: {
-        current_daily_goal_min: totalMinutes,
-        current_timer_duration_sec: totalSeconds,
-      },
-    });
+    try {
+      const participantId = user || (await storage.uid.get());
+      await saveUserPreferences({
+        participantId,
+        learning_time_minutes: totalMinutes,
+      });
+    } catch (e) {
+      console.warn("Failed to sync learning time preference", e);
+    }
     update();
   }
 </script>
