@@ -279,14 +279,25 @@ function registerProcrastinationGuards() {
     // Get the previous active tab for this window
     const previousTabId = lastActiveTabByWindow.get(windowId);
     
+    // Update tracking for this window immediately
+    lastActiveTabByWindow.set(windowId, tabId);
+    
     // End session on previous tab if different from new tab
     if (previousTabId !== undefined && previousTabId !== tabId) {
-      await finalizeSession(previousTabId, "procrastination", "tab_switch");
-      await finalizeSession(previousTabId, "learning", "tab_switch");
+      // Defer slightly to allow onRemoved to fire first if tab is being closed
+      // This prevents logging "tab_switch" when the tab is actually being closed
+      setTimeout(async () => {
+        try {
+          // Check if the previous tab still exists
+          await browser.tabs.get(previousTabId);
+          // Tab still exists - this was a genuine tab switch
+          await finalizeSession(previousTabId, "procrastination", "tab_switch");
+          await finalizeSession(previousTabId, "learning", "tab_switch");
+        } catch {
+          // Tab no longer exists - it was closed, onRemoved handles it with "tab_closed"
+        }
+      }, 50);
     }
-    
-    // Update tracking for this window
-    lastActiveTabByWindow.set(windowId, tabId);
     
     // Start new session on newly activated tab if it's on a tracked site
     await maybeStartSessionForTab(tabId);
@@ -294,6 +305,7 @@ function registerProcrastinationGuards() {
 
   // Handle tab removal: end session on closed tab
   browser.tabs.onRemoved.addListener(async (tabId, removeInfo) => {
+    // Finalize immediately - this will run before the deferred onActivated check
     await finalizeSession(tabId, "procrastination", "tab_closed");
     await finalizeSession(tabId, "learning", "tab_closed");
     // Clean up window tracking if this was the tracked tab
