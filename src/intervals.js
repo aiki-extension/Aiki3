@@ -1,6 +1,5 @@
 import browser from "webextension-polyfill";
 import storage from "./util/storage";
-import { logSessionEvent } from "./util/logger";
 import { parseUrl } from "./util/utilities";
 import { learningSites } from "./util/constants";
 
@@ -117,40 +116,9 @@ function calculateCategoryTime(data, siteList) {
 function storeData(snapshot) {
   if (!user) return;
 
+  // Store locally for stats/badge display only
+  // Session logging is handled by redirection.js on tab switch/close
   storage.stats.storeSession(snapshot);
-
-  const perSiteSeconds = Object.entries(snapshot).reduce((acc, [key, value]) => {
-    if (key !== "chromeActive" && key !== "chromeInactive" && typeof value === "number") {
-      acc[key] = value;
-    }
-    return acc;
-  }, {});
-
-  const procrastination = calculateCategoryTime(perSiteSeconds, list || []);
-  const learning = calculateCategoryTime(perSiteSeconds, learningNames);
-
-  procrastination.siteDetails.forEach((site) => {
-    logSessionEvent({
-      participantId: user,
-      sessionType: "procrastination",
-      siteVisited: site.name,
-      durationSeconds: site.seconds,
-      timestamp: Date.now(),
-      triggeredBySite: null,
-    });
-  });
-
-
-  learning.siteDetails.forEach((site) => {
-    logSessionEvent({
-      participantId: user,
-      sessionType: "learning",
-      siteVisited: site.name,
-      durationSeconds: site.seconds,
-      timestamp: Date.now(),
-      triggeredBySite: null,
-   });
- });
 }
 
 function resetData() {

@@ -18,11 +18,15 @@ const PRELOAD_HIDE_CSS = `
 const hiddenTabs = new Set();
 const pendingRevealTabs = new Set();
 const PREPROMPT_ID = "__aiki-preprompt";
-let lastActiveTabId = null;
+// Per-tab session state is managed entirely via storage.activeSessions
+// No global "active session" - each tab tracks its own session independently
 let procrastinationGuardsRegistered = false;
-let activeLearningTabId = null;
 let cachedGoalSeconds = null;
 let lastGoalFetch = 0;
+// Track last active tab per window for proper session handoff on tab switch
+const lastActiveTabByWindow = new Map();
+// Track sessions currently being finalized to prevent duplicate logging (race condition fix)
+const finalizingSessionKeys = new Set();
 
 function buildProcrastinationUrlFilters(list = []) {
   const seen = new Set();
@@ -37,119 +41,92 @@ function buildProcrastinationUrlFilters(list = []) {
     .filter(Boolean);
 }
 
-async function finalizeTrackedSession(tabId, outcome = "continue", metadata = {}) {
-  if (tabId === undefined || tabId === null) return;
-  const session = await storage.activeSessions.get(tabId);
-  if (!session) return;
-  await storage.activeSessions.remove(tabId);
-  
-  const now = Date.now();
-  const startedAt = session.startedAt || now;
-  const durationSeconds = Math.max(0, Math.round((now - startedAt) / 1000));
-  
-  await logSessionEvent({
-    participantId: session.participantId,
-    sessionType: session.sessionType || "learning",
-    procrastinationSite: session.procrastinationUrl,
-    learningSite: session.learningUrl,
-    triggerSource: metadata.sourceType || "extension",
-    promptResponse: "redirect",
-    eventData: "accept",
-    sessionStart: new Date(startedAt),
-    sessionEnd: new Date(now),
-    completedMicrolearning:
-      typeof metadata.completed === "boolean"
-        ? metadata.completed
-        : outcome === "continue",
-    actualDurationSeconds:
-      typeof metadata.durationSeconds === "number"
-        ? metadata.durationSeconds
-        : durationSeconds,
-    returnedToProcrastinationSite:
-      typeof metadata.returned === "boolean"
-        ? metadata.returned
-        : outcome !== "tab_closed",
-  });
-}
-
-async function startProcrastinationSession(tabId, procrastinationUrl) {
-  if (tabId === undefined || tabId === null || !procrastinationUrl) return;
+/**
+ * Start a session for the given tab.
+ * @param {number} tabId - The tab ID
+ * @param {string} sessionType - "learning" or "procrastination"
+ * @param {string} siteUrl - The URL of the site being visited
+ * @param {string|null} triggerUrl - The procrastination URL that triggered learning (for learning sessions)
+ */
+async function startSession(tabId, sessionType, siteUrl, triggerUrl = null) {
+  if (tabId === undefined || tabId === null || !siteUrl) return;
   const participantId = await storage.uid.get();
   if (!participantId) return;
-  lastActiveTabId = tabId;
-  await storage.activeSessions.set(tabId, {
-    participantId,
-    sessionType: "procrastination",
-    procrastinationUrl,
-    startedAt: Date.now(),
-  });
-}
-
-async function finalizeProcrastinationSession(tabId, reason = "switch") {
-  if (tabId === undefined || tabId === null) return;
-  const session = await storage.activeSessions.get(tabId);
-  if (!session || session.sessionType !== "procrastination") return;
+  
+  // Silently remove any existing session for this tab (don't log, just overwrite)
   await storage.activeSessions.remove(tabId);
-
-  const now = Date.now();
-  const startedAt = session.startedAt || now;
-  const durationSeconds = Math.max(0, Math.round((now - startedAt) / 1000));
-
-  await logSessionEvent({
-    participantId: session.participantId,
-    sessionType: "procrastination",
-    procrastinationSite: session.procrastinationUrl,
-    sessionStart: new Date(startedAt),
-    sessionEnd: new Date(now),
-    actualDurationSeconds: durationSeconds,
-    durationSeconds,
-    completed: false,
-    eventData: reason,
-  });
-}
-
-async function startLearningSession(tabId, learningUrl, procrastinationUrl) {
-  if (tabId === undefined || tabId === null || !learningUrl) return;
-  const participantId = await storage.uid.get();
-  if (!participantId) return;
-  lastActiveTabId = tabId;
-  activeLearningTabId = tabId;
-  await storage.activeSessions.set(tabId, {
+  
+  const sessionData = {
     participantId,
-    sessionType: "learning",
-    procrastinationUrl: procrastinationUrl || null,
-    learningUrl,
+    sessionType,
     startedAt: Date.now(),
-  });
-}
-
-async function finalizeLearningSession(tabId, reason = "switch") {
-  if (tabId === undefined || tabId === null) return;
-  const session = await storage.activeSessions.get(tabId);
-  if (!session || session.sessionType !== "learning") return;
-  await storage.activeSessions.remove(tabId);
-  if (activeLearningTabId === tabId) {
-    activeLearningTabId = null;
+  };
+  
+  if (sessionType === "learning") {
+    sessionData.learningUrl = siteUrl;
+    sessionData.procrastinationUrl = triggerUrl;
+  } else {
+    sessionData.procrastinationUrl = siteUrl;
   }
+  
+  await storage.activeSessions.set(tabId, sessionData);
+}
 
-  const now = Date.now();
-  const startedAt = session.startedAt || now;
-  const durationSeconds = Math.max(0, Math.round((now - startedAt) / 1000));
-  const goalSeconds = await getGoalSeconds();
+/**
+ * Finalize and log the session for the given tab.
+ * @param {number} tabId - The tab ID
+ * @param {string} sessionType - "learning" or "procrastination"  
+ * @param {string} reason - Reason for ending (tab_switch, tab_closed, etc.)
+ */
+async function finalizeSession(tabId, sessionType, reason = "switch") {
+  if (tabId === undefined || tabId === null) return;
+  
+  // Create a unique key for this finalization attempt to prevent race conditions
+  const finalizeKey = `${tabId}:${sessionType}`;
+  if (finalizingSessionKeys.has(finalizeKey)) return;
+  finalizingSessionKeys.add(finalizeKey);
+  
+  try {
+    const session = await storage.activeSessions.get(tabId);
+    if (!session || session.sessionType !== sessionType) return;
+    await storage.activeSessions.remove(tabId);
 
-  await logSessionEvent({
-    participantId: session.participantId,
-    sessionType: "learning",
-    procrastinationSite: session.procrastinationUrl,
-    learningSite: session.learningUrl,
-    sessionStart: new Date(startedAt),
-    sessionEnd: new Date(now),
-    actualDurationSeconds: durationSeconds,
-    durationSeconds,
-    goalSeconds,
-    completed: false,
-    eventData: reason,
-  });
+    const now = Date.now();
+    const startedAt = session.startedAt || now;
+    const durationSeconds = Math.max(0, Math.round((now - startedAt) / 1000));
+
+    // Log discrete event for tab visibility changes
+    if (reason === "tab_switch" || reason === "tab_closed") {
+      await logEvent({
+        participantId: session.participantId,
+        eventType: reason,
+        procrastinationSite: session.procrastinationUrl,
+        learningSite: session.learningUrl,
+        eventData: sessionType,
+      });
+    }
+
+    const logData = {
+      participantId: session.participantId,
+      sessionType,
+      procrastinationSite: session.procrastinationUrl,
+      sessionStart: new Date(startedAt),
+      sessionEnd: new Date(now),
+      actualDurationSeconds: durationSeconds,
+      durationSeconds,
+      completed: false,
+      eventData: reason,
+    };
+
+    if (sessionType === "learning") {
+      logData.learningSite = session.learningUrl;
+      logData.goalSeconds = await getGoalSeconds();
+    }
+
+    await logSessionEvent(logData);
+  } finally {
+    finalizingSessionKeys.delete(finalizeKey);
+  }
 }
 
 async function getGoalSeconds() {
@@ -205,7 +182,7 @@ async function handleTabNavigation(tabId, nextUrl) {
       await storage.activeSessions.set(tabId, { ...session, procrastinationUrl: nextUrl });
       return;
     }
-    await finalizeProcrastinationSession(tabId, "navigation");
+    await finalizeSession(tabId, "procrastination", "navigation");
     return;
   }
 
@@ -215,47 +192,144 @@ async function handleTabNavigation(tabId, nextUrl) {
       await storage.activeSessions.set(tabId, { ...session, learningUrl: nextUrl });
       return;
     }
-    await finalizeLearningSession(tabId, "navigation");
+    await finalizeSession(tabId, "learning", "navigation");
   }
+}
+
+/**
+ * Check if a URL belongs to a procrastination site
+ */
+async function isProcrastinationSite(url) {
+  if (!url) return false;
+  try {
+    const urlName = parseUrl(url).name;
+    if (!urlName) return false;
+    const procList = await storage.list.get();
+    const procNames = (procList || []).map((site) => site.name);
+    return procNames.includes(urlName);
+  } catch (_) {
+    return false;
+  }
+}
+
+/**
+ * Check if a URL belongs to a learning site
+ */
+async function isLearningSite(url) {
+  if (!url) return false;
+  try {
+    const learningUri = await storage.learningUri.get();
+    if (!learningUri) return false;
+    const learningName = parseUrl(learningUri).name;
+    const urlName = parseUrl(url).name;
+    return learningName && urlName && learningName === urlName;
+  } catch (_) {
+    return false;
+  }
+}
+
+/**
+ * Start a session for the given tab if it's on a tracked site.
+ * Always starts a NEW session (even if returning to same site/category).
+ */
+async function maybeStartSessionForTab(tabId) {
+  if (tabId === undefined || tabId === null) return;
+  try {
+    const tab = await browser.tabs.get(tabId);
+    if (!tab || !tab.url) return;
+    
+    // Check if on a procrastination site
+    if (await isProcrastinationSite(tab.url)) {
+      await startSession(tabId, "procrastination", tab.url);
+      return;
+    }
+    
+    // Check if on a learning site
+    if (await isLearningSite(tab.url)) {
+      const origin = await storage.origin.get();
+      await startSession(tabId, "learning", tab.url, origin?.url || null);
+      return;
+    }
+  } catch (_) {
+    // Tab may have been closed or is otherwise inaccessible
+  }
+}
+
+/**
+ * Finalize all active sessions (used when window loses focus)
+ */
+async function finalizeAllActiveSessions(reason = "window_blur") {
+  try {
+    const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+    for (const tab of tabs) {
+      if (tab?.id !== undefined) {
+        await finalizeSession(tab.id, "procrastination", reason);
+        await finalizeSession(tab.id, "learning", reason);
+      }
+    }
+  } catch (_) {}
 }
 
 function registerProcrastinationGuards() {
   if (procrastinationGuardsRegistered) return;
   procrastinationGuardsRegistered = true;
 
-  browser.tabs.onActivated.addListener(async ({ tabId }) => {
-    if (lastActiveTabId !== null && lastActiveTabId !== tabId) {
-      await finalizeProcrastinationSession(lastActiveTabId, "tab_switch");
-      await finalizeLearningSession(lastActiveTabId, "tab_switch");
+  // Handle tab activation: end session on previous tab, start on new tab if tracked
+  browser.tabs.onActivated.addListener(async ({ tabId, windowId }) => {
+    // Get the previous active tab for this window
+    const previousTabId = lastActiveTabByWindow.get(windowId);
+    
+    // End session on previous tab if different from new tab
+    if (previousTabId !== undefined && previousTabId !== tabId) {
+      await finalizeSession(previousTabId, "procrastination", "tab_switch");
+      await finalizeSession(previousTabId, "learning", "tab_switch");
     }
-    lastActiveTabId = tabId;
+    
+    // Update tracking for this window
+    lastActiveTabByWindow.set(windowId, tabId);
+    
+    // Start new session on newly activated tab if it's on a tracked site
+    await maybeStartSessionForTab(tabId);
   });
 
-  browser.tabs.onRemoved.addListener(async (tabId) => {
-    await finalizeProcrastinationSession(tabId, "tab_closed");
-    await finalizeLearningSession(tabId, "tab_closed");
+  // Handle tab removal: end session on closed tab
+  browser.tabs.onRemoved.addListener(async (tabId, removeInfo) => {
+    await finalizeSession(tabId, "procrastination", "tab_closed");
+    await finalizeSession(tabId, "learning", "tab_closed");
+    // Clean up window tracking if this was the tracked tab
+    if (removeInfo?.windowId !== undefined) {
+      const tracked = lastActiveTabByWindow.get(removeInfo.windowId);
+      if (tracked === tabId) {
+        lastActiveTabByWindow.delete(removeInfo.windowId);
+      }
+    }
   });
 
+  // Handle URL changes within a tab
   browser.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
     if (changeInfo.url) {
       await handleTabNavigation(tabId, changeInfo.url);
     }
   });
+  
+  // Handle window focus changes: end sessions when Chrome loses focus
+  browser.windows.onFocusChanged.addListener(async (windowId) => {
+    if (windowId === browser.windows.WINDOW_ID_NONE) {
+      // Browser lost focus entirely - end all active sessions
+      await finalizeAllActiveSessions("window_blur");
+    }
+    // Note: When focus is gained, the onActivated listener handles session start
+  });
 }
 
 async function logDeclinedIntervention(originUrl, learningUrl) {
-  await logSessionEvent({
-    sessionType: "learning",
+  // Log as event only - "stay" decision shouldn't create a Session row
+  await logEvent({
+    participantId: await storage.uid.get(),
+    eventType: "redirection_decision",
     procrastinationSite: originUrl,
     learningSite: learningUrl,
-    triggerSource: "prompt",
-    promptResponse: "continue",
     eventData: "stay",
-    completedMicrolearning: false,
-    actualDurationSeconds: 0,
-    returnedToProcrastinationSite: true,
-    sessionStart: Date.now(),
-    sessionEnd: Date.now(),
   });
 }
 
@@ -376,18 +450,28 @@ function removeTabChangeListener() {
 }
 
 async function windowChangeListener(windowId) {
-  if (windowId >= 0) {
-    try {
-      const tabs = await browser.tabs.query({
-        active: true,
-        currentWindow: true,
-      });
-      if (tabs.length > 0) {
-        checkTab(tabs[0]);
+  // Handle focus lost entirely
+  if (windowId === browser.windows.WINDOW_ID_NONE || windowId < 0) {
+    await finalizeAllActiveSessions("window_blur");
+    return;
+  }
+  
+  // Handle focus gained
+  try {
+    const tabs = await browser.tabs.query({
+      active: true,
+      windowId: windowId,
+    });
+    if (tabs.length > 0) {
+      const tab = tabs[0];
+      // Start session if on tracked site (returning to window)
+      if (tab.id !== undefined) {
+        await maybeStartSessionForTab(tab.id);
       }
-    } catch (error) {
-      // console.log(error);
+      checkTab(tab);
     }
+  } catch (error) {
+    // console.log(error);
   }
 }
 
@@ -546,13 +630,9 @@ async function onOriginRemoved(details) {
         removeOriginUpdatedListener();
         removeAllContentBlockers();
         storage.origin.remove();
-        await finalizeTrackedSession(details, "tab_closed", {
-          sourceType: "tab_removed",
-          completed: false,
-          returned: false,
-        });
-        timer.stopBonusTime(); // Without this badge goes "Done". This is bad. Maybe I'll fix it later.
-        timer.stopLearningSession(); // This is fine
+        await finalizeSession(details, "learning", "tab_closed");
+        timer.stopBonusTime();
+        timer.stopLearningSession();
         storage.shouldRedirect.set(true);
       }
     }
@@ -759,11 +839,7 @@ async function gotoOrigin(event, sourceContext = {}) {
 
   const sessionTabId = targetTabId !== undefined ? targetTabId : origin?.tabId;
   if (sessionTabId !== undefined) {
-    await finalizeTrackedSession(sessionTabId, normalizedEvent, {
-      sourceType,
-      completed: normalizedEvent === "continue",
-      returned: normalizedEvent !== "tab_closed",
-    });
+    await finalizeSession(sessionTabId, "learning", normalizedEvent);
   }
 
   removeOriginUpdatedListener();
@@ -898,48 +974,23 @@ async function talkToContent(tabId, url, originUrl, attempt = 0) {
         await storage.stats.skip();
       } catch (_) {}
       registerProcrastinationGuards();
-      await startProcrastinationSession(tabId, originUrl);
-      // Log immediate event for continue decision
-      await logEvent({
-        participantId: await storage.uid.get(),
-        eventType: "redirection_decision",
-        procrastinationSite: originUrl,
-        learningSite: url,
-        eventData: "stay",
-        timestamp: Date.now(),
-      });
+      await startSession(tabId, "procrastination", originUrl);
+      // Log single event for stay decision
       await logDeclinedIntervention(originUrl, url);
-      addRedirectionLog(
-        `Interception: continue on procrastination site`,
-        parseUrl(originUrl).name,
-        parseUrl(url).name,
-        {
-          eventType: "redirection_decision",
-          action: "continue",
-          continueTap: true,
-          eventData: "stay",
-          procrastinationUrl: originUrl,
-          learningUrl: url,
-    }
-  );
       await hideImmediatePrompt(tabId);
       await removePreemptiveHide(tabId);
     } else if (result && result.action === "redirect") {
       addLearningSiteLoadedListener();
       registerProcrastinationGuards();
-      await startLearningSession(tabId, url, originUrl);
-      addRedirectionLog(
-        `Interception: user redirected to learning platform`,
-        parseUrl(originUrl).name,
-        parseUrl(url).name,
-        {
-          eventType: "redirection_decision",
-          action: "redirect",
-          eventData: "accept",
-          procrastinationUrl: originUrl,
-          learningUrl: url,
-        }
-      );
+      await startSession(tabId, "learning", url, originUrl);
+      // Log single event for accept decision
+      await logEvent({
+        participantId: await storage.uid.get(),
+        eventType: "redirection_decision",
+        procrastinationSite: originUrl,
+        learningSite: url,
+        eventData: "accept",
+      });
       await timer.startLearningSession();
       storage.origin.set({ url: originUrl, tabId: tabId });
       addOriginUpdatedListener(tabId);
@@ -979,7 +1030,8 @@ async function addRedirectionLog(event, from, to, details = {}) {
   };
 
   logEvent({
-    sessionType: eventType,
+    eventType: eventType,
+    eventData: rest.eventData,
     procrastinationSite: rest.procrastinationUrl || from,
     learningSite: rest.learningUrl || to,
     promptResponse: JSON.stringify(metadata),

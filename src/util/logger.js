@@ -343,7 +343,7 @@ export async function logEvent(event = {}) {
   }
 }
 
-// Compatibility wrapper to keep callers but route to the Event class only.
+// Creates a Session record only - Events are for discrete actions
 export async function logSessionEvent(details = {}) {
   if (!isConfigured()) return null;
   try {
@@ -373,18 +373,6 @@ export async function logSessionEvent(details = {}) {
     const sessionResponse = await parseRequest("/classes/Sessions", {
       method: "POST",
       body: JSON.stringify(sessionPayload),
-    });
-
-    const sessionPointer =
-      sessionResponse?.objectId && sessionResponse?.objectId.length > 0
-        ? { __type: "Pointer", className: "Sessions", objectId: sessionResponse.objectId }
-        : null;
-
-    await logEvent({
-      participantId,
-      eventType: details.sessionType || "session",
-      eventData: details.eventData,
-      sessionPointer,
     });
 
     return sessionResponse;
