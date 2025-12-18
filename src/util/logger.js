@@ -100,7 +100,6 @@ async function createParticipant(participantId) {
       const prefsPayload = sanitizeUserPreferences({
         is_active: true,
         learning_time_minutes: 30,
-        procrastination_reward_minutes: 5,
       }, pointer);
       
       if (prefsPayload) {
@@ -453,9 +452,11 @@ export async function saveUserPreferences(preferences = {}) {
       procrastination_sites:
         "procrastination_sites" in payload
           ? payload.procrastination_sites
-          : existing?.procrastination_sites || [],
+          : existing?.procrastination_sites,
       learning_sites:
-        "learning_sites" in payload ? payload.learning_sites : existing?.learning_sites || [],
+        "learning_sites" in payload
+          ? payload.learning_sites
+          : existing?.learning_sites,
     });
 
     const method = existingId ? "PUT" : "POST";

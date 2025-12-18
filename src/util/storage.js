@@ -1,5 +1,5 @@
 import browser from "webextension-polyfill";
-import { participantResource } from "./constants";
+import { parseUrl } from "./utilities";
 const storage = browser.storage.local;
 
 /**
@@ -257,6 +257,9 @@ async function storeSession(data) {
   const { statsDate } = await storage.get("statsDate");
   await checkDate(statsDate);
   const { sessionData } = await storage.get("sessionData");
+  const { learningUri } = await storage.get("learningUri");
+  const learningName = learningUri ? parseUrl(learningUri).name : null;
+  
   let newData = sessionData || {
     procrastinationDuration: 0,
     learningDuration: 0,
@@ -275,7 +278,7 @@ async function storeSession(data) {
   }
 
   for (const key in data) {
-    if (key === participantResource.name) {
+    if (learningName && key === learningName) {
       newData.learningDuration += data[key];
     } else if (!["chromeInactive", "chromeActive"].includes(key)) {
       newData[key] = newData.hasOwnProperty(key)

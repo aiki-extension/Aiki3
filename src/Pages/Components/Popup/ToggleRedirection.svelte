@@ -11,15 +11,17 @@
   export let port;
   let toggled = storage.redirection.get();
 
-  function toggleRedirection() {
+  async function toggleRedirection() {
+    const wasOn = await storage.redirection.get();
     storage.redirection.toggle();
-    toggled = !toggled;
+    const isNowOn = !wasOn;
+    toggled = Promise.resolve(isNowOn);
     try {
-      if (!toggled) {
-        port.postMessage("goto: off");
+      if (isNowOn) {
+        port.postMessage("goto: on");
         location.reload();
       } else {
-        port.postMessage("goto: on");
+        port.postMessage("goto: off");
         location.reload();
       }
     } catch (error) {

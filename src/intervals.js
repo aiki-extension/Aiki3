@@ -1,10 +1,10 @@
 import browser from "webextension-polyfill";
 import storage from "./util/storage";
 import { parseUrl } from "./util/utilities";
-import { learningSites } from "./util/constants";
 
 let list = [];
 let user = null;
+let learningName = null;
 let data = {
   chromeActive: 0,
   chromeInactive: 0,
@@ -12,13 +12,16 @@ let data = {
 let counterId = null;
 let loggerId = null;
 
-const learningNames = learningSites.map((s) => s.name);
-
 async function intervalSetup() {
-  await Promise.all([syncUser(), syncList()]);
+  await Promise.all([syncUser(), syncList(), syncLearningSite()]);
   startCounter();
   startLogger();
   addOnWindowsCloseListener();
+}
+
+async function syncLearningSite() {
+  const learningUri = await storage.learningUri.get();
+  learningName = learningUri ? parseUrl(learningUri).name : null;
 }
 
 async function counter() {
@@ -42,7 +45,7 @@ async function counter() {
     const { name } = parseUrl(activeTab.url);
 
     const isProcrastinationSite = list.includes(name);
-    const isLearningSite = learningNames.includes(name);
+    const isLearningSite = learningName && name === learningName;
 
     if (isProcrastinationSite || isLearningSite) {
       data[name] = (data[name] ?? 0) + 1;

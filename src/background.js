@@ -139,6 +139,7 @@ browser.runtime.onConnect.addListener(function (port) {
     isDisconnected = true;
   });
   port.onMessage.addListener(function (msg) {
+    console.log("[Aiki Debug] Port message received:", msg, "parsed as:", msg.split(": ")[1]);
     switch (msg.split(": ")[1]) {
       case "user":
         intervals.logger.restart();
@@ -150,6 +151,7 @@ browser.runtime.onConnect.addListener(function (port) {
       case "origin": {
         const segments = msg.split(": ");
         const action = segments[2];
+        console.log("[Aiki Debug] Background received origin message:", { msg, action, segments });
         (async () => {
           let tabId = port.sender?.tab?.id;
           if (tabId === undefined) {
@@ -161,6 +163,7 @@ browser.runtime.onConnect.addListener(function (port) {
               tabId = activeTab?.id;
             } catch (_) {}
           }
+          console.log("[Aiki Debug] Calling redirection.gotoOrigin with:", { action, tabId, type: "popup" });
           redirection.gotoOrigin(action, {
             type: "popup",
             tabId,

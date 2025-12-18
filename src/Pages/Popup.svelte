@@ -13,7 +13,6 @@
   import SettingsButton from "./Components/Popup/SettingsButton.svelte";
   import ToggleRedirection from "./Components/Popup/ToggleRedirection.svelte";
   import ContinueButton from "./Components/Popup/ContinueButton.svelte";
-  import SkipButton from "./Components/Popup/SkipButton.svelte";
   import LearningTimeLeft from "./Components/Popup/LearningTimeLeft.svelte";
 
   const port = browser.runtime.connect({
@@ -93,17 +92,10 @@
     />
     <hr />
     {#if siteName !== ""}
-      {#if values.learningTimeRemaining > 0}
-        <div class="container">
-          <SkipButton {gotoOrigin} />
-        </div>
-        <hr />
-      {:else}
-        <div class="container">
-          <ContinueButton {gotoOrigin} />
-        </div>
-        <hr />
-      {/if}
+      <div class="container">
+        <ContinueButton {gotoOrigin} />
+      </div>
+      <hr />
     {/if}
   {/await}
 </main>

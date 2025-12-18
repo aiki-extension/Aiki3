@@ -95,8 +95,9 @@ async function finalizeSession(tabId, sessionType, reason = "switch") {
     const startedAt = session.startedAt || now;
     const durationSeconds = Math.max(0, Math.round((now - startedAt) / 1000));
 
-    // Log discrete event for tab visibility changes
-    if (reason === "tab_switch" || reason === "tab_closed") {
+    // Log discrete event for session end reasons
+    const logEventReasons = ["tab_switch", "tab_closed", "continue"];
+    if (logEventReasons.includes(reason)) {
       await logEvent({
         participantId: session.participantId,
         eventType: reason,
@@ -849,9 +850,20 @@ async function gotoOrigin(event, sourceContext = {}) {
     } catch (_) {}
   }
 
+  console.log("[Aiki Debug] gotoOrigin called:", {
+    event,
+    normalizedEvent,
+    targetTabId,
+    originTabId: origin?.tabId,
+    originUrl: origin?.url,
+  });
+
   const sessionTabId = targetTabId !== undefined ? targetTabId : origin?.tabId;
   if (sessionTabId !== undefined) {
+    console.log("[Aiki Debug] Finalizing learning session for tab:", sessionTabId);
     await finalizeSession(sessionTabId, "learning", normalizedEvent);
+  } else {
+    console.log("[Aiki Debug] No session to finalize - sessionTabId is undefined");
   }
 
   removeOriginUpdatedListener();
@@ -931,6 +943,15 @@ async function gotoOrigin(event, sourceContext = {}) {
 
   const remainingLearningTabs = await getActiveLearningTabs(restoredTabIds);
   const hasRemainingLearningTabs = remainingLearningTabs.length > 0;
+
+  // Start a procrastination session for the destination tab
+  console.log("[Aiki Debug] gotoOrigin procrastination session check:", { destinationUrl, targetTabId });
+  if (destinationUrl && targetTabId !== undefined) {
+    console.log("[Aiki Debug] Starting procrastination session:", { targetTabId, destinationUrl });
+    await startSession(targetTabId, "procrastination", destinationUrl);
+  } else {
+    console.log("[Aiki Debug] NOT starting procrastination session - missing destinationUrl or targetTabId");
+  }
 
   if (destinationUrl) {
     try {
