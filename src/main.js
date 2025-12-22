@@ -1,6 +1,6 @@
 import Popup from "./Pages/Popup.svelte";
 import Settings from "./Pages/Settings.svelte";
-import { getTheme, drawTheme } from "./util/themes";
+import { drawTheme } from "./util/themes";
 
 const app = async () => {
   await drawTheme();

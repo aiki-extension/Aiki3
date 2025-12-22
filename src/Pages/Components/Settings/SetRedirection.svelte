@@ -19,6 +19,7 @@
   export let user = "";
 
   let learningUri = "";
+  let previousUri = "";
   let isEditing = true;
   let hasSaved = false;
   let urlInputRef;
@@ -86,17 +87,26 @@
 
   async function enableEditing() {
     if (isEditing) return;
+    previousUri = learningUri;
     isEditing = true;
     await tick();
     urlInputRef && urlInputRef.focus();
     toast.pop();
   }
 
+  function cancelEdit() {
+    learningUri = previousUri;
+    isEditing = false;
+    toast.pop();
+    toast.push("Changes cancelled.", {
+      theme: themes.infoTheme(toastCoords),
+    });
+  }
+
 </script>
 
 <Container headline="Redirection Settings">
   <h5>Your Learning Platform:</h5>
-  <hr />
   <div class="container">
     <div class="full" id="learning-url-container">
       <input
@@ -110,35 +120,38 @@
         id="learning-url-input"
       />
       <div class="actions">
-        <button
-          type="button"
-          class="btn btn-theme-primary"
-          on:click={saveUri}
-          disabled={!isEditing}
-          id="learning-url-save"
-        >
-          {hasSaved && !isEditing ? "Saved" : "Save"}
-        </button>
-        <button
-          type="button"
-          class="btn btn-theme-secondary edit"
-          class:active-edit={isEditing}
-          on:click={enableEditing}
-          disabled={isEditing}
-          data-tooltip="Unlock to update your learning platform"
-        >
-          Edit
-        </button>
+        {#if isEditing}
+          <button
+            type="button"
+            class="btn btn-success"
+            on:click={saveUri}
+            id="learning-url-save"
+          >
+            Save
+          </button>
+          {#if hasSaved}
+            <button
+              type="button"
+              class="btn btn-secondary"
+              on:click={cancelEdit}
+            >
+              Cancel
+            </button>
+          {/if}
+        {:else}
+          <button
+            type="button"
+            class="btn btn-theme-primary"
+            on:click={enableEditing}
+            data-tooltip="Change your learning platform"
+          >
+            Change
+          </button>
+        {/if}
       </div>
       <div class="status-row">
-        {#if hasSaved}
-          <span class:saved={!isEditing} class="status-badge">
-            {#if isEditing}
-              Editing in progress
-            {:else}
-              Saved for redirection
-            {/if}
-          </span>
+        {#if hasSaved && !isEditing}
+          <span class="status-badge saved">Saved for redirection</span>
         {/if}
       </div>
     </div>
@@ -150,7 +163,6 @@
 
   <hr />
   <h5>Other Settings:</h5>
-  <hr />
   <div>
     <div class="row">
       <div class="col-sm">Pick a theme:</div>

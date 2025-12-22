@@ -14,7 +14,6 @@
 </script>
 
 <h5>Set Learning Time:</h5>
-<hr />
 <p>
   Set a daily learning goal so Aiki knows how long to keep you on your
   learning platform before letting procrastination sites through.

@@ -14,7 +14,7 @@
 </script>
 
 <h5>Set Operating Hours:</h5>
-<hr />
+
 <p>Choose the window of time you would like Aiki to be ON during the day.</p>
 {#await operatingHours}
   LOADING...

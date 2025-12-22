@@ -100,6 +100,8 @@ async function createParticipant(participantId) {
       const prefsPayload = sanitizeUserPreferences({
         is_active: true,
         learning_time_minutes: 30,
+        operating_hours_start: 480,   // 8:00 AM (8 * 60 = 480 minutes from midnight)
+        operating_hours_end: 1290,    // 9:30 PM (21 * 60 + 30 = 1290 minutes from midnight)
       }, pointer);
       
       if (prefsPayload) {
@@ -510,5 +512,92 @@ export async function saveUserPreferences(preferences = {}) {
   } catch (error) {
     console.warn("[Aiki] Unable to save user preferences to Back4App", error);
     return null;
+  }
+}
+
+/**
+ * Fetch session statistics from the database for a given time period.
+ * @param {Object} options
+ * @param {string} [options.participantId] - Optional participant ID (defaults to stored UID)
+ * @param {Date} [options.startDate] - Start of date range (inclusive)
+ * @param {Date} [options.endDate] - End of date range (inclusive, defaults to now)
+ * @returns {Promise<{procrastinationSeconds: number, learningSeconds: number, learningSessionCount: number, procrastinationSessionCount: number, avgLearningSessionSeconds: number}>}
+ */
+export async function fetchSessionStats(options = {}) {
+  if (!isConfigured()) {
+    return { procrastinationSeconds: 0, learningSeconds: 0, learningSessionCount: 0, procrastinationSessionCount: 0, avgLearningSessionSeconds: 0 };
+  }
+  
+  try {
+    const participantId = await getParticipantId(options.participantId);
+    if (!participantId) {
+      return { procrastinationSeconds: 0, learningSeconds: 0, learningSessionCount: 0, procrastinationSessionCount: 0, avgLearningSessionSeconds: 0 };
+    }
+    
+    const participant = await ensureParticipant(participantId);
+    if (!participant) {
+      return { procrastinationSeconds: 0, learningSeconds: 0, learningSessionCount: 0, procrastinationSessionCount: 0, avgLearningSessionSeconds: 0 };
+    }
+    
+    const pointer = toParticipantPointer(participant);
+    if (!pointer) {
+      return { procrastinationSeconds: 0, learningSeconds: 0, learningSessionCount: 0, procrastinationSessionCount: 0, avgLearningSessionSeconds: 0 };
+    }
+    
+    // Build query constraints
+    const constraints = {
+      participant_id: pointer,
+    };
+    
+    if (options.startDate) {
+      constraints.session_start = constraints.session_start || {};
+      constraints.session_start.$gte = toParseDate(options.startDate);
+    }
+    if (options.endDate) {
+      constraints.session_start = constraints.session_start || {};
+      constraints.session_start.$lte = toParseDate(options.endDate);
+    }
+    
+    const where = encodeURIComponent(JSON.stringify(constraints));
+    const limit = 1000; // Fetch up to 1000 sessions
+    
+    const response = await parseRequest(`/classes/Sessions?where=${where}&limit=${limit}`);
+    const sessions = response?.results || [];
+    
+    let procrastinationSeconds = 0;
+    let learningSeconds = 0;
+    let learningSessionCount = 0;
+    let procrastinationSessionCount = 0;
+    
+    for (const session of sessions) {
+      const duration = typeof session.duration_seconds === "number" ? session.duration_seconds : 0;
+      if (session.session_type === "learning") {
+        learningSeconds += duration;
+        learningSessionCount++;
+      } else if (session.session_type === "procrastination") {
+        procrastinationSeconds += duration;
+        procrastinationSessionCount++;
+      }
+    }
+    
+    const avgLearningSessionSeconds = learningSessionCount > 0
+      ? Math.round(learningSeconds / learningSessionCount)
+      : 0;
+    
+    const avgProcrastinationSessionSeconds = procrastinationSessionCount > 0
+      ? Math.round(procrastinationSeconds / procrastinationSessionCount)
+      : 0;
+    
+    return {
+      procrastinationSeconds,
+      learningSeconds,
+      learningSessionCount,
+      procrastinationSessionCount,
+      avgLearningSessionSeconds,
+      avgProcrastinationSessionSeconds,
+    };
+  } catch (error) {
+    console.warn("[Aiki] Unable to fetch session stats from Back4App", error);
+    return { procrastinationSeconds: 0, learningSeconds: 0, learningSessionCount: 0, procrastinationSessionCount: 0, avgLearningSessionSeconds: 0, avgProcrastinationSessionSeconds: 0 };
   }
 }

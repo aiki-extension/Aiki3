@@ -1,144 +1,133 @@
-<!-- This acts as a wrapper for the Chart.svelte
-  component, retreiving and processing data before 
-  rendering the Chart.
-Used in / Parent components: /src/Pages/Settings.svelte	
+<!-- 
+  Statistics display component showing time spent on learning/procrastination sites.
+  Queries the Back4App database for accurate session statistics.
+  Used in / Parent components: /src/Pages/Components/Settings/Statistics.svelte
 -->
 <script>
-  export let data;
-  export let type;
+  import { fetchSessionStats } from "../../../util/logger";
 
-  //procTime and learnTime are in seconds. Probably need to refactor this.
-  let skips = 0;
-  let completed = 0;
-  let procTime = 0;
-  let learnTime = 0;
+  export let type = "today";
 
-  let learnMinutes = 0;
-  let procMinutes = 0;
-  let noStats = false;
-  let focusShare = null;
-  let procrastShare = null;
-  let summaryCards = [];
+  let stats = null;
+  let loading = true;
+  let error = null;
 
-  const timeFrames = {
-    today: "today",
-    yesterday: "yesterday",
-    history: "overall",
+  const timeFrameLabels = {
+    today: "Today",
+    weekly: "This Week",
+    allTime: "All Time",
   };
 
-  let windowLabel = timeFrames[type] || "this period";
-  $: windowLabel = timeFrames[type] || "this period";
+  $: windowLabel = timeFrameLabels[type] || "this period";
 
-  function formatMinutes(value) {
-    if (!value || value <= 0) return "0m";
-    const hrs = Math.floor(value / 60);
-    const mins = value % 60;
-    const parts = [];
-    if (hrs) parts.push(`${hrs}h`);
-    if (mins) parts.push(`${mins}m`);
-    return parts.join(" ") || "0m";
+  function getDateRange(rangeType) {
+    const now = new Date();
+    const endDate = now;
+    let startDate;
+
+    switch (rangeType) {
+      case "today": {
+        startDate = new Date(now);
+        startDate.setHours(0, 0, 0, 0);
+        break;
+      }
+      case "weekly": {
+        startDate = new Date(now);
+        startDate.setDate(startDate.getDate() - 7);
+        startDate.setHours(0, 0, 0, 0);
+        break;
+      }
+      case "allTime":
+      default: {
+        startDate = null; // No start limit
+        break;
+      }
+    }
+
+    return { startDate, endDate };
   }
 
-  function selectRange() {
-    switch (type) {
-      case "today":
-        return {
-          skips: data.skipCount,
-          completed: data.completedCount,
-          procTime: data.sessionData.procrastinationDuration,
-          learnTime: data.sessionData.learningDuration,
-        };
-      case "yesterday":
-        return {
-          skips: data.yesterday.skipCount,
-          completed: data.yesterday.completedCount,
-          procTime: data.yesterday.sessionData.procrastinationDuration,
-          learnTime: data.yesterday.sessionData.learningDuration,
-        };
-      case "history":
-        return {
-          skips: data.history.skipCount,
-          completed: data.history.completedCount,
-          procTime: data.history.sessionData.procrastinationDuration,
-          learnTime: data.history.sessionData.learningDuration,
-        };
-      default:
-        return {
-          skips: 0,
-          completed: 0,
-          procTime: 0,
-          learnTime: 0,
-        };
+  function formatDuration(seconds) {
+    if (!seconds || seconds <= 0) return "0m 0s";
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    
+    const parts = [];
+    if (hrs > 0) parts.push(`${hrs}h`);
+    if (mins > 0 || hrs > 0) parts.push(`${mins}m`);
+    parts.push(`${secs}s`);
+    
+    return parts.join(" ");
+  }
+
+  async function loadStats(rangeType) {
+    loading = true;
+    error = null;
+    try {
+      const { startDate, endDate } = getDateRange(rangeType);
+      stats = await fetchSessionStats({ startDate, endDate });
+    } catch (e) {
+      console.error("Failed to load stats:", e);
+      error = "Failed to load statistics";
+      stats = null;
+    } finally {
+      loading = false;
     }
   }
 
-  $: {
-    const range = selectRange();
-    skips = range.skips || 0;
-    completed = range.completed || 0;
-    procTime = range.procTime || 0;
-    learnTime = range.learnTime || 0;
+  // React to type changes
+  $: loadStats(type);
 
-    learnMinutes = Math.round(learnTime / 60);
-    procMinutes = Math.round(procTime / 60);
-
-    const totalTracked = learnMinutes + procMinutes;
-    focusShare = totalTracked > 0 ? Math.round((learnMinutes / totalTracked) * 100) : null;
-    procrastShare = totalTracked > 0 ? 100 - focusShare : null;
-    noStats = totalTracked === 0;
-
-    summaryCards = [
-      {
-        label: "Learning time",
-        value: formatMinutes(learnMinutes),
-        helper: `Spent on task ${windowLabel}`,
-      },
-      {
-        label: "Break time",
-        value: formatMinutes(procMinutes),
-        helper: "Tracked on procrastination sites",
-      },
-      {
-        label: "Completed redirects",
-        value: completed.toLocaleString(),
-        helper: "Times you chose to learn",
-      },
-      {
-        label: "Continue taps",
-        value: skips.toLocaleString(),
-        helper: "Times you stayed on the original site",
-      },
-    ];
-  }
+  $: noStats = !loading && stats && 
+    stats.learningSeconds === 0 && 
+    stats.procrastinationSeconds === 0;
 </script>
 
-{#if noStats}
+{#if loading}
+  <div class="loading-state">
+    <p>Loading statistics...</p>
+  </div>
+{:else if error}
+  <div class="error-state">
+    <p>{error}</p>
+  </div>
+{:else if noStats}
   <div class="empty-state">
-    <h5>No stats for this time period yet.</h5>
-    <p>Come back after a learning session to see your progress.</p>
+    <h5>No stats for {windowLabel.toLowerCase()} yet.</h5>
+    <p>Come back after a browsing session to see your progress.</p>
   </div>
 {:else}
-  <div class="summary-grid">
-    {#if focusShare !== null}
-      <div class="ratio-card">
-        <div class="ratio-value">{focusShare}%</div>
-        <span class="ratio-helper">of tracked time on task</span>
-        <div class="ratio-divider" />
-        <div class="ratio-meta">{procrastShare}% on breaks</div>
-      </div>
-    {/if}
+  <div class="stats-grid">
+    <div class="stat-card learning">
+      <span class="stat-label">Total Learning Time</span>
+      <span class="stat-value">{formatDuration(stats.learningSeconds)}</span>
+      <span class="stat-helper">{stats.learningSessionCount} session{stats.learningSessionCount !== 1 ? 's' : ''} {windowLabel.toLowerCase()}</span>
+    </div>
 
-    {#each summaryCards as card (card.label)}
-      <div class="card">
-        <span class="card-label">{card.label}</span>
-        <span class="card-value">{card.value}</span>
-        <span class="card-helper">{card.helper}</span>
-      </div>
-    {/each}
+    <div class="stat-card procrastination">
+      <span class="stat-label">Total Procrastination Time</span>
+      <span class="stat-value">{formatDuration(stats.procrastinationSeconds)}</span>
+      <span class="stat-helper">{stats.procrastinationSessionCount} session{stats.procrastinationSessionCount !== 1 ? 's' : ''} {windowLabel.toLowerCase()}</span>
+    </div>
+
+    <div class="stat-card average">
+      <span class="stat-label">Avg Learning Session</span>
+      <span class="stat-value">{formatDuration(stats.avgLearningSessionSeconds)}</span>
+      <span class="stat-helper">Average duration per session</span>
+    </div>
+
+    <div class="stat-card average-proc">
+      <span class="stat-label">Avg Procrastination Session</span>
+      <span class="stat-value">{formatDuration(stats.avgProcrastinationSessionSeconds)}</span>
+      <span class="stat-helper">Average duration per session</span>
+    </div>
   </div>
 {/if}
 
 <style>
+  .loading-state,
+  .error-state,
   .empty-state {
     display: flex;
     flex-direction: column;
@@ -149,81 +138,73 @@ Used in / Parent components: /src/Pages/Settings.svelte
     color: var(--textColor);
   }
 
-  .empty-state h5 {
+  .empty-state h5,
+  .error-state p {
     margin: 0;
     font-size: 1rem;
   }
 
-  .empty-state p {
+  .empty-state p,
+  .loading-state p {
     margin: 0;
     font-family: var(--fontContent);
     font-size: 0.9rem;
     opacity: 0.75;
   }
 
-  .summary-grid {
+  .stats-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 16px;
   }
 
-  .card,
-  .ratio-card {
+  .stat-card {
     background: var(--backgroundColorSecondary);
     border: 1px solid var(--hrColor);
     border-radius: 12px;
-    padding: 16px;
+    padding: 20px;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 8px;
     min-height: 120px;
   }
 
-  .card-label {
-    font-size: 0.85rem;
+  .stat-card.learning {
+    border-left: 4px solid #22c55e;
+  }
+
+  .stat-card.procrastination {
+    border-left: 4px solid #ef4444;
+  }
+
+  .stat-card.average {
+    border-left: 4px solid #3b82f6;
+  }
+
+  .stat-card.average-proc {
+    border-left: 4px solid #f97316;
+  }
+
+  .stat-label {
+    font-size: 0.8rem;
     font-family: var(--fontContent);
     text-transform: uppercase;
     letter-spacing: 0.08em;
     opacity: 0.7;
+    color: var(--textColor);
   }
 
-  .card-value {
-    font-size: 1.6rem;
-    font-weight: 600;
-    font-family: var(--fontHeaders);
-  }
-
-  .card-helper {
-    font-size: 0.9rem;
-    opacity: 0.75;
-    font-family: var(--fontContent);
-  }
-
-  .ratio-card {
-    position: relative;
-    overflow: hidden;
-    align-items: flex-start;
-  }
-
-  .ratio-value {
-    font-size: 2rem;
+  .stat-value {
+    font-size: 1.8rem;
     font-weight: 700;
     font-family: var(--fontHeaders);
     color: var(--textColor);
   }
 
-  .ratio-helper,
-  .ratio-meta {
+  .stat-helper {
     font-size: 0.85rem;
+    opacity: 0.6;
     font-family: var(--fontContent);
-    opacity: 0.75;
-  }
-
-  .ratio-divider {
-    width: 100%;
-    height: 1px;
-    background: var(--hrColor);
-    margin: 12px 0;
-    opacity: 0.4;
+    color: var(--textColor);
   }
 </style>
