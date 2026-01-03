@@ -6,6 +6,8 @@ import timer from "./timer";
 import { setTheme } from "./util/themes";
 import badge from "./badge";
 import { logAuditEvent, saveUserPreferences } from "./util/logger";
+import controlledMode from "./controlledMode";
+import { isControlled } from "./util/variantConfig";
 
 // Manifest V3: No DOM access, no stray variables
 
@@ -25,7 +27,26 @@ browser.runtime.onMessage.addListener((message, sender) => {
       try {
         await timer.sync();
       } catch (_) {}
-      return timer.getTime();
+      
+      const timeData = timer.getTime();
+      
+      // Add controlled mode state if controlled variant
+      if (isControlled()) {
+        const controlledState = controlledMode.getState();
+        return {
+          ...timeData,
+          isControlledVariant: true,
+          controlledState: controlledState.state,
+          controlledLearningRemaining: controlledState.state === "learning" ? controlledState.remainingMs : 0,
+          controlledLearningGoal: controlledState.state === "learning" ? controlledState.goalMs : 0,
+          controlledLearningElapsed: controlledState.state === "learning" ? controlledState.elapsedMs : 0,
+          controlledLearningCompleted: controlledState.state === "learning" ? controlledState.completed : false,
+          controlledRewardRemaining: controlledState.state === "reward" ? controlledState.remainingMs : 0,
+          controlledRewardGoal: controlledState.state === "reward" ? controlledState.goalMs : 0,
+        };
+      }
+      
+      return { ...timeData, isControlledVariant: false };
     })();
   }
 
@@ -47,6 +68,36 @@ browser.runtime.onMessage.addListener((message, sender) => {
   if (message.type === "blocker:release" && sender && sender.tab && sender.tab.id !== undefined) {
     storage.blockedTabs.remove(sender.tab.id);
     storage.blockedOrigins.remove(sender.tab.id);
+  }
+
+  // Handle claim reward for controlled variant
+  if (message.type === "controlled:claimReward" && sender && sender.tab) {
+    return (async () => {
+      try {
+        if (isControlled()) {
+          // Use the dedicated claimReward function which handles the full transition
+          await controlledMode.claimReward(sender.tab.id);
+        }
+      } catch (e) {
+        console.log("[Background] Failed to claim reward:", e);
+      }
+      return true;
+    })();
+  }
+  
+  // Handle snooze reward for controlled variant (adds 1 minute)
+  if (message.type === "controlled:snoozeReward") {
+    return (async () => {
+      try {
+        if (isControlled()) {
+          const success = controlledMode.snoozeReward();
+          console.log("[Background] Snooze reward result:", success);
+        }
+      } catch (e) {
+        console.log("[Background] Failed to snooze reward:", e);
+      }
+      return true;
+    })();
   }
 });
 
@@ -79,6 +130,12 @@ async function setup() {
   redirection.tabChangeListener.start();
   redirection.windowChangeListener.start();
   redirection.addOriginTabCloseListener();
+  
+  // Initialize controlled mode if applicable
+  if (isControlled()) {
+    await controlledMode.init();
+    console.log("[Background] Controlled mode initialized");
+  }
 }
 
 async function killAiki() {
@@ -180,7 +237,24 @@ browser.runtime.onConnect.addListener(function (port) {
           } catch (_) {}
           if (isDisconnected) return;
           try {
-            port.postMessage(timer.getTime());
+            const timeData = timer.getTime();
+            // Add controlled mode state if controlled variant
+            if (isControlled()) {
+              const controlledState = controlledMode.getState();
+              port.postMessage({
+                ...timeData,
+                isControlledVariant: true,
+                controlledState: controlledState.state,
+                controlledLearningRemaining: controlledState.state === "learning" ? controlledState.remainingMs : 0,
+                controlledLearningGoal: controlledState.state === "learning" ? controlledState.goalMs : 0,
+                controlledLearningElapsed: controlledState.state === "learning" ? controlledState.elapsedMs : 0,
+                controlledLearningCompleted: controlledState.state === "learning" ? controlledState.completed : false,
+                controlledRewardRemaining: controlledState.state === "reward" ? controlledState.remainingMs : 0,
+                controlledRewardGoal: controlledState.state === "reward" ? controlledState.goalMs : 0,
+              });
+            } else {
+              port.postMessage({ ...timeData, isControlledVariant: false });
+            }
           } catch (error) {
             // Port might have been disconnected between sync and post
           }

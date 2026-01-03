@@ -250,6 +250,228 @@ function killAiki() {
   dailyProgress = 0;
 }
 
+// ============================================
+// Controlled Variant Session-Based Timers
+// These are separate from daily goal timers
+// ============================================
+
+let controlledLearningRemaining = 0;
+let controlledLearningIntervalRef;
+let controlledLearningGoal = 0;
+let controlledLearningElapsed = 0; // Total time spent (continues past goal)
+let controlledLearningCompleted = false; // Whether goal was reached
+let controlledRewardRemaining = 0;
+let controlledRewardIntervalRef;
+let controlledRewardGoal = 0;
+let controlledLearningOnComplete = null;
+let controlledRewardOnComplete = null;
+
+async function decrementControlledLearning() {
+  if (await checkActive()) {
+    // Always increment elapsed time
+    controlledLearningElapsed += 1000;
+    
+    if (controlledLearningRemaining > 0) {
+      controlledLearningRemaining -= 1000;
+      if (controlledLearningRemaining <= 0) {
+        controlledLearningRemaining = 0;
+        controlledLearningCompleted = true;
+        // Fire onComplete callback once when goal is reached
+        if (typeof controlledLearningOnComplete === "function") {
+          controlledLearningOnComplete();
+          controlledLearningOnComplete = null; // Prevent multiple calls
+        }
+        // NOTE: Timer continues running to track time past goal
+      }
+    }
+    // If remaining is 0, timer keeps running to track extra time
+  }
+}
+
+/**
+ * Start a controlled variant learning session timer.
+ * @param {number} learningMs - Learning time in milliseconds
+ * @param {Function} onComplete - Callback when timer completes
+ */
+function startControlledLearningSession(learningMs, onComplete) {
+  stopControlledLearningSession();
+  stopControlledRewardSession();
+  
+  controlledLearningGoal = learningMs;
+  controlledLearningRemaining = learningMs;
+  controlledLearningElapsed = 0;
+  controlledLearningCompleted = false;
+  controlledLearningOnComplete = onComplete;
+  
+  badge.setBusy();
+  
+  if (controlledLearningRemaining > 0) {
+    controlledLearningIntervalRef = setInterval(decrementControlledLearning, 1000);
+  } else if (typeof onComplete === "function") {
+    onComplete();
+  }
+}
+
+function stopControlledLearningSession() {
+  if (controlledLearningIntervalRef) {
+    clearInterval(controlledLearningIntervalRef);
+    controlledLearningIntervalRef = undefined;
+  }
+  controlledLearningRemaining = 0;
+  controlledLearningGoal = 0;
+  controlledLearningElapsed = 0;
+  controlledLearningCompleted = false;
+  controlledLearningOnComplete = null;
+}
+
+function isControlledLearningActive() {
+  return Boolean(controlledLearningIntervalRef);
+}
+
+async function decrementControlledReward() {
+  // Reward timer ticks regardless of focus (user is on procrastination site)
+  if (controlledRewardRemaining > 0) {
+    controlledRewardRemaining -= 1000;
+    if (controlledRewardRemaining <= 0) {
+      controlledRewardRemaining = 0;
+      clearInterval(controlledRewardIntervalRef);
+      controlledRewardIntervalRef = undefined;
+      if (typeof controlledRewardOnComplete === "function") {
+        controlledRewardOnComplete();
+      }
+    }
+  }
+}
+
+/**
+ * Start a controlled variant reward session timer.
+ * @param {number} rewardMs - Reward time in milliseconds
+ * @param {Function} onComplete - Callback when timer completes
+ */
+function startControlledRewardSession(rewardMs, onComplete) {
+  stopControlledLearningSession();
+  stopControlledRewardSession();
+  
+  controlledRewardGoal = rewardMs;
+  controlledRewardRemaining = rewardMs;
+  controlledRewardOnComplete = onComplete;
+  
+  badge.setProgress("🎉", 1);
+  
+  if (controlledRewardRemaining > 0) {
+    controlledRewardIntervalRef = setInterval(decrementControlledReward, 1000);
+  } else if (typeof onComplete === "function") {
+    onComplete();
+  }
+}
+
+function stopControlledRewardSession() {
+  if (controlledRewardIntervalRef) {
+    clearInterval(controlledRewardIntervalRef);
+    controlledRewardIntervalRef = undefined;
+  }
+  controlledRewardRemaining = 0;
+  controlledRewardGoal = 0;
+  controlledRewardOnComplete = null;
+}
+
+function isControlledRewardActive() {
+  return Boolean(controlledRewardIntervalRef);
+}
+
+function getControlledSessionState() {
+  return {
+    learningRemaining: controlledLearningRemaining,
+    learningGoal: controlledLearningGoal,
+    learningElapsed: controlledLearningElapsed,
+    learningCompleted: controlledLearningCompleted,
+    rewardRemaining: controlledRewardRemaining,
+    rewardGoal: controlledRewardGoal,
+    isLearning: isControlledLearningActive(),
+    isReward: isControlledRewardActive(),
+  };
+}
+
+function killControlledTimers() {
+  stopControlledLearningSession();
+  stopControlledRewardSession();
+}
+
+// ============================================
+// Wrapper Methods for ControlledMode Compatibility
+// ============================================
+
+/**
+ * Get timer durations from settings (wrapper for controlledMode).
+ */
+async function getControlledDurations() {
+  const learningMinutes = await storage.controlledTimerSettings?.learningMinutes?.get?.() || 1;
+  const rewardMinutes = await storage.controlledTimerSettings?.rewardMinutes?.get?.() || 2;
+  return {
+    learningMs: learningMinutes * 60 * 1000,
+    rewardMs: rewardMinutes * 60 * 1000,
+  };
+}
+
+/**
+ * Stop all controlled timers.
+ */
+function stopAllTimers() {
+  killControlledTimers();
+}
+
+/**
+ * Start a timer (using controlled timer functions which have checkActive built-in).
+ * @param {string} type - "learning" or "reward"
+ * @param {number} durationMs - Duration in milliseconds
+ * @param {Function} onComplete - Callback when timer completes
+ */
+function startTimer(type, durationMs, onComplete) {
+  if (type === "learning") {
+    startControlledLearningSession(durationMs, onComplete);
+  } else if (type === "reward") {
+    startControlledRewardSession(durationMs, onComplete);
+  }
+}
+
+/**
+ * Get timer state for controlled mode.
+ * @param {string} type - "learning" or "reward"
+ */
+function getTimerState(type) {
+  if (type === "learning") {
+    return {
+      remaining: controlledLearningRemaining,
+      goal: controlledLearningGoal,
+      active: isControlledLearningActive(),
+      elapsed: controlledLearningElapsed, // Total time spent (continues past goal)
+      completed: controlledLearningCompleted, // True once goal is reached
+    };
+  } else if (type === "reward") {
+    return {
+      remaining: controlledRewardRemaining,
+      goal: controlledRewardGoal,
+      active: isControlledRewardActive(),
+      elapsed: controlledRewardGoal - controlledRewardRemaining,
+      completed: controlledRewardRemaining <= 0 && controlledRewardGoal > 0,
+    };
+  }
+  return { remaining: 0, goal: 0, active: false, elapsed: 0, completed: false };
+}
+
+/**
+ * Extend a timer by adding more time.
+ * @param {string} type - Timer type
+ * @param {number} durationMs - Duration to add
+ */
+function extendTimer(type, durationMs) {
+  if (type === "reward" && isControlledRewardActive()) {
+    controlledRewardRemaining += durationMs;
+    controlledRewardGoal += durationMs;
+    console.log(`[Timer] Extended reward timer by ${durationMs / 1000}s`);
+  }
+}
+
 function getTime() {
   return {
     bonusTime: bonusTime,
@@ -258,6 +480,11 @@ function getTime() {
     dailyGoal,
     dailyProgress,
     rewardUnlockAt,
+    // Controlled variant session state
+    controlledLearningRemaining,
+    controlledLearningGoal,
+    controlledRewardRemaining,
+    controlledRewardGoal,
   };
 }
 
@@ -271,4 +498,20 @@ export default {
   getTime,
   killAiki,
   sync: syncDailyState,
+  // Controlled variant timers
+  startControlledLearningSession,
+  stopControlledLearningSession,
+  isControlledLearningActive,
+  startControlledRewardSession,
+  stopControlledRewardSession,
+  isControlledRewardActive,
+  getControlledSessionState,
+  killControlledTimers,
+  // Wrapper methods for controlledMode.js compatibility
+  getControlledDurations,
+  stopAllTimers,
+  startTimer,
+  getTimerState,
+  extendTimer,
 };
+

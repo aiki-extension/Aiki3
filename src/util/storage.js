@@ -647,6 +647,47 @@ function clearActiveSessions() {
   return storage.remove("activeSessions");
 }
 
+// Controlled variant session state
+async function setControlledSession(session) {
+  if (session && typeof session === "object") {
+    await storage.set({ controlledSession: session });
+  } else {
+    await storage.remove("controlledSession");
+  }
+}
+
+async function getControlledSession() {
+  const result = await storage.get("controlledSession");
+  return result && result.controlledSession ? result.controlledSession : null;
+}
+
+async function clearControlledSession() {
+  return storage.remove("controlledSession");
+}
+
+// Controlled variant timer settings (session-based, separate from daily goal)
+async function getControlledLearningMinutes() {
+  const result = await storage.get("controlledLearningMinutes");
+  return typeof result.controlledLearningMinutes === "number"
+    ? result.controlledLearningMinutes
+    : 5; // Default 5 minutes
+}
+
+async function setControlledLearningMinutes(minutes) {
+  await storage.set({ controlledLearningMinutes: minutes });
+}
+
+async function getControlledRewardMinutes() {
+  const result = await storage.get("controlledRewardMinutes");
+  return typeof result.controlledRewardMinutes === "number"
+    ? result.controlledRewardMinutes
+    : 2; // Default 2 minutes
+}
+
+async function setControlledRewardMinutes(minutes) {
+  await storage.set({ controlledRewardMinutes: minutes });
+}
+
 export default {
   timeSettings: {
     getAll: getUserTimes,
@@ -716,5 +757,15 @@ export default {
     remove: removeActiveSession,
     clear: clearActiveSessions,
   },
+  controlledSession: {
+    get: getControlledSession,
+    set: setControlledSession,
+    clear: clearControlledSession,
+  },
+  controlledTimerSettings: {
+    learningMinutes: { get: getControlledLearningMinutes, set: setControlledLearningMinutes },
+    rewardMinutes: { get: getControlledRewardMinutes, set: setControlledRewardMinutes },
+  },
   forgetOrigin: () => storage.remove("origin"),
 };
+

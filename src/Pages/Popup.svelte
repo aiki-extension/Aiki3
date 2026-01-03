@@ -7,6 +7,9 @@
   import { parseUrl } from "../util/utilities";
   import storage from "../util/storage";
   import browser from "webextension-polyfill";
+  import { AIKI_VARIANT } from "../util/variant";
+
+  const isControlled = AIKI_VARIANT === "controlled";
 
   /* Components import */
   import Header from "./Components/Popup/Header.svelte";
@@ -89,9 +92,16 @@
       learningTimeRemaining={values.learningTimeRemaining}
       dailyGoal={values.dailyGoal}
       dailyProgress={values.dailyProgress}
+      controlledState={values.controlledState || "idle"}
+      controlledLearningRemaining={values.controlledLearningRemaining || 0}
+      controlledLearningGoal={values.controlledLearningGoal || 0}
+      controlledLearningElapsed={values.controlledLearningElapsed || 0}
+      controlledLearningCompleted={values.controlledLearningCompleted || false}
+      controlledRewardRemaining={values.controlledRewardRemaining || 0}
+      controlledRewardGoal={values.controlledRewardGoal || 0}
     />
     <hr />
-    {#if siteName !== ""}
+    {#if siteName !== "" || (isControlled && values.controlledState === "learning")}
       <div class="container">
         <ContinueButton {gotoOrigin} />
       </div>
