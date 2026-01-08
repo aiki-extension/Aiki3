@@ -102,7 +102,6 @@ export async function finalizeSession(tabId, sessionType, reason = "switch") {
     sessionType: session.sessionType,
     startedAt: new Date(session.startedAt).toISOString(),
     durationMs,
-    endReason: reason,
     learningUrl: session.learningUrl,
     procrastinationUrl: session.procrastinationUrl,
   }).catch(() => {});

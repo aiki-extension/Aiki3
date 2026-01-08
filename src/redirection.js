@@ -91,7 +91,9 @@ async function finalizeSession(tabId, sessionType, reason = "switch") {
   
   try {
     const session = await storage.activeSessions.get(tabId);
-    if (!session || session.sessionType !== sessionType) return;
+    if (!session || session.sessionType !== sessionType) {
+      return;
+    }
     await storage.activeSessions.remove(tabId);
 
     const now = Date.now();
@@ -119,12 +121,17 @@ async function finalizeSession(tabId, sessionType, reason = "switch") {
       actualDurationSeconds: durationSeconds,
       durationSeconds,
       completed: false,
-      eventData: reason,
     };
 
+    // Use stored goalMs if available (controlled variant), otherwise fetch daily goal
+    if (session.goalMs) {
+      logData.goalSeconds = Math.round(session.goalMs / 1000);
+    } else if (sessionType === "learning") {
+      logData.goalSeconds = await getGoalSeconds();
+    }
+    
     if (sessionType === "learning") {
       logData.learningSite = session.learningUrl;
-      logData.goalSeconds = await getGoalSeconds();
     }
 
     await logSessionEvent(logData);
@@ -201,22 +208,6 @@ async function handleTabNavigation(tabId, nextUrl) {
 }
 
 /**
- * Check if a URL belongs to a procrastination site
- * @deprecated Use siteDetector.checkIfProcrastination() instead
- */
-async function isProcrastinationSite(url) {
-  return siteDetector.checkIfProcrastination(url);
-}
-
-/**
- * Check if a URL belongs to a learning site
- * @deprecated Use siteDetector.checkIfLearning() instead
- */
-async function isLearningSite(url) {
-  return siteDetector.checkIfLearning(url);
-}
-
-/**
  * Start a session for the given tab if it's on a tracked site.
  * Always starts a NEW session (even if returning to same site/category).
  */
@@ -227,13 +218,13 @@ async function maybeStartSessionForTab(tabId) {
     if (!tab || !tab.url) return;
     
     // Check if on a procrastination site
-    if (await isProcrastinationSite(tab.url)) {
+    if (await siteDetector.checkIfProcrastination(tab.url)) {
       await startSession(tabId, "procrastination", tab.url);
       return;
     }
     
     // Check if on a learning site
-    if (await isLearningSite(tab.url)) {
+    if (await siteDetector.checkIfLearning(tab.url)) {
       const origin = await storage.origin.get();
       await startSession(tabId, "learning", tab.url, origin?.url || null);
       return;
@@ -294,9 +285,23 @@ function registerProcrastinationGuards() {
 
   // Handle tab removal: end session on closed tab
   browser.tabs.onRemoved.addListener(async (tabId, removeInfo) => {
-    // Finalize immediately - this will run before the deferred onActivated check
-    await finalizeSession(tabId, "procrastination", "tab_closed");
-    await finalizeSession(tabId, "learning", "tab_closed");
+    console.log("[Redirection] Tab removed:", { tabId, isControlled: isControlled() });
+    
+    if (isControlled()) {
+      // Controlled variant: try in-memory handleTabClose first, but ALSO 
+      // call finalizeSession as fallback since activeSessions storage persists
+      console.log("[Redirection] Calling controlledMode.handleTabClose for tab:", tabId);
+      await controlledMode.handleTabClose(tabId);
+      // ALSO call finalizeSession to catch sessions stored in activeSessions
+      // (claimReward stores procrastination sessions there, and this handles SW restarts)
+      await finalizeSession(tabId, "procrastination", "tab_closed");
+      await finalizeSession(tabId, "learning", "tab_closed");
+    } else {
+      // Experimental variant: use standard finalizeSession
+      await finalizeSession(tabId, "procrastination", "tab_closed");
+      await finalizeSession(tabId, "learning", "tab_closed");
+    }
+    
     // Clean up window tracking if this was the tracked tab
     if (removeInfo?.windowId !== undefined) {
       const tracked = lastActiveTabByWindow.get(removeInfo.windowId);
@@ -321,6 +326,9 @@ function registerProcrastinationGuards() {
     }
     // Note: Timer pausing for controlled variant is handled automatically by checkActive() in timer.js
   });
+  
+  // For controlled variant, also listen for direct learning site navigation
+  addControlledLearningSiteListener();
 }
 
 async function logDeclinedIntervention(originUrl, learningUrl) {
@@ -694,6 +702,50 @@ async function addLearningSiteLoadedListener() {
   });
 }
 
+/**
+ * Handle controlled variant learning site navigation.
+ * Called when user directly navigates to learning site while in IDLE state.
+ */
+async function handleControlledLearningSiteNavigation(details) {
+  if (details.frameId !== 0) return;
+  
+  const toggled = await storage.redirection.get();
+  if (!toggled) return;
+  
+  if (!isControlled()) return;
+  
+  // Get procrastination hosts and learning URL
+  const procList = await storage.list.get();
+  const procHosts = (procList || []).map(item => item?.host || item?.name || "").filter(Boolean);
+  const learningUrl = await storage.learningUri.get();
+  
+  // Let controlledMode handle the navigation
+  controlledMode.handleNavigation(
+    details.tabId,
+    details.url,
+    procHosts,
+    learningUrl
+  );
+}
+
+/**
+ * Add listener for learning site navigation (controlled variant only).
+ * This enables direct learning session start when user navigates to learning site.
+ */
+async function addControlledLearningSiteListener() {
+  if (!isControlled()) return;
+  
+  const currentLearning = await storage.learningUri.get();
+  if (!currentLearning) return;
+  const learningName = parseUrl(currentLearning).name;
+  if (!learningName) return;
+  
+  browser.webNavigation.onCompleted.addListener(handleControlledLearningSiteNavigation, {
+    url: [{ hostContains: learningName }],
+  });
+  console.log("[Redirection] Added controlled learning site listener for:", learningName);
+}
+
 // Fallback trigger in case webNavigation timing misses injection readiness
 async function triggerLearningOverlay(tabId) {
   try {
@@ -792,6 +844,19 @@ async function checkActiveTab() {
       if (procListNames.includes(tabSiteName)) {
         const learningUri = await storage.learningUri.get();
         if (!learningUri) return; // no learning site set; do nothing
+        
+        // CONTROLLED VARIANT: Use controlledMode to immediately redirect
+        if (isControlled()) {
+          // Check if reward timer is active - allow procrastination
+          if (controlledMode.isInReward()) {
+            return;
+          }
+          const procHosts = procList.map(item => item?.host || item?.name || "").filter(Boolean);
+          const handled = controlledMode.handleNavigation(tab.id, tab.url, procHosts, learningUri);
+          if (handled) return;
+        }
+        
+        // EXPERIMENTAL VARIANT: Show redirect prompt
         addRedirectionLog(
           `Interception: initiating countdown`,
           tabSiteName,
@@ -912,8 +977,13 @@ async function gotoOrigin(event, sourceContext = {}) {
 
   const sessionTabId = targetTabId !== undefined ? targetTabId : origin?.tabId;
   if (sessionTabId !== undefined) {
-    console.log("[Aiki Debug] Finalizing learning session for tab:", sessionTabId);
-    await finalizeSession(sessionTabId, "learning", normalizedEvent);
+    // Skip for controlled variant - handleContinue already logs the learning session
+    if (isControlled()) {
+      console.log("[Aiki Debug] Controlled variant - skipping finalizeSession (handled by controlledMode)");
+    } else {
+      console.log("[Aiki Debug] Finalizing learning session for tab:", sessionTabId);
+      await finalizeSession(sessionTabId, "learning", normalizedEvent);
+    }
   } else {
     console.log("[Aiki Debug] No session to finalize - sessionTabId is undefined");
   }
@@ -1037,159 +1107,6 @@ async function gotoOrigin(event, sourceContext = {}) {
     await timer.startProcrastinationSession(checkActiveTab, rewardTime);
   } else if (hasRemainingLearningTabs) {
     await storage.shouldRedirect.set(true);
-  }
-}
-
-/**
- * Handle controlled variant redirect - immediate redirect without consent.
- * @param {number} tabId - Tab ID
- * @param {string} learningUrl - Learning URL to redirect to
- * @param {string} procrastinationUrl - Original procrastination URL
- */
-async function handleControlledRedirect(tabId, learningUrl, procrastinationUrl) {
-  try {
-    l("[Controlled] Immediate redirect to learning");
-    
-    // IMPORTANT: Redirect FIRST for instant response - don't wait for async operations
-    try {
-      await browser.tabs.update(tabId, { url: learningUrl });
-    } catch (e) {
-      l("[Controlled] Failed to redirect:", e);
-      return; // If redirect fails, don't continue
-    }
-    
-    // Now do all the async work in background (after redirect started)
-    (async () => {
-      try {
-        // Store session state
-        await storage.controlledSession.set({
-          triggeringProcrastinationUrl: procrastinationUrl,
-          sessionStartedAt: Date.now(),
-        });
-        
-        // Log events (non-blocking)
-        const participantId = await storage.uid.get();
-        logEvent({
-          participantId,
-          eventType: "controlled:procrastination_detected",
-          procrastinationSite: procrastinationUrl,
-          learningSite: learningUrl,
-        }).catch(() => {});
-        logEvent({
-          participantId,
-          eventType: "controlled:forced_redirect",
-          procrastinationSite: procrastinationUrl,
-          learningSite: learningUrl,
-        }).catch(() => {});
-        
-        // Setup learning session
-        addLearningSiteLoadedListener();
-        registerProcrastinationGuards();
-        await startSession(tabId, "learning", learningUrl, procrastinationUrl);
-        
-        // Store origin for learning overlay
-        storage.origin.set({ url: procrastinationUrl, tabId: tabId });
-        addOriginUpdatedListener(tabId);
-        
-        // Get controlled learning time and start session timer
-        const learningMinutes = await storage.controlledTimerSettings.learningMinutes.get();
-        const learningMs = learningMinutes * 60 * 1000;
-        
-        logEvent({
-          participantId,
-          eventType: "controlled:learning_session_start",
-          procrastinationSite: procrastinationUrl,
-          learningSite: learningUrl,
-          eventData: `${learningMinutes} minutes`,
-        }).catch(() => {});
-        
-        // Trigger learning overlay after page loads
-        setTimeout(() => triggerLearningOverlay(tabId), 1500);
-        
-        // Start session-based learning timer
-        timer.startControlledLearningSession(learningMs, async () => {
-          // Timer completed - redirect back to procrastination site
-          l("[Controlled] Learning timer complete, redirecting to procrastination");
-          
-          const session = await storage.controlledSession.get();
-          const triggerUrl = session?.triggeringProcrastinationUrl || procrastinationUrl;
-          
-          logEvent({
-            participantId,
-            eventType: "controlled:learning_timer_complete",
-            procrastinationSite: triggerUrl,
-            learningSite: learningUrl,
-          }).catch(() => {});
-          
-          // Finalize learning session
-          await finalizeSession(tabId, "learning", "timer_complete");
-          removeLearningSiteLoadedListener();
-          removeOriginUpdatedListener();
-          storage.origin.remove();
-          
-          // Start reward timer and redirect to procrastination
-          const rewardMinutes = await storage.controlledTimerSettings.rewardMinutes.get();
-          const rewardMs = rewardMinutes * 60 * 1000;
-          
-          logEvent({
-            participantId,
-            eventType: "controlled:reward_session_start",
-            procrastinationSite: triggerUrl,
-            learningSite: learningUrl,
-            eventData: `${rewardMinutes} minutes`,
-          }).catch(() => {});
-          
-          // Start procrastination session for tracking
-          await startSession(tabId, "procrastination", triggerUrl);
-          
-          // Redirect to procrastination site
-          try {
-            await browser.tabs.update(tabId, { url: triggerUrl });
-          } catch (e) {
-            l("[Controlled] Failed to redirect to procrastination:", e);
-          }
-          
-          // Start reward timer
-          timer.startControlledRewardSession(rewardMs, async () => {
-            // Reward time expired - redirect back to learning
-            l("[Controlled] Reward timer expired, redirecting to learning");
-            
-            logEvent({
-              participantId,
-              eventType: "controlled:reward_timer_expiry",
-              procrastinationSite: triggerUrl,
-              learningSite: learningUrl,
-            }).catch(() => {});
-            
-            // Finalize procrastination session
-            await finalizeSession(tabId, "procrastination", "reward_expiry");
-            
-            // Store new session state and redirect to learning
-            await storage.controlledSession.set({
-              triggeringProcrastinationUrl: triggerUrl,
-              sessionStartedAt: Date.now(),
-            });
-            
-            // Redirect to learning
-            try {
-              await browser.tabs.update(tabId, { url: learningUrl });
-            } catch (e) {
-              l("[Controlled] Failed to redirect to learning on reward expiry:", e);
-            }
-            
-            // Re-trigger learning flow
-            setTimeout(() => {
-              handleControlledRedirect(tabId, learningUrl, triggerUrl);
-            }, 500);
-          });
-        });
-      } catch (error) {
-        l("[Controlled] Error in background processing:", error);
-      }
-    })();
-    
-  } catch (error) {
-    l("[Controlled] Error in handleControlledRedirect:", error);
   }
 }
 
@@ -1358,4 +1275,6 @@ export default {
   addOriginTabCloseListener,
   removeLearningSiteLoadedListener,
   checkActiveTab,
+  registerProcrastinationGuards,
+  finalizeAllActiveSessions,
 };

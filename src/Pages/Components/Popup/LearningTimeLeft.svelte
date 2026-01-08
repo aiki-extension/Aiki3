@@ -131,7 +131,7 @@
   }
 
   p.reward {
-    color: #f59e0b;
+    color: #ffffff;
   }
 
   p.idle {
@@ -158,7 +158,7 @@
   }
 
   .progress-bar.reward-bar {
-    background: linear-gradient(135deg, #f59e0b, #f97316);
+    background: linear-gradient(135deg, #ffffff, #ffffff);
   }
 
   .meta {

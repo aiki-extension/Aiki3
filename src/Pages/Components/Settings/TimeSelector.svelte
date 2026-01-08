@@ -199,7 +199,7 @@
         on:change={setControlledRewardMinutes}
         class="custom-select custom-select-sm inline"
       >
-        {#each minuteOptions.slice(1, 31) as value}
+        {#each minuteOptions.slice(1, 61) as value}
           <option {value}>{parseNumberToTime(value)}</option>
         {/each}
       </select>

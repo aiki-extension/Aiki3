@@ -94,7 +94,6 @@
       toast.push("New Website Added!", {
         theme: themes.successTheme(toastCoords),
       });
-    } else {
     }
   }
 

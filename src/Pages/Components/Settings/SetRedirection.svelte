@@ -213,7 +213,6 @@
     margin-top: 12px;
   }
 
-  /* Theme-aware buttons */
   .btn-theme-primary {
     background-color: var(--bannerBackgroundColor);
     border-color: var(--bannerBackgroundColor);
@@ -222,48 +221,6 @@
 
   .btn-theme-primary:hover {
     filter: brightness(1.05);
-  }
-
-  .btn-theme-secondary {
-    background-color: transparent;
-    color: var(--textColor);
-    border: 1px solid var(--textColor);
-    transition: filter 150ms ease, background-color 150ms ease,
-      color 150ms ease, border-color 150ms ease;
-  }
-
-  .btn-theme-secondary.edit {
-    min-width: 96px;
-    background-color: var(--bannerBackgroundColor);
-    border-color: var(--bannerBackgroundColor);
-    color: var(--bannerTextColor);
-  }
-
-  .btn-theme-secondary.edit:hover:not(:disabled) {
-    filter: brightness(1.05);
-  }
-
-  .btn-theme-secondary.edit:disabled {
-    background-color: var(--backgroundColorSecondary);
-    border-color: var(--hrColor);
-    color: var(--textColor);
-    opacity: 0.85;
-    cursor: not-allowed;
-  }
-
-  .btn-theme-secondary.edit.active-edit {
-    background-color: transparent;
-    border-color: var(--textColor);
-    color: var(--textColor);
-  }
-
-  .btn-theme-secondary.edit.active-edit:hover {
-    filter: brightness(1.05);
-  }
-
-  .btn-theme-secondary:hover {
-    background-color: var(--backgroundColorSecondary);
-    filter: brightness(1.1);
   }
 
   .status-row {
@@ -292,13 +249,9 @@
     color: var(--bannerTextColor);
   }
 
-  .center{
+  .center {
     display: flex;
     justify-content: center;
-  }
-
-  .btn-dark {
-    display: flex;
   }
 
   h5 {

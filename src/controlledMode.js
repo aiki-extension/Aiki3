@@ -77,6 +77,12 @@ export function handleNavigation(tabId, url, procrastinationHosts, learningUrl) 
         redirectToLearning(tabId, url, learningUrl);
         return true;
       }
+      // Allow direct learning: if user navigates to learning site while in IDLE,
+      // start a learning session (without a procrastination trigger URL)
+      if (isLearning) {
+        startDirectLearningSession(tabId, learningUrl);
+        return true;
+      }
       break;
       
     case State.LEARNING:
@@ -129,11 +135,32 @@ export async function handleContinue(tabId) {
     return;
   }
   
+  // LOG LEARNING SESSION before transitioning (user bypassed early)
+  if (currentState === State.LEARNING && sessionData.learningStartedAt) {
+    const timerState = timer.getTimerState("learning");
+    const actualDurationMs = timerState.elapsed || (Date.now() - sessionData.learningStartedAt);
+    
+    console.log("[ControlledMode] Logging learning session before continue bypass", { actualDurationMs });
+    
+    await sessionManager.logControlledSession({
+      sessionType: "learning",
+      startedAt: sessionData.learningStartedAt,
+      durationMs: actualDurationMs,
+      goalMs: sessionData.learningGoalMs,
+      completed: false, // User bypassed early
+      learningSite: sessionData.learningUrl,
+      procrastinationSite: procrastinationUrl,
+    });
+    
+    // Remove learning session from activeSessions since we just logged it
+    await storage.activeSessions.remove(tabId);
+  }
+  
   // Stop any existing timers
   timer.stopAllTimers();
   
-  // Log bypass
-  sessionManager.logEventAsync("controlled:continue_bypass", {
+  // Log bypass event
+  sessionManager.logEventAsync("continue_bypass", {
     procrastinationSite: procrastinationUrl,
     learningSite: sessionData.learningUrl,
   });
@@ -141,16 +168,25 @@ export async function handleContinue(tabId) {
   // Transition to REWARD state (not IDLE) - this gives user their procrastination time
   currentState = State.REWARD;
   sessionData.tabId = tabId;
+  sessionData.rewardStartedAt = Date.now();
   
   // Get reward duration and start timer
   const { rewardMs } = await timer.getControlledDurations();
+  sessionData.rewardGoalMs = rewardMs;
   
-  // Log reward session start
-  sessionManager.logEventAsync("controlled:reward_session_start", {
-    procrastinationSite: procrastinationUrl,
-    learningSite: sessionData.learningUrl,
-    eventData: `${rewardMs / 60000} minutes (via continue)`,
-  });
+  // Store in activeSessions for tab close tracking (same as claimReward)
+  const participantId = await storage.uid.get();
+  if (participantId) {
+    await storage.activeSessions.set(tabId, {
+      participantId,
+      sessionType: "procrastination",
+      startedAt: sessionData.rewardStartedAt,
+      learningUrl: sessionData.learningUrl,
+      procrastinationUrl: procrastinationUrl,
+      goalMs: rewardMs,
+    });
+    console.log("[ControlledMode] Stored procrastination session in activeSessions", { tabId });
+  }
   
   // Navigate to procrastination site
   try {
@@ -233,10 +269,9 @@ export function snoozeReward() {
   timer.extendTimer("reward", SNOOZE_DURATION);
   
   // Log the snooze
-  sessionManager.logEventAsync("controlled:reward_snoozed", {
+  sessionManager.logEventAsync("reward_snoozed", {
     procrastinationSite: sessionData.procrastinationUrl,
     learningSite: sessionData.learningUrl,
-    eventData: "1 minute extension",
   });
   
   console.log("[ControlledMode] Reward timer extended by 1 minute");
@@ -261,7 +296,7 @@ async function redirectToLearning(tabId, procrastinationUrl, learningUrl) {
     return;
   }
   
-  // Update state
+  // Update in-memory state
   timer.stopAllTimers();
   currentState = State.LEARNING;
   sessionData.procrastinationUrl = procrastinationUrl;
@@ -273,15 +308,23 @@ async function redirectToLearning(tabId, procrastinationUrl, learningUrl) {
   const { learningMs } = await timer.getControlledDurations();
   sessionData.learningGoalMs = learningMs;
   
-  // Log events (fire and forget)
-  sessionManager.logEventAsync("controlled:forced_redirect", {
+  // ALSO store in activeSessions for tab close tracking (like experimental variant)
+  const participantId = await storage.uid.get();
+  if (participantId) {
+    await storage.activeSessions.set(tabId, {
+      participantId,
+      sessionType: "learning",
+      startedAt: sessionData.learningStartedAt,
+      learningUrl: learningUrl,
+      procrastinationUrl: procrastinationUrl,
+      goalMs: learningMs,
+    });
+  }
+  
+  // Log event (fire and forget) - session is tracked in Sessions table
+  sessionManager.logEventAsync("forced_redirect", {
     procrastinationSite: procrastinationUrl,
     learningSite: learningUrl,
-  });
-  sessionManager.logEventAsync("controlled:learning_session_start", {
-    procrastinationSite: procrastinationUrl,
-    learningSite: learningUrl,
-    eventData: `${learningMs / 60000} minutes`,
   });
   
   // Start learning timer
@@ -289,6 +332,49 @@ async function redirectToLearning(tabId, procrastinationUrl, learningUrl) {
   timer.startTimer("learning", learningMs, onLearningComplete);
   
   console.log("[ControlledMode] Now in LEARNING state");
+}
+
+/**
+ * Start a direct learning session when user navigates to learning site while in IDLE state.
+ * This is different from redirectToLearning - no redirect, no procrastination trigger.
+ */
+async function startDirectLearningSession(tabId, learningUrl) {
+  console.log("[ControlledMode] Starting direct learning session");
+  
+  // Update in-memory state
+  timer.stopAllTimers();
+  currentState = State.LEARNING;
+  sessionData.procrastinationUrl = null; // No procrastination trigger
+  sessionData.learningUrl = learningUrl;
+  sessionData.tabId = tabId;
+  sessionData.learningStartedAt = Date.now();
+  
+  // Get durations
+  const { learningMs } = await timer.getControlledDurations();
+  sessionData.learningGoalMs = learningMs;
+  
+  // Store in activeSessions for tab close tracking
+  const participantId = await storage.uid.get();
+  if (participantId) {
+    await storage.activeSessions.set(tabId, {
+      participantId,
+      sessionType: "learning",
+      startedAt: sessionData.learningStartedAt,
+      learningUrl: learningUrl,
+      procrastinationUrl: null, // No procrastination trigger
+      goalMs: learningMs,
+    });
+  }
+  
+  // Log event - direct learning start
+  sessionManager.logEventAsync("direct_learning_start", {
+    learningSite: learningUrl,
+  });
+  
+  // Start learning timer
+  timer.startTimer("learning", learningMs, onLearningComplete);
+  
+  console.log("[ControlledMode] Now in LEARNING state (direct)");
 }
 
 /**
@@ -303,7 +389,7 @@ async function onLearningComplete() {
   const { procrastinationUrl, learningUrl } = sessionData;
   
   // Log completion
-  sessionManager.logEventAsync("controlled:learning_timer_complete", {
+  sessionManager.logEventAsync("learning_timer_complete", {
     procrastinationSite: procrastinationUrl,
     learningSite: learningUrl,
   });
@@ -355,15 +441,10 @@ export async function claimReward(tabId) {
   const { rewardMs } = await timer.getControlledDurations();
   sessionData.rewardGoalMs = rewardMs;
   
-  // Log events
-  sessionManager.logEventAsync("controlled:reward_claimed", {
+  // Log event
+  sessionManager.logEventAsync("reward_claimed", {
     procrastinationSite: procrastinationUrl,
     learningSite: learningUrl,
-  });
-  sessionManager.logEventAsync("controlled:reward_session_start", {
-    procrastinationSite: procrastinationUrl,
-    learningSite: learningUrl,
-    eventData: `${rewardMs / 60000} minutes`,
   });
   
   // Redirect to procrastination site
@@ -373,6 +454,19 @@ export async function claimReward(tabId) {
     } catch (e) {
       console.log("[ControlledMode] Failed to redirect to procrastination:", e);
     }
+  }
+  
+  // Update activeSessions for reward/procrastination tracking
+  const participantId = await storage.uid.get();
+  if (participantId) {
+    await storage.activeSessions.set(tabId, {
+      participantId,
+      sessionType: "procrastination",
+      startedAt: sessionData.rewardStartedAt,
+      learningUrl: learningUrl,
+      procrastinationUrl: procrastinationUrl,
+      goalMs: rewardMs,
+    });
   }
   
   // Start reward timer
@@ -424,7 +518,7 @@ async function onRewardComplete() {
   });
   
   // Log expiry event
-  sessionManager.logEventAsync("controlled:reward_timer_expiry", {
+  sessionManager.logEventAsync("reward_timer_expiry", {
     procrastinationSite: procrastinationUrl,
     learningSite: learningUrl,
   });
@@ -437,19 +531,65 @@ async function onRewardComplete() {
   const { learningMs } = await timer.getControlledDurations();
   sessionData.learningGoalMs = learningMs;
   
-  // Log new learning session
-  sessionManager.logEventAsync("controlled:learning_session_start", {
-    procrastinationSite: procrastinationUrl,
-    learningSite: learningUrl,
-    eventData: `${learningMs / 60000} minutes (auto-restart)`,
-  });
+  // NOTE: Session logging happens in Sessions table, not here
   
-  // Redirect to learning
-  if (tabId && learningUrl) {
+  // Redirect the ACTIVE procrastination tab to learning
+  // User may have switched tabs, so we need to find the current active procrastination tab
+  if (learningUrl) {
     try {
-      await browser.tabs.update(tabId, { url: learningUrl });
+      // Get procrastination hosts list
+      const procList = await storage.list.get();
+      const procHosts = (procList || []).map(item => item?.host || item?.name || "").filter(Boolean);
+      
+      // Get all tabs and find active procrastination tabs
+      const allTabs = await browser.tabs.query({});
+      const activeTabs = allTabs.filter(tab => tab.active);
+      
+      // First, try to redirect the currently focused/active procrastination tab
+      let redirected = false;
+      for (const tab of activeTabs) {
+        if (tab.url && siteDetector.isProcrastinationSite(tab.url, procHosts)) {
+          await browser.tabs.update(tab.id, { url: learningUrl });
+          sessionData.tabId = tab.id; // Update to the new tab
+          console.log("[ControlledMode] Redirected active procrastination tab:", tab.id);
+          redirected = true;
+          break;
+        }
+      }
+      
+      // If no active procrastination tab, try the original stored tabId
+      if (!redirected && tabId) {
+        try {
+          const originalTab = await browser.tabs.get(tabId);
+          if (originalTab && originalTab.url && siteDetector.isProcrastinationSite(originalTab.url, procHosts)) {
+            await browser.tabs.update(tabId, { url: learningUrl });
+            console.log("[ControlledMode] Redirected original tab:", tabId);
+            redirected = true;
+          }
+        } catch (e) {
+          // Original tab might be closed
+        }
+      }
+      
+      // If still not redirected, redirect any procrastination tab
+      if (!redirected) {
+        for (const tab of allTabs) {
+          if (tab.url && siteDetector.isProcrastinationSite(tab.url, procHosts)) {
+            await browser.tabs.update(tab.id, { url: learningUrl });
+            sessionData.tabId = tab.id;
+            console.log("[ControlledMode] Redirected first found procrastination tab:", tab.id);
+            break;
+          }
+        }
+      }
     } catch (e) {
-      console.log("[ControlledMode] Failed to redirect to learning:", e);
+      console.log("[ControlledMode] Failed to find/redirect procrastination tab:", e);
+      // Fallback to original tabId
+      if (tabId && learningUrl) {
+        try {
+          await browser.tabs.update(tabId, { url: learningUrl });
+        } catch (_) {}
+      }
     }
   }
   
@@ -458,6 +598,48 @@ async function onRewardComplete() {
   timer.startTimer("learning", learningMs, onLearningComplete);
   
   console.log("[ControlledMode] Back to LEARNING state");
+}
+
+/**
+ * Handle tab close event - reset state and timers.
+ * NOTE: Session logging is handled by finalizeSession in redirection.js
+ * which uses activeSessions storage. This function only cleans up in-memory state.
+ * @param {number} tabId - Tab ID that was closed
+ */
+export async function handleTabClose(tabId) {
+  console.log("[ControlledMode] handleTabClose called", { 
+    closedTabId: tabId, 
+    trackedTabId: sessionData.tabId, 
+    currentState 
+  });
+  
+  // Only handle if this is our tracked tab or we're in an active state
+  if (currentState === State.IDLE) {
+    console.log("[ControlledMode] In IDLE state, nothing to reset");
+    return;
+  }
+  
+  // If we have a tracked tab and it's not this one, skip
+  if (sessionData.tabId && sessionData.tabId !== tabId) {
+    console.log("[ControlledMode] Tab ID mismatch, skipping", { expected: sessionData.tabId, got: tabId });
+    return;
+  }
+  
+  // Stop timers and reset state
+  // NOTE: Session is logged by finalizeSession in redirection.js using activeSessions storage
+  timer.stopAllTimers();
+  currentState = State.IDLE;
+  sessionData = {
+    procrastinationUrl: null,
+    learningUrl: null,
+    tabId: null,
+    learningStartedAt: null,
+    learningGoalMs: null,
+    rewardStartedAt: null,
+    rewardGoalMs: null,
+  };
+  
+  console.log("[ControlledMode] Tab closed, in-memory state reset (session logged by finalizeSession)");
 }
 
 // ============================================
@@ -473,5 +655,6 @@ export default {
   getState,
   isInReward,
   cleanup,
+  handleTabClose,
   State,
 };

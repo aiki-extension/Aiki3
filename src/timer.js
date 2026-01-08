@@ -263,6 +263,7 @@ let controlledLearningCompleted = false; // Whether goal was reached
 let controlledRewardRemaining = 0;
 let controlledRewardIntervalRef;
 let controlledRewardGoal = 0;
+let controlledRewardElapsed = 0; // Tracks actual time spent on procrastination site
 let controlledLearningOnComplete = null;
 let controlledRewardOnComplete = null;
 
@@ -330,6 +331,9 @@ function isControlledLearningActive() {
 
 async function decrementControlledReward() {
   // Reward timer ticks regardless of focus (user is on procrastination site)
+  // Always increment elapsed time to track actual time spent
+  controlledRewardElapsed += 1000;
+  
   if (controlledRewardRemaining > 0) {
     controlledRewardRemaining -= 1000;
     if (controlledRewardRemaining <= 0) {
@@ -354,6 +358,7 @@ function startControlledRewardSession(rewardMs, onComplete) {
   
   controlledRewardGoal = rewardMs;
   controlledRewardRemaining = rewardMs;
+  controlledRewardElapsed = 0; // Reset elapsed time
   controlledRewardOnComplete = onComplete;
   
   badge.setProgress("🎉", 1);
@@ -370,6 +375,7 @@ function stopControlledRewardSession() {
     clearInterval(controlledRewardIntervalRef);
     controlledRewardIntervalRef = undefined;
   }
+  // Note: Don't reset elapsed here - it's needed for logging before stop is called
   controlledRewardRemaining = 0;
   controlledRewardGoal = 0;
   controlledRewardOnComplete = null;
@@ -387,6 +393,7 @@ function getControlledSessionState() {
     learningCompleted: controlledLearningCompleted,
     rewardRemaining: controlledRewardRemaining,
     rewardGoal: controlledRewardGoal,
+    rewardElapsed: controlledRewardElapsed,
     isLearning: isControlledLearningActive(),
     isReward: isControlledRewardActive(),
   };
@@ -405,8 +412,8 @@ function killControlledTimers() {
  * Get timer durations from settings (wrapper for controlledMode).
  */
 async function getControlledDurations() {
-  const learningMinutes = await storage.controlledTimerSettings?.learningMinutes?.get?.() || 1;
-  const rewardMinutes = await storage.controlledTimerSettings?.rewardMinutes?.get?.() || 2;
+  const learningMinutes = await storage.controlledTimerSettings?.learningMinutes?.get?.() || 5;
+  const rewardMinutes = await storage.controlledTimerSettings?.rewardMinutes?.get?.() || 15;
   return {
     learningMs: learningMinutes * 60 * 1000,
     rewardMs: rewardMinutes * 60 * 1000,
@@ -452,7 +459,7 @@ function getTimerState(type) {
       remaining: controlledRewardRemaining,
       goal: controlledRewardGoal,
       active: isControlledRewardActive(),
-      elapsed: controlledRewardGoal - controlledRewardRemaining,
+      elapsed: controlledRewardElapsed, // Use tracked elapsed time
       completed: controlledRewardRemaining <= 0 && controlledRewardGoal > 0,
     };
   }

@@ -1,8 +1,7 @@
 import { BACK4APP_CONFIG } from "./back4appConfig";
 import storage from "./storage";
 import { parseUrl } from "./utilities";
-
-const EXT_VERSION = "decision-based-redirection";
+import { getVariant } from "./variantConfig";
 
 const PARSE_BASE_URL = BACK4APP_CONFIG?.serverURL || "https://parseapi.back4app.com";
 const participantCache = new Map();
@@ -83,7 +82,7 @@ async function createParticipant(participantId) {
   const now = toParseDate(Date.now());
   const payload = {
     participant_id: participantId,
-    assigned_version: EXT_VERSION,
+    assigned_version: getVariant(),
     install_date: now,
   };
   const response = await parseRequest("/classes/Participants", {
@@ -99,7 +98,8 @@ async function createParticipant(participantId) {
     if (pointer) {
       const prefsPayload = sanitizeUserPreferences({
         is_active: true,
-        learning_time_minutes: 30,
+        learning_time_minutes: 5,
+        procrastination_reward_minutes: 15,
         operating_hours_start: 480,   // 8:00 AM (8 * 60 = 480 minutes from midnight)
         operating_hours_end: 1290,    // 9:30 PM (21 * 60 + 30 = 1290 minutes from midnight)
       }, pointer);

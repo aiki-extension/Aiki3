@@ -41,7 +41,7 @@
     console.error(error);
   }
 
-  let updateIntervalRef = setInterval(() => {
+  setInterval(() => {
     try {
       port.postMessage("get: timer");
     } catch (error) {

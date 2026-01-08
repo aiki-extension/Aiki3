@@ -1,6 +1,111 @@
 import browser from "webextension-polyfill";
 
 const l = console.log;
+
+// ============================================
+// SHARED UTILITIES
+// ============================================
+
+/**
+ * Format milliseconds as "Xm Ys" string.
+ */
+const formatDuration = (value) => {
+  if (typeof value !== "number" || value <= 0) return "0m 0s";
+  const totalSeconds = Math.floor(value / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}m ${seconds}s`;
+};
+
+/**
+ * Make an element draggable.
+ * @param {HTMLElement} element - Element to make draggable
+ * @returns {{ cleanup: () => void }}
+ */
+const makeDraggable = (element) => {
+  let dragState = { dragging: false, startX: 0, startY: 0, offsetX: 0, offsetY: 0 };
+
+  const onPointerDown = (event) => {
+    dragState.dragging = true;
+    dragState.startX = event.clientX;
+    dragState.startY = event.clientY;
+    element.style.cursor = "grabbing";
+    event.preventDefault();
+  };
+
+  const onPointerMove = (event) => {
+    if (!dragState.dragging) return;
+    const dx = event.clientX - dragState.startX;
+    const dy = event.clientY - dragState.startY;
+    dragState.offsetX += dx;
+    dragState.offsetY += dy;
+    dragState.startX = event.clientX;
+    dragState.startY = event.clientY;
+    element.style.transform = `translate(${dragState.offsetX}px, ${dragState.offsetY}px)`;
+    event.preventDefault();
+  };
+
+  const endDrag = () => {
+    dragState.dragging = false;
+    element.style.cursor = "grab";
+  };
+
+  element.addEventListener("pointerdown", onPointerDown);
+  window.addEventListener("pointermove", onPointerMove);
+  window.addEventListener("pointerup", endDrag);
+  window.addEventListener("pointerleave", endDrag);
+
+  return {
+    cleanup: () => {
+      element.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", endDrag);
+      window.removeEventListener("pointerleave", endDrag);
+    }
+  };
+};
+
+/**
+ * Create a timer communication port with polling.
+ * @param {(msg: any) => void} updateCallback - Function to call on each timer update
+ * @returns {{ port: any, intervalRef: number, cleanup: () => void }}
+ */
+const createTimerPort = (updateCallback) => {
+  let port = null;
+  let intervalRef = null;
+  let cleanupCalled = false;
+
+  const cleanup = () => {
+    if (cleanupCalled) return;
+    cleanupCalled = true;
+    try { if (port) port.disconnect(); } catch (_) {}
+    try { if (intervalRef) clearInterval(intervalRef); } catch (_) {}
+  };
+
+  try {
+    port = browser.runtime.connect({ name: "Content Communication" });
+    port.onDisconnect.addListener(cleanup);
+    port.onMessage.addListener(updateCallback);
+
+    browser.runtime
+      .sendMessage({ type: "timer:get" })
+      .then(updateCallback)
+      .catch(() => {});
+
+    intervalRef = setInterval(() => {
+      try { port.postMessage("get: timer"); } catch (_) {}
+    }, 1000);
+
+    try { port.postMessage("get: timer"); } catch (_) {}
+  } catch (_) {}
+
+  return { port, intervalRef, cleanup };
+};
+
+// ============================================
+// OVERLAY PERSISTENCE GUARDS
+// ============================================
+
 let overlayGuardsInstalled = false;
 let overlayEnsureTimeout = null;
 
@@ -91,20 +196,37 @@ if (document.readyState === "loading") {
 /**
  * Bootstrap reward overlay on page load if we're in reward mode.
  * This handles full page reloads on procrastination sites.
+ * Only shows on procrastination sites to avoid appearing on other pages.
  */
 async function bootstrapRewardOverlayIfNeeded() {
   try {
     // Query background for current timer state
     const timerData = await browser.runtime.sendMessage({ type: "timer:get" });
     
-    // If reward timer is active (goal > 0), render the overlay
+    // If reward timer is active (goal > 0), check if we're on a procrastination site
     if (timerData && timerData.controlledRewardGoal > 0) {
-      // Small delay to ensure DOM is ready
-      setTimeout(() => {
-        if (!document.getElementById("aiki-reward-overlay")) {
-          renderProcrastinationRewardOverlay();
-        }
-      }, 50);
+      // Get procrastination sites list
+      const result = await browser.storage.local.get("list");
+      const procList = result?.list || [];
+      const procHosts = procList.map(item => item?.host || item?.name || "").filter(Boolean);
+      
+      // Check if current page matches any procrastination site
+      const currentHost = location.hostname.replace(/^www\./, "");
+      const isOnProcrastinationSite = procHosts.some(host => {
+        const normalizedHost = host.replace(/^www\./, "");
+        return currentHost === normalizedHost || 
+               currentHost.endsWith("." + normalizedHost) || 
+               normalizedHost.endsWith("." + currentHost);
+      });
+      
+      if (isOnProcrastinationSite) {
+        // Small delay to ensure DOM is ready
+        setTimeout(() => {
+          if (!document.getElementById("aiki-reward-overlay")) {
+            renderProcrastinationRewardOverlay();
+          }
+        }, 50);
+      }
     }
   } catch (_) {
     // Ignore errors - background might not be ready
@@ -183,7 +305,7 @@ function removeOverlay() {
   }
 }
 
-function renderRedirectPrompt(url, originUrl) {
+function renderRedirectPrompt(originUrl) {
   return new Promise((resolve) => {
     let done = false;
     try {
@@ -350,26 +472,38 @@ function renderLearningContent() {
     );
 
     const panel = document.createElement("div");
-    panel.setAttribute(
+    const isCollapsedKey = "aiki-learning-collapsed";
+    let isCollapsed = localStorage.getItem(isCollapsedKey) === "true";
+    
+    const getPanelStyle = (collapsed) => `pointer-events: auto; margin: 24px; padding: ${collapsed ? "10px 14px" : "clamp(16px, 3vw, 22px)"}; min-width: ${collapsed ? "140px" : "260px"}; max-width: ${collapsed ? "180px" : "320px"}; background: rgba(15, 23, 42, 0.96); color: #f8fafc; border-radius: ${collapsed ? "12px" : "18px"}; box-shadow: 0 24px 45px rgba(15, 23, 42, 0.45); font-family: 'Inter', 'Segoe UI', sans-serif; display: flex; flex-direction: column; gap: ${collapsed ? "6px" : "12px"}; cursor: grab; position: relative; font-size: 14px; transition: all 0.3s ease;`;
+    
+    panel.setAttribute("style", getPanelStyle(isCollapsed));
+
+    // Collapse toggle button
+    const collapseBtn = document.createElement("button");
+    collapseBtn.textContent = isCollapsed ? "▼" : "▲";
+    collapseBtn.setAttribute(
       "style",
-      `pointer-events: auto; margin: 24px; padding: clamp(16px, 3vw, 22px); min-width: 260px; max-width: 320px; background: rgba(15, 23, 42, 0.96); color: #f8fafc; border-radius: 18px; box-shadow: 0 24px 45px rgba(15, 23, 42, 0.45); font-family: 'Inter', 'Segoe UI', sans-serif; display: flex; flex-direction: column; gap: 12px; cursor: grab; position: relative; font-size: 14px;`
+      "position: absolute; top: 6px; right: 8px; background: transparent; border: none; color: rgba(248, 250, 252, 0.6); cursor: pointer; font-size: 10px; padding: 4px; transition: color 0.2s;"
     );
+    collapseBtn.addEventListener("mouseenter", () => { collapseBtn.style.color = "rgba(248, 250, 252, 0.95)"; });
+    collapseBtn.addEventListener("mouseleave", () => { collapseBtn.style.color = "rgba(248, 250, 252, 0.6)"; });
 
     const heading = document.createElement("strong");
     heading.textContent = "Learning progress";
-    heading.setAttribute("style", "font-size: 1em; letter-spacing: 0.01em; font-weight: 600;");
+    heading.setAttribute("style", `font-size: 1em; letter-spacing: 0.01em; font-weight: 600; display: ${isCollapsed ? "none" : "block"};`);
 
     const progressLabel = document.createElement("span");
     progressLabel.setAttribute(
       "style",
-      "font-size: 0.9em; color: rgba(248, 250, 252, 0.88);"
+      `font-size: ${isCollapsed ? "0.95em" : "0.9em"}; color: rgba(248, 250, 252, 0.92); font-weight: ${isCollapsed ? "600" : "400"};`
     );
     progressLabel.textContent = "Getting things ready...";
 
     const barShell = document.createElement("div");
     barShell.setAttribute(
       "style",
-      "width: 100%; height: 10px; border-radius: 999px; background: rgba(148, 163, 184, 0.35); overflow: hidden;"
+      `width: 100%; height: ${isCollapsed ? "6px" : "10px"}; border-radius: 999px; background: rgba(148, 163, 184, 0.35); overflow: hidden; transition: height 0.3s ease;`
     );
 
     const barFill = document.createElement("div");
@@ -382,7 +516,7 @@ function renderLearningContent() {
     const status = document.createElement("span");
     status.setAttribute(
       "style",
-      "font-size: 0.88em; color: rgba(248, 250, 252, 0.78);"
+      `font-size: 0.88em; color: rgba(248, 250, 252, 0.78); display: ${isCollapsed ? "none" : "block"};`
     );
     status.textContent = "Stay focused here to earn your time.";
 
@@ -403,13 +537,36 @@ function renderLearningContent() {
     });
     claimRewardBtn.addEventListener("click", async () => {
       try {
-        // Request reward from background
         await browser.runtime.sendMessage({ type: "controlled:claimReward" });
       } catch (e) {
         console.log("[Aiki] Failed to claim reward:", e);
       }
     });
 
+    // Collapse/expand toggle handler
+    const toggleCollapse = () => {
+      isCollapsed = !isCollapsed;
+      localStorage.setItem(isCollapsedKey, isCollapsed.toString());
+      collapseBtn.textContent = isCollapsed ? "▼" : "▲";
+      panel.setAttribute("style", getPanelStyle(isCollapsed));
+      heading.style.display = isCollapsed ? "none" : "block";
+      status.style.display = isCollapsed ? "none" : "block";
+      barShell.style.height = isCollapsed ? "6px" : "10px";
+      progressLabel.style.fontSize = isCollapsed ? "0.95em" : "0.9em";
+      progressLabel.style.fontWeight = isCollapsed ? "600" : "400";
+      if (isCollapsed && claimRewardBtn.style.display !== "none") {
+        claimRewardBtn.dataset.wasVisible = "true";
+        claimRewardBtn.style.display = "none";
+      } else if (!isCollapsed && claimRewardBtn.dataset.wasVisible === "true") {
+        claimRewardBtn.style.display = "block";
+      }
+    };
+    collapseBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleCollapse();
+    });
+
+    panel.appendChild(collapseBtn);
     panel.appendChild(heading);
     panel.appendChild(progressLabel);
     panel.appendChild(barShell);
@@ -419,100 +576,18 @@ function renderLearningContent() {
     document.body.appendChild(overlay);
     installOverlayPersistence();
 
-    let dragState = {
-      dragging: false,
-      startX: 0,
-      startY: 0,
-      offsetX: 0,
-      offsetY: 0,
-    };
-
-    const onPointerDown = (event) => {
-      dragState.dragging = true;
-      dragState.startX = event.clientX;
-      dragState.startY = event.clientY;
-      panel.style.cursor = "grabbing";
-      event.preventDefault();
-    };
-
-    const onPointerMove = (event) => {
-      if (!dragState.dragging) return;
-      const dx = event.clientX - dragState.startX;
-      const dy = event.clientY - dragState.startY;
-      dragState.offsetX += dx;
-      dragState.offsetY += dy;
-      dragState.startX = event.clientX;
-      dragState.startY = event.clientY;
-      panel.style.transform = `translate(${dragState.offsetX}px, ${dragState.offsetY}px)`;
-      event.preventDefault();
-    };
-
-    const endDrag = () => {
-      dragState.dragging = false;
-      panel.style.cursor = "grab";
-    };
-
-    panel.addEventListener("pointerdown", onPointerDown);
-    window.addEventListener("pointermove", onPointerMove);
-    window.addEventListener("pointerup", endDrag);
-    window.addEventListener("pointerleave", endDrag);
-
-    const port = browser.runtime.connect({
-      name: "Content Communication",
-    });
-
-    try {
-      port.postMessage("get: timer");
-    } catch (_) {}
-
-    let cleanupCalled = false;
-    const cleanup = () => {
-      if (cleanupCalled) return;
-      cleanupCalled = true;
-      panel.removeEventListener("pointerdown", onPointerDown);
-      window.removeEventListener("pointermove", onPointerMove);
-      window.removeEventListener("pointerup", endDrag);
-      window.removeEventListener("pointerleave", endDrag);
-      try {
-        port.disconnect();
-      } catch (_) {}
-      try {
-        clearInterval(intervalRef);
-      } catch (_) {}
-      try {
-        removeOverlay();
-      } catch (_) {}
-    };
-
-    port.onDisconnect.addListener(() => {
-      cleanup();
-    });
-
-    overlay.cleanup = cleanup;
-    window.addEventListener("beforeunload", cleanup, { once: true });
-
-    const formatDuration = (value) => {
-      if (typeof value !== "number" || value <= 0) return "0m 0s";
-      const totalSeconds = Math.floor(value / 1000);
-      const minutes = Math.floor(totalSeconds / 60);
-      const seconds = totalSeconds % 60;
-      return `${minutes}m ${seconds}s`;
-    };
+    // Use shared drag utility
+    const dragHandle = makeDraggable(panel);
 
     const update = (msg) => {
       if (!msg) return;
       
-      // Check for controlled variant
       const isControlledVariant = msg.isControlledVariant === true;
       const controlledState = msg.controlledState;
-      
-      // Default panel background (reset from green)
       const defaultBg = "rgba(15, 23, 42, 0.96)";
       
       if (isControlledVariant) {
-        // CONTROLLED VARIANT
         if (controlledState === "learning") {
-          // LEARNING state: show session-based timer
           const goal = msg.controlledLearningGoal || 0;
           const remaining = typeof msg.controlledLearningRemaining === "number" ? msg.controlledLearningRemaining : 0;
           const elapsed = typeof msg.controlledLearningElapsed === "number" ? msg.controlledLearningElapsed : 0;
@@ -526,9 +601,7 @@ function renderLearningContent() {
           panel.style.background = defaultBg;
           claimRewardBtn.style.display = "none";
           
-          // Check if goal is reached (completed or remaining <= 0)
           if (goal > 0 && (remaining <= 0 || completed)) {
-            // Show elapsed time / goal (e.g., "1m 40s / 1m 0s")
             progressLabel.textContent = `${formatDuration(elapsed)} / ${formatDuration(goal)}`;
             status.textContent = "Session complete! Claim your reward.";
             panel.style.background = "linear-gradient(135deg, #22c55e, #0ea5e9)";
@@ -541,21 +614,19 @@ function renderLearningContent() {
             status.textContent = "Session starting...";
           }
         } else if (controlledState === "reward") {
-          // REWARD state: show procrastination/reward timer
           const goal = msg.controlledRewardGoal || 0;
           const remaining = typeof msg.controlledRewardRemaining === "number" ? msg.controlledRewardRemaining : 0;
           const progress = Math.max(0, goal - remaining);
           const percent = goal > 0 ? Math.min(100, (progress / goal) * 100) : 0;
           
           barFill.style.width = `${percent}%`;
-          barFill.style.background = "linear-gradient(135deg, #f59e0b, #f97316)";
+          barFill.style.background = "linear-gradient(135deg, #ffffffff, #32CD32)";
           progressLabel.textContent = goal > 0 ? `${formatDuration(progress)} / ${formatDuration(goal)}` : "Enjoy!";
           heading.textContent = "🎉 Reward Time";
           status.textContent = goal > 0 ? `Enjoy! ${formatDuration(remaining)} remaining.` : "Your reward time!";
-          panel.style.background = "linear-gradient(135deg, #f59e0b80, #f9731680)";
+          panel.style.background = "linear-gradient(135deg, #ffffff, #32CD32)";
           claimRewardBtn.style.display = "none";
         } else {
-          // IDLE state for controlled variant
           heading.textContent = "📚 Aiki Learning";
           progressLabel.textContent = "Ready to learn";
           barFill.style.width = "0%";
@@ -565,21 +636,14 @@ function renderLearningContent() {
           claimRewardBtn.style.display = "none";
         }
       } else {
-        // Experimental variant or IDLE: show daily progress
         const goal = typeof msg.dailyGoal === "number" ? msg.dailyGoal : 0;
-        const progress = Math.min(
-          goal,
-          typeof msg.dailyProgress === "number" ? msg.dailyProgress : 0
-        );
+        const progress = Math.min(goal, typeof msg.dailyProgress === "number" ? msg.dailyProgress : 0);
         const remaining = Math.max(goal - progress, 0);
         const percent = goal > 0 ? Math.min(100, (progress / goal) * 100) : 0;
 
         barFill.style.width = `${percent}%`;
         barFill.style.background = "linear-gradient(135deg, #22c55e, #14b8a6)";
-        progressLabel.textContent =
-          goal > 0
-            ? `${formatDuration(progress)} / ${formatDuration(goal)}`
-            : "No goal set yet";
+        progressLabel.textContent = goal > 0 ? `${formatDuration(progress)} / ${formatDuration(goal)}` : "No goal set yet";
         heading.textContent = "Learning progress";
         claimRewardBtn.style.display = "none";
         panel.style.background = defaultBg;
@@ -588,35 +652,27 @@ function renderLearningContent() {
           status.textContent = "Daily goal complete! Great work.";
           panel.style.background = "linear-gradient(135deg, #22c55e, #0ea5e9)";
         } else if (goal > 0) {
-          status.textContent = `Stay focused for ${formatDuration(
-            remaining
-          )} more.`;
+          status.textContent = `Stay focused for ${formatDuration(remaining)} more.`;
         } else {
           status.textContent = "Set a goal in Aiki settings to track progress.";
         }
       }
     };
 
-    port.onMessage.addListener((msg) => update(msg));
-    try {
-      browser.runtime
-        .sendMessage({ type: "timer:get" })
-        .then((data) => update(data))
-        .catch(() => {});
-    } catch (_) {}
-    try {
-      browser.runtime
-        .sendMessage({ type: "timer:get" })
-        .then((data) => update(data))
-        .catch(() => {});
-    } catch (_) {}
+    // Use shared timer port utility
+    const timerPort = createTimerPort(update);
 
-    const intervalRef = setInterval(() => {
-      try {
-        port.postMessage("get: timer");
-      } catch (_) {}
-    }, 1000);
+    let cleanupCalled = false;
+    const cleanup = () => {
+      if (cleanupCalled) return;
+      cleanupCalled = true;
+      dragHandle.cleanup();
+      timerPort.cleanup();
+      try { removeOverlay(); } catch (_) {}
+    };
 
+    overlay.cleanup = cleanup;
+    window.addEventListener("beforeunload", cleanup, { once: true });
     update(null);
 
     resolve({ action: "end injection" });
@@ -669,10 +725,7 @@ function renderContentBlocker() {
   status.textContent = "Stay focused a little longer to unlock breaks.";
 
   const actions = document.createElement("div");
-  actions.setAttribute(
-    "style",
-    "display: flex; gap: 12px; justify-content: flex-end; flex-wrap: wrap;"
-  );
+  actions.setAttribute("style", "display: flex; gap: 12px; justify-content: flex-end; flex-wrap: wrap;");
 
   const continueButton = document.createElement("button");
   continueButton.textContent = "Visit site anyway";
@@ -710,34 +763,6 @@ function renderContentBlocker() {
   overlay.appendChild(card);
   document.body.appendChild(overlay);
 
-  let cleanupCalled = false;
-  let intervalRef;
-  let port;
-
-  const cleanup = () => {
-    if (cleanupCalled) return;
-    cleanupCalled = true;
-    try {
-      if (intervalRef) clearInterval(intervalRef);
-    } catch (_) {}
-    try {
-      if (port) port.disconnect();
-    } catch (_) {}
-    try {
-      overlay.remove();
-    } catch (_) {}
-  };
-
-  overlay.cleanup = cleanup;
-
-  const formatDuration = (value) => {
-    if (typeof value !== "number" || value <= 0) return "0m 0s";
-    const totalSeconds = Math.floor(value / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${minutes}m ${seconds}s`;
-  };
-
   const update = (msg) => {
     if (!msg) return;
     const goal = typeof msg.dailyGoal === "number" ? msg.dailyGoal : 0;
@@ -759,33 +784,22 @@ function renderContentBlocker() {
     }
   };
 
-  try {
-    port = browser.runtime.connect({ name: "Content Communication" });
-    port.onDisconnect.addListener(() => cleanup());
-    port.onMessage.addListener((msg) => update(msg));
-    try {
-      browser.runtime
-        .sendMessage({ type: "timer:get" })
-        .then((data) => update(data))
-        .catch(() => {});
-    } catch (_) {}
-    intervalRef = setInterval(() => {
-      try {
-        port.postMessage("get: timer");
-      } catch (_) {}
-    }, 1000);
-    try {
-      port.postMessage("get: timer");
-    } catch (_) {}
-  } catch (_) {}
+  // Use shared timer port utility
+  const timerPort = createTimerPort(update);
+
+  let cleanupCalled = false;
+  const cleanup = () => {
+    if (cleanupCalled) return;
+    cleanupCalled = true;
+    timerPort.cleanup();
+    try { overlay.remove(); } catch (_) {}
+  };
+
+  overlay.cleanup = cleanup;
 
   continueButton.addEventListener("click", async () => {
-    try {
-      await browser.runtime.sendMessage({ type: "stats:skip" });
-    } catch (_) {}
-    try {
-      await browser.runtime.sendMessage({ type: "blocker:release" });
-    } catch (_) {}
+    try { await browser.runtime.sendMessage({ type: "stats:skip" }); } catch (_) {}
+    try { await browser.runtime.sendMessage({ type: "blocker:release" }); } catch (_) {}
     cleanup();
   });
 
@@ -801,14 +815,12 @@ function renderContentBlocker() {
     } catch (_) {}
 
     try {
-      if (port) {
-        port.postMessage("goto: originTab");
+      if (timerPort.port) {
+        timerPort.port.postMessage("goto: originTab");
       } else {
         const keepAlive = browser.runtime.connect({ name: "Content Communication" });
         keepAlive.postMessage("goto: originTab");
-        setTimeout(() => {
-          try { keepAlive.disconnect(); } catch (_) {}
-        }, 150);
+        setTimeout(() => { try { keepAlive.disconnect(); } catch (_) {} }, 150);
       }
     } catch (_) {}
 
@@ -825,17 +837,30 @@ let rewardOverlayEnsureTimeout = null;
 
 const scheduleRewardOverlayEnsure = () => {
   if (rewardOverlayEnsureTimeout) return;
-  rewardOverlayEnsureTimeout = setTimeout(() => {
+  rewardOverlayEnsureTimeout = setTimeout(async () => {
     rewardOverlayEnsureTimeout = null;
-    // Only re-render if overlay is missing but should exist
-    // Check with background if we're in reward mode
-    browser.runtime.sendMessage({ type: "timer:get" })
-      .then((data) => {
-        if (data && data.controlledRewardGoal > 0 && !document.getElementById("aiki-reward-overlay")) {
+    try {
+      // Check with background if we're in reward mode
+      const data = await browser.runtime.sendMessage({ type: "timer:get" });
+      if (data && data.controlledRewardGoal > 0 && !document.getElementById("aiki-reward-overlay")) {
+        // Also check if we're on a procrastination site
+        const result = await browser.storage.local.get("list");
+        const procList = result?.list || [];
+        const procHosts = procList.map(item => item?.host || item?.name || "").filter(Boolean);
+        
+        const currentHost = location.hostname.replace(/^www\./, "");
+        const isOnProcrastinationSite = procHosts.some(host => {
+          const normalizedHost = host.replace(/^www\./, "");
+          return currentHost === normalizedHost || 
+                 currentHost.endsWith("." + normalizedHost) || 
+                 normalizedHost.endsWith("." + currentHost);
+        });
+        
+        if (isOnProcrastinationSite) {
           renderProcrastinationRewardOverlay();
         }
-      })
-      .catch(() => {});
+      }
+    } catch (_) {}
   }, 120);
 };
 
@@ -892,26 +917,39 @@ function renderProcrastinationRewardOverlay() {
   );
 
   const panel = document.createElement("div");
-  panel.setAttribute(
+  const isCollapsedKey = "aiki-reward-collapsed";
+  let isCollapsed = localStorage.getItem(isCollapsedKey) === "true";
+  
+  const getPanelStyle = (collapsed, bg = "linear-gradient(135deg, #ADD8E6, #32CD32)") => `pointer-events: auto; margin: 24px; padding: ${collapsed ? "8px 12px" : "clamp(14px, 2.5vw, 18px)"}; min-width: ${collapsed ? "120px" : "220px"}; max-width: ${collapsed ? "160px" : "280px"}; background: ${bg}; color: #ffffff; border-radius: ${collapsed ? "10px" : "16px"}; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25); font-family: 'Inter', 'Segoe UI', sans-serif; display: flex; flex-direction: column; gap: ${collapsed ? "4px" : "10px"}; cursor: grab; position: relative; font-size: 13px; transition: all 0.3s ease;`;
+  
+  let currentBg = "linear-gradient(135deg, #ADD8E6, #32CD32)";
+  panel.setAttribute("style", getPanelStyle(isCollapsed, currentBg));
+
+  // Collapse toggle button
+  const collapseBtn = document.createElement("button");
+  collapseBtn.textContent = isCollapsed ? "▼" : "▲";
+  collapseBtn.setAttribute(
     "style",
-    `pointer-events: auto; margin: 24px; padding: clamp(14px, 2.5vw, 18px); min-width: 220px; max-width: 280px; background: linear-gradient(135deg, #f59e0b, #ef4444); color: #ffffff; border-radius: 16px; box-shadow: 0 20px 40px rgba(245, 158, 11, 0.35); font-family: 'Inter', 'Segoe UI', sans-serif; display: flex; flex-direction: column; gap: 10px; cursor: grab; position: relative; font-size: 13px;`
+    "position: absolute; top: 4px; right: 6px; background: transparent; border: none; color: rgba(255, 255, 255, 0.6); cursor: pointer; font-size: 10px; padding: 4px; transition: color 0.2s;"
   );
+  collapseBtn.addEventListener("mouseenter", () => { collapseBtn.style.color = "rgba(255, 255, 255, 0.95)"; });
+  collapseBtn.addEventListener("mouseleave", () => { collapseBtn.style.color = "rgba(255, 255, 255, 0.6)"; });
 
   const heading = document.createElement("strong");
   heading.textContent = "🎉 Reward time";
-  heading.setAttribute("style", "font-size: 0.95em; letter-spacing: 0.01em; font-weight: 600;");
+  heading.setAttribute("style", `font-size: 0.95em; letter-spacing: 0.01em; font-weight: 600; display: ${isCollapsed ? "none" : "block"};`);
 
   const progressLabel = document.createElement("span");
   progressLabel.setAttribute(
     "style",
-    "font-size: 0.85em; color: rgba(255, 255, 255, 0.92);"
+    `font-size: ${isCollapsed ? "0.9em" : "0.85em"}; color: rgba(255, 255, 255, 0.95); font-weight: ${isCollapsed ? "600" : "400"};`
   );
   progressLabel.textContent = "Syncing...";
 
   const barShell = document.createElement("div");
   barShell.setAttribute(
     "style",
-    "width: 100%; height: 8px; border-radius: 999px; background: rgba(255, 255, 255, 0.3); overflow: hidden;"
+    `width: 100%; height: ${isCollapsed ? "5px" : "8px"}; border-radius: 999px; background: rgba(255, 255, 255, 0.3); overflow: hidden; transition: height 0.3s ease;`
   );
 
   const barFill = document.createElement("div");
@@ -924,7 +962,7 @@ function renderProcrastinationRewardOverlay() {
   const status = document.createElement("span");
   status.setAttribute(
     "style",
-    "font-size: 0.82em; color: rgba(255, 255, 255, 0.85);"
+    `font-size: 0.82em; color: rgba(255, 255, 255, 0.85); display: ${isCollapsed ? "none" : "block"};`
   );
   status.textContent = "Enjoy your break!";
 
@@ -949,12 +987,38 @@ function renderProcrastinationRewardOverlay() {
       // Hide button after snooze
       snoozeBtn.style.display = "none";
       status.textContent = "Added 1 minute! Enjoy!";
-      panel.style.background = "linear-gradient(135deg, #22c55e, #14b8a6)";
+      currentBg = "linear-gradient(135deg, #22c55e, #14b8a6)";
+      panel.style.background = currentBg;
     } catch (e) {
       console.log("[Aiki] Failed to snooze:", e);
     }
   });
 
+  // Collapse/expand toggle handler
+  const toggleCollapse = () => {
+    isCollapsed = !isCollapsed;
+    localStorage.setItem(isCollapsedKey, isCollapsed.toString());
+    collapseBtn.textContent = isCollapsed ? "▼" : "▲";
+    panel.setAttribute("style", getPanelStyle(isCollapsed, currentBg));
+    heading.style.display = isCollapsed ? "none" : "block";
+    status.style.display = isCollapsed ? "none" : "block";
+    barShell.style.height = isCollapsed ? "5px" : "8px";
+    progressLabel.style.fontSize = isCollapsed ? "0.9em" : "0.85em";
+    progressLabel.style.fontWeight = isCollapsed ? "600" : "400";
+    // Hide snooze button when collapsed
+    if (isCollapsed && snoozeBtn.style.display !== "none") {
+      snoozeBtn.dataset.wasVisible = "true";
+      snoozeBtn.style.display = "none";
+    } else if (!isCollapsed && snoozeBtn.dataset.wasVisible === "true") {
+      snoozeBtn.style.display = "block";
+    }
+  };
+  collapseBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    toggleCollapse();
+  });
+
+  panel.appendChild(collapseBtn);
   panel.appendChild(heading);
   panel.appendChild(progressLabel);
   panel.appendChild(barShell);
@@ -963,71 +1027,11 @@ function renderProcrastinationRewardOverlay() {
   overlay.appendChild(panel);
   document.body.appendChild(overlay);
 
-  // Make panel draggable
-  let dragState = {
-    dragging: false,
-    startX: 0,
-    startY: 0,
-    offsetX: 0,
-    offsetY: 0,
-  };
+  // Use shared drag utility
+  const dragHandle = makeDraggable(panel);
 
-  const onPointerDown = (event) => {
-    dragState.dragging = true;
-    dragState.startX = event.clientX;
-    dragState.startY = event.clientY;
-    panel.style.cursor = "grabbing";
-    event.preventDefault();
-  };
-
-  const onPointerMove = (event) => {
-    if (!dragState.dragging) return;
-    const dx = event.clientX - dragState.startX;
-    const dy = event.clientY - dragState.startY;
-    dragState.offsetX += dx;
-    dragState.offsetY += dy;
-    dragState.startX = event.clientX;
-    dragState.startY = event.clientY;
-    panel.style.transform = `translate(${dragState.offsetX}px, ${dragState.offsetY}px)`;
-    event.preventDefault();
-  };
-
-  const endDrag = () => {
-    dragState.dragging = false;
-    panel.style.cursor = "grab";
-  };
-
-  panel.addEventListener("pointerdown", onPointerDown);
-  window.addEventListener("pointermove", onPointerMove);
-  window.addEventListener("pointerup", endDrag);
-  window.addEventListener("pointerleave", endDrag);
-
-  let port;
-  let intervalRef;
   let cleanupCalled = false;
   let warningShown = false;
-
-  const cleanup = () => {
-    if (cleanupCalled) return;
-    cleanupCalled = true;
-    panel.removeEventListener("pointerdown", onPointerDown);
-    window.removeEventListener("pointermove", onPointerMove);
-    window.removeEventListener("pointerup", endDrag);
-    window.removeEventListener("pointerleave", endDrag);
-    try { if (port) port.disconnect(); } catch (_) {}
-    try { if (intervalRef) clearInterval(intervalRef); } catch (_) {}
-    try { overlay.remove(); } catch (_) {}
-  };
-
-  overlay.cleanup = cleanup;
-
-  const formatDuration = (value) => {
-    if (typeof value !== "number" || value <= 0) return "0m 0s";
-    const totalSeconds = Math.floor(value / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${minutes}m ${seconds}s`;
-  };
 
   const update = (msg) => {
     if (!msg) return;
@@ -1036,17 +1040,14 @@ function renderProcrastinationRewardOverlay() {
     const remaining = typeof msg.controlledRewardRemaining === "number" ? msg.controlledRewardRemaining : 0;
     
     if (goal <= 0) {
-      // No reward timer active, remove overlay
       cleanup();
       return;
     }
     
-    // Check if overlay was removed from DOM (e.g., during SPA navigation)
-    // If reward is still active but overlay is gone, re-render it
     if (!document.getElementById("aiki-reward-overlay")) {
       console.log("[Aiki] Reward overlay missing from DOM, re-rendering...");
-      cleanup(); // Clean up old references
-      renderProcrastinationRewardOverlay(); // Re-render
+      cleanup();
+      renderProcrastinationRewardOverlay();
       return;
     }
     
@@ -1056,13 +1057,11 @@ function renderProcrastinationRewardOverlay() {
     barFill.style.width = `${percent}%`;
     progressLabel.textContent = `${formatDuration(remaining)} remaining`;
     
-    // Show snooze button at 5 seconds or less (but > 0)
     if (remaining <= 5000 && remaining > 0) {
       if (!warningShown) {
         warningShown = true;
         snoozeBtn.style.display = "block";
         panel.style.background = "linear-gradient(135deg, #dc2626, #b91c1c)";
-        panel.style.boxShadow = "0 20px 40px rgba(220, 38, 38, 0.5)";
         heading.textContent = "⚠️ Time's almost up!";
       }
       status.textContent = `Returning to learning in ${Math.ceil(remaining / 1000)} seconds...`;
@@ -1072,45 +1071,33 @@ function renderProcrastinationRewardOverlay() {
       snoozeBtn.style.display = "none";
     } else if (remaining < 30000) {
       status.textContent = "Almost time to learn again!";
-      // Reset warning state if timer was extended
       if (remaining > 5000) {
         warningShown = false;
         snoozeBtn.style.display = "none";
         heading.textContent = "🎉 Reward time";
-        panel.style.background = "linear-gradient(135deg, #f59e0b, #ef4444)";
-        panel.style.boxShadow = "0 20px 40px rgba(245, 158, 11, 0.35)";
+        panel.style.background = "linear-gradient(135deg, #ADD8E6, #32CD32)";
       }
     } else {
       status.textContent = "Enjoy your break!";
       warningShown = false;
       snoozeBtn.style.display = "none";
       heading.textContent = "🎉 Reward time";
-      panel.style.background = "linear-gradient(135deg, #f59e0b, #ef4444)";
-      panel.style.boxShadow = "0 20px 40px rgba(245, 158, 11, 0.35)";
+      panel.style.background = "linear-gradient(135deg, #ADD8E6, #32CD32)";
     }
   };
 
-  try {
-    port = browser.runtime.connect({ name: "Content Communication" });
-    port.onDisconnect.addListener(() => cleanup());
-    port.onMessage.addListener((msg) => update(msg));
-    
-    browser.runtime
-      .sendMessage({ type: "timer:get" })
-      .then((data) => update(data))
-      .catch(() => {});
-    
-    intervalRef = setInterval(() => {
-      try {
-        port.postMessage("get: timer");
-      } catch (_) {}
-    }, 1000);
-    
-    try {
-      port.postMessage("get: timer");
-    } catch (_) {}
-  } catch (_) {}
+  // Use shared timer port utility
+  const timerPort = createTimerPort(update);
 
+  const cleanup = () => {
+    if (cleanupCalled) return;
+    cleanupCalled = true;
+    dragHandle.cleanup();
+    timerPort.cleanup();
+    try { overlay.remove(); } catch (_) {}
+  };
+
+  overlay.cleanup = cleanup;
   window.addEventListener("beforeunload", cleanup, { once: true });
 }
 

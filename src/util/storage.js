@@ -681,7 +681,7 @@ async function getControlledRewardMinutes() {
   const result = await storage.get("controlledRewardMinutes");
   return typeof result.controlledRewardMinutes === "number"
     ? result.controlledRewardMinutes
-    : 2; // Default 2 minutes
+    : 15; // Default 15 minutes
 }
 
 async function setControlledRewardMinutes(minutes) {

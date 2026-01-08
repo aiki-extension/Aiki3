@@ -134,11 +134,31 @@ async function setup() {
   // Initialize controlled mode if applicable
   if (isControlled()) {
     await controlledMode.init();
+    redirection.registerProcrastinationGuards(); // Register tab close listeners for session logging
     console.log("[Background] Controlled mode initialized");
   }
 }
 
 async function killAiki() {
+  // FIRST: Finalize all active sessions before stopping anything
+  // This ensures we capture the exact duration up to the disable moment
+  try {
+    await redirection.finalizeAllActiveSessions("extension_disabled");
+    console.log("[Background] Finalized all active sessions on extension disable");
+  } catch (e) {
+    console.warn("[Background] Failed to finalize sessions on disable:", e);
+  }
+  
+  // For controlled variant, also cleanup controlledMode state
+  if (isControlled()) {
+    try {
+      await controlledMode.cleanup();
+      console.log("[Background] Controlled mode cleaned up on extension disable");
+    } catch (e) {
+      console.warn("[Background] Failed to cleanup controlled mode:", e);
+    }
+  }
+  
   const tabs = await browser.tabs.query({
     active: true,
     currentWindow: true,
