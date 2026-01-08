@@ -3,8 +3,34 @@ import browser from "webextension-polyfill";
 const l = console.log;
 
 // ============================================
-// SHARED UTILITIES
+// SHARED UTILITIES & STYLES
 // ============================================
+
+// Style constants (inline to avoid host CSS conflicts)
+const STYLES = {
+  // Base font and reset
+  fontBase: `font-family: 'Inter','Segoe UI',sans-serif; font-size: 14px;`,
+  
+  // Overlay types
+  overlayBlocking: `all: initial; position: fixed; inset: 0; background: rgba(3, 7, 18, 0.98); display: flex; align-items: center; justify-content: center; z-index: 2147483646;`,
+  overlayTransparent: `all: initial; position: fixed; inset: 0; pointer-events: none; background: transparent; display: flex;`,
+  
+  // Card containers
+  cardLight: `background: #ffffff; color: #0f172a; border-radius: 18px; box-shadow: 0 28px 55px rgba(15, 23, 42, 0.35); display: flex; flex-direction: column;`,
+  cardDark: `background: rgba(15, 23, 42, 0.98); color: #f8fafc; border-radius: 22px; box-shadow: 0 32px 70px rgba(15, 23, 42, 0.55); display: flex; flex-direction: column;`,
+  
+  // Buttons
+  btnPrimary: `padding: 10px 14px; border-radius: 999px; border: none; background: linear-gradient(135deg, #2563eb, #7c3aed); color: #ffffff; font-weight: 600; cursor: pointer; box-shadow: 0 10px 20px rgba(37, 99, 235, 0.28); transition: transform 0.15s ease, box-shadow 0.15s ease;`,
+  btnPrimaryHover: `padding: 10px 14px; border-radius: 999px; border: none; background: linear-gradient(135deg, #1d4ed8, #5b21b6); color: #ffffff; font-weight: 600; cursor: pointer; box-shadow: 0 12px 24px rgba(29, 78, 216, 0.32); transform: translateY(-1px);`,
+  btnSecondary: `padding: 10px 14px; border-radius: 999px; border: 1px solid #cbd5f5; background: #ffffff; color: #1f2937; font-weight: 600; cursor: pointer; transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;`,
+  btnSecondaryHover: `padding: 10px 14px; border-radius: 999px; border: 1px solid #3b82f6; background: #eff6ff; color: #1d4ed8; font-weight: 600; cursor: pointer;`,
+  
+  // Progress bar
+  progressShell: `width: 100%; border-radius: 999px; overflow: hidden;`,
+  progressFill: `height: 100%; border-radius: inherit; transition: width 0.4s ease;`,
+  progressGreen: `background: linear-gradient(135deg, #22c55e, #14b8a6);`,
+};
+
 
 /**
  * Format milliseconds as "Xm Ys" string.
@@ -317,13 +343,13 @@ function renderRedirectPrompt(originUrl) {
     overlay.className = "aiki-overlay";
     overlay.setAttribute(
       "style",
-      `all: initial; position: fixed; inset: 0; background: rgba(3, 7, 18, 0.98); display: flex; align-items: center; justify-content: center; z-index: 2147483646; font-family: 'Inter','Segoe UI',sans-serif; font-size: 14px;`
+      `${STYLES.overlayBlocking} ${STYLES.fontBase}`
     );
 
     const card = document.createElement("div");
     card.setAttribute(
       "style",
-      `background: #ffffff; color: #0f172a; width: min(320px, 92vw); padding: clamp(16px, 3vw, 24px); border-radius: 18px; box-shadow: 0 28px 55px rgba(15, 23, 42, 0.35); font-family: 'Inter', 'Segoe UI', sans-serif; display: flex; flex-direction: column; gap: 18px; text-align: left; font-size: 14px;`
+      `${STYLES.cardLight} width: min(320px, 92vw); padding: clamp(16px, 3vw, 24px); gap: 18px; text-align: left; ${STYLES.fontBase}`
     );
 
     const title = document.createElement("h2");
@@ -378,37 +404,19 @@ function renderRedirectPrompt(originUrl) {
 
     const continueButton = document.createElement("button");
     continueButton.textContent = "Stay here";
-    continueButton.setAttribute(
-      "style",
-      `flex: 1; padding: 10px 14px; border-radius: 999px; border: 1px solid #cbd5f5; background: #ffffff; color: #1f2937; font-weight: 600; cursor: pointer; transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease; display: flex; justify-content: center; align-items: center; text-align: center;`
-    );
-    continueButton.onmouseenter = () =>
-      continueButton.setAttribute(
-        "style",
-        `flex: 1; padding: 10px 14px; border-radius: 999px; border: 1px solid #3b82f6; background: #eff6ff; color: #1d4ed8; font-weight: 600; cursor: pointer; transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease; display: flex; justify-content: center; align-items: center; text-align: center;`
-      );
-    continueButton.onmouseleave = () =>
-      continueButton.setAttribute(
-        "style",
-        `flex: 1; padding: 10px 14px; border-radius: 999px; border: 1px solid #cbd5f5; background: #ffffff; color: #1f2937; font-weight: 600; cursor: pointer; transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease; display: flex; justify-content: center; align-items: center; text-align: center;`
-      );
+    const btnSecStyle = `flex: 1; ${STYLES.btnSecondary} display: flex; justify-content: center; align-items: center; text-align: center;`;
+    const btnSecHoverStyle = `flex: 1; ${STYLES.btnSecondaryHover} display: flex; justify-content: center; align-items: center; text-align: center;`;
+    continueButton.setAttribute("style", btnSecStyle);
+    continueButton.onmouseenter = () => continueButton.setAttribute("style", btnSecHoverStyle);
+    continueButton.onmouseleave = () => continueButton.setAttribute("style", btnSecStyle);
 
     const redirectButton = document.createElement("button");
     redirectButton.textContent = "Redirect";
-    redirectButton.setAttribute(
-      "style",
-      `flex: 1; padding: 10px 14px; border-radius: 999px; border: none; background: linear-gradient(135deg, #2563eb, #7c3aed); color: #ffffff; font-weight: 600; cursor: pointer; box-shadow: 0 10px 20px rgba(37, 99, 235, 0.28); transition: transform 0.15s ease, box-shadow 0.15s ease; display: flex; justify-content: center; align-items: center; text-align: center;`
-    );
-    redirectButton.onmouseenter = () =>
-      redirectButton.setAttribute(
-        "style",
-        `flex: 1; padding: 10px 14px; border-radius: 999px; border: none; background: linear-gradient(135deg, #1d4ed8, #5b21b6); color: #ffffff; font-weight: 600; cursor: pointer; box-shadow: 0 12px 24px rgba(29, 78, 216, 0.32); transform: translateY(-1px); transition: transform 0.15s ease, box-shadow 0.15s ease; display: flex; justify-content: center; align-items: center; text-align: center;`
-      );
-    redirectButton.onmouseleave = () =>
-      redirectButton.setAttribute(
-        "style",
-        `flex: 1; padding: 10px 14px; border-radius: 999px; border: none; background: linear-gradient(135deg, #2563eb, #7c3aed); color: #ffffff; font-weight: 600; cursor: pointer; box-shadow: 0 10px 20px rgba(37, 99, 235, 0.28); transition: transform 0.15s ease, box-shadow 0.15s ease; display: flex; justify-content: center; align-items: center; text-align: center;`
-      );
+    const btnPriStyle = `flex: 1; ${STYLES.btnPrimary} display: flex; justify-content: center; align-items: center; text-align: center;`;
+    const btnPriHoverStyle = `flex: 1; ${STYLES.btnPrimaryHover} display: flex; justify-content: center; align-items: center; text-align: center;`;
+    redirectButton.setAttribute("style", btnPriStyle);
+    redirectButton.onmouseenter = () => redirectButton.setAttribute("style", btnPriHoverStyle);
+    redirectButton.onmouseleave = () => redirectButton.setAttribute("style", btnPriStyle);
 
     const finalize = (action) => {
       if (done) return;
@@ -1035,7 +1043,6 @@ function renderProcrastinationRewardOverlay() {
 
   const update = (msg) => {
     if (!msg) return;
-    
     const goal = typeof msg.controlledRewardGoal === "number" ? msg.controlledRewardGoal : 0;
     const remaining = typeof msg.controlledRewardRemaining === "number" ? msg.controlledRewardRemaining : 0;
     

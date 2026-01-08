@@ -3,6 +3,53 @@ import { parseUrl } from "./utilities";
 const storage = browser.storage.local;
 
 /**
+ * Factory for creating keyed storage accessors (maps with set/get/remove/clear).
+ * @param {string} storageKey - The key to use in browser.storage
+ */
+function createKeyedStore(storageKey) {
+  return {
+    async set(key, value) {
+      if (!key || !value) return;
+      const data = await storage.get(storageKey);
+      const current = data[storageKey] && typeof data[storageKey] === "object" 
+        ? { ...data[storageKey] } : {};
+      current[String(key)] = value;
+      return storage.set({ [storageKey]: current });
+    },
+    async get(key) {
+      if (key === null || key === undefined) return null;
+      const data = await storage.get(storageKey);
+      if (data[storageKey] && typeof data[storageKey] === "object") {
+        return data[storageKey][String(key)] || null;
+      }
+      return null;
+    },
+    async remove(key) {
+      if (key === null || key === undefined) return;
+      const strKey = String(key);
+      const data = await storage.get(storageKey);
+      if (data[storageKey] && typeof data[storageKey] === "object" && strKey in data[storageKey]) {
+        const next = { ...data[storageKey] };
+        delete next[strKey];
+        if (Object.keys(next).length > 0) {
+          return storage.set({ [storageKey]: next });
+        } else {
+          return storage.remove(storageKey);
+        }
+      }
+    },
+    clear() {
+      return storage.remove(storageKey);
+    }
+  };
+}
+
+// Pre-created keyed stores
+const blockedOriginsStore = createKeyedStore("blockedOrigins");
+const promptLocksStore = createKeyedStore("promptLocks");
+const activeSessionsStore = createKeyedStore("activeSessions");
+
+/**
  * @function
  * @description Clears all stored data in browser storage. */
 function clearStorage() {
@@ -296,8 +343,6 @@ async function checkDate(statsDate) {
   if (statsDate !== date) {
     console.log("Rolling over date");
     await overWriteYesterday();
-    await storage.set({ completedCount: 0 });
-    await storage.set({ skipCount: 0 });
     await storage.set({
       sessionData: { procrastinationDuration: 0, learningDuration: 0 },
     });
@@ -305,29 +350,11 @@ async function checkDate(statsDate) {
   }
 }
 
-async function incrContinueCount() {
-  const { completedCount, statsDate } = await storage.get([
-    "completedCount",
-    "statsDate",
-  ]);
-  await checkDate(statsDate);
-  storage.set({ completedCount: completedCount + 1 });
-}
 
-async function incrSkipCount() {
-  const { skipCount, statsDate } = await storage.get([
-    "skipCount",
-    "statsDate",
-  ]);
-  await checkDate(statsDate);
-  storage.set({ skipCount: skipCount + 1 });
-}
 
 async function getAllStats() {
   const result = await storage.get([
     "sessionData",
-    "skipCount",
-    "completedCount",
     "yesterday",
     "history",
   ]);
@@ -337,24 +364,14 @@ async function getAllStats() {
     ? { ...defaultSession, ...result.sessionData }
     : { ...defaultSession };
   const yesterday = result.yesterday && typeof result.yesterday === 'object'
-    ? {
-        sessionData: { ...defaultSession, ...(result.yesterday.sessionData || {}) },
-        skipCount: result.yesterday.skipCount || 0,
-        completedCount: result.yesterday.completedCount || 0,
-      }
-    : { sessionData: { ...defaultSession }, skipCount: 0, completedCount: 0 };
+    ? { sessionData: { ...defaultSession, ...(result.yesterday.sessionData || {}) } }
+    : { sessionData: { ...defaultSession } };
   const history = result.history && typeof result.history === 'object'
-    ? {
-        sessionData: { ...defaultSession, ...(result.history.sessionData || {}) },
-        skipCount: result.history.skipCount || 0,
-        completedCount: result.history.completedCount || 0,
-      }
-    : { sessionData: { ...defaultSession }, skipCount: 0, completedCount: 0 };
+    ? { sessionData: { ...defaultSession, ...(result.history.sessionData || {}) } }
+    : { sessionData: { ...defaultSession } };
 
   return {
     sessionData: today,
-    skipCount: result.skipCount || 0,
-    completedCount: result.completedCount || 0,
     yesterday,
     history,
   };
@@ -379,38 +396,26 @@ function initializeStats() {
   storage.set({
     sessionData: { procrastinationDuration: 0, learningDuration: 0 },
   });
-  storage.set({ skipCount: 0 });
-  storage.set({ completedCount: 0 });
   storage.set({
     history: {
       sessionData: { procrastinationDuration: 0, learningDuration: 0 },
-      completedCount: 0,
-      skipCount: 0,
     },
   });
   storage.set({
     yesterday: {
       sessionData: { procrastinationDuration: 0, learningDuration: 0 },
-      skipCount: 0,
-      completedCount: 0,
     },
   });
 }
 
 async function overWriteYesterday() {
   await addToHistory();
-  const y = await storage.get([
-    "sessionData",
-    "skipCount",
-    "completedCount",
-  ]);
+  const y = await storage.get(["sessionData"]);
   const yesterday = {
     sessionData: y.sessionData || {
       procrastinationDuration: 0,
       learningDuration: 0,
     },
-    skipCount: y.skipCount || 0,
-    completedCount: y.completedCount || 0,
   };
   storage.set({ yesterday });
 }
@@ -420,19 +425,13 @@ async function addToHistory() {
   if (!history || typeof history !== "object") {
     history = {
       sessionData: { procrastinationDuration: 0, learningDuration: 0 },
-      skipCount: 0,
-      completedCount: 0,
     };
   }
   if (!yesterday || typeof yesterday !== "object") {
     yesterday = {
       sessionData: { procrastinationDuration: 0, learningDuration: 0 },
-      skipCount: 0,
-      completedCount: 0,
     };
   }
-  if (typeof history.skipCount !== "number") history.skipCount = 0;
-  if (typeof history.completedCount !== "number") history.completedCount = 0;
   if (!history.sessionData || typeof history.sessionData !== "object") {
     history.sessionData = { procrastinationDuration: 0, learningDuration: 0 };
   }
@@ -440,8 +439,6 @@ async function addToHistory() {
     yesterday.sessionData = { procrastinationDuration: 0, learningDuration: 0 };
   }
 
-  history.skipCount += yesterday.skipCount || 0;
-  history.completedCount += yesterday.completedCount || 0;
   history.sessionData.procrastinationDuration +=
     yesterday.sessionData.procrastinationDuration || 0;
   history.sessionData.learningDuration +=
@@ -507,71 +504,9 @@ function clearBlockedTabs() {
   storage.remove("blockedTabs");
 }
 
-async function addBlockedOrigin(tabId, url) {
-  if (!tabId || !url) return;
-  const { blockedOrigins } = await storage.get("blockedOrigins");
-  const next = blockedOrigins && typeof blockedOrigins === "object" ? { ...blockedOrigins } : {};
-  next[tabId] = url;
-  storage.set({ blockedOrigins: next });
-}
 
-async function getBlockedOrigin(tabId) {
-  const { blockedOrigins } = await storage.get("blockedOrigins");
-  if (blockedOrigins && typeof blockedOrigins === "object") {
-    return blockedOrigins[tabId];
-  }
-  return null;
-}
 
-async function removeBlockedOrigin(tabId) {
-  const { blockedOrigins } = await storage.get("blockedOrigins");
-  if (blockedOrigins && typeof blockedOrigins === "object" && tabId in blockedOrigins) {
-    const next = { ...blockedOrigins };
-    delete next[tabId];
-    if (Object.keys(next).length > 0) {
-      storage.set({ blockedOrigins: next });
-    } else {
-      storage.remove("blockedOrigins");
-    }
-  }
-}
 
-function clearBlockedOrigins() {
-  storage.remove("blockedOrigins");
-}
-
-async function setPromptLock(tabId, payload) {
-  if (!tabId || !payload) return;
-  const { promptLocks } = await storage.get("promptLocks");
-  const next = promptLocks && typeof promptLocks === "object" ? { ...promptLocks } : {};
-  next[tabId] = payload;
-  storage.set({ promptLocks: next });
-}
-
-async function getPromptLock(tabId) {
-  const { promptLocks } = await storage.get("promptLocks");
-  if (promptLocks && typeof promptLocks === "object") {
-    return promptLocks[tabId];
-  }
-  return null;
-}
-
-async function removePromptLock(tabId) {
-  const { promptLocks } = await storage.get("promptLocks");
-  if (promptLocks && typeof promptLocks === "object" && tabId in promptLocks) {
-    const next = { ...promptLocks };
-    delete next[tabId];
-    if (Object.keys(next).length > 0) {
-      storage.set({ promptLocks: next });
-    } else {
-      storage.remove("promptLocks");
-    }
-  }
-}
-
-function clearPromptLocks() {
-  storage.remove("promptLocks");
-}
 
 async function setParticipantRecord(record) {
   if (record && typeof record === "object") {
@@ -608,44 +543,7 @@ async function getUserPreferencesId() {
   return result && result.userPreferencesId ? result.userPreferencesId : null;
 }
 
-async function setActiveSession(tabId, session) {
-  const key = normalizeSessionKey(tabId);
-  if (!key || !session) return;
-  const { activeSessions } = await storage.get("activeSessions");
-  const next =
-    activeSessions && typeof activeSessions === "object" ? { ...activeSessions } : {};
-  next[key] = session;
-  storage.set({ activeSessions: next });
-}
 
-async function getActiveSession(tabId) {
-  const key = normalizeSessionKey(tabId);
-  if (!key) return null;
-  const { activeSessions } = await storage.get("activeSessions");
-  if (activeSessions && typeof activeSessions === "object") {
-    return activeSessions[key] || null;
-  }
-  return null;
-}
-
-async function removeActiveSession(tabId) {
-  const key = normalizeSessionKey(tabId);
-  if (!key) return;
-  const { activeSessions } = await storage.get("activeSessions");
-  if (activeSessions && typeof activeSessions === "object" && key in activeSessions) {
-    const next = { ...activeSessions };
-    delete next[key];
-    if (Object.keys(next).length > 0) {
-      storage.set({ activeSessions: next });
-    } else {
-      storage.remove("activeSessions");
-    }
-  }
-}
-
-function clearActiveSessions() {
-  return storage.remove("activeSessions");
-}
 
 // Controlled variant session state
 async function setControlledSession(session) {
@@ -713,8 +611,6 @@ export default {
   redirection: { toggle: toggleRedirection, get: getRedirectionToggled },
   stats: {
     storeSession: storeSession,
-    skip: incrSkipCount,
-    continue: incrContinueCount,
     getAll: getAllStats,
     init: initializeStats,
   },
@@ -731,16 +627,16 @@ export default {
     clear: clearBlockedTabs,
   },
   blockedOrigins: {
-    add: addBlockedOrigin,
-    get: getBlockedOrigin,
-    remove: removeBlockedOrigin,
-    clear: clearBlockedOrigins,
+    add: blockedOriginsStore.set,
+    get: blockedOriginsStore.get,
+    remove: blockedOriginsStore.remove,
+    clear: blockedOriginsStore.clear,
   },
   promptLocks: {
-    set: setPromptLock,
-    get: getPromptLock,
-    remove: removePromptLock,
-    clear: clearPromptLocks,
+    set: promptLocksStore.set,
+    get: promptLocksStore.get,
+    remove: promptLocksStore.remove,
+    clear: promptLocksStore.clear,
   },
   participantRecord: {
     get: getParticipantRecord,
@@ -752,10 +648,10 @@ export default {
     set: setUserPreferencesId,
   },
   activeSessions: {
-    set: setActiveSession,
-    get: getActiveSession,
-    remove: removeActiveSession,
-    clear: clearActiveSessions,
+    set: activeSessionsStore.set,
+    get: activeSessionsStore.get,
+    remove: activeSessionsStore.remove,
+    clear: activeSessionsStore.clear,
   },
   controlledSession: {
     get: getControlledSession,

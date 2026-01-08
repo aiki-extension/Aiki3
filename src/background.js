@@ -50,11 +50,9 @@ browser.runtime.onMessage.addListener((message, sender) => {
     })();
   }
 
-  if (message.type === "stats:skip") {
-    storage.stats.skip();
-  }
 
   if (message.type === "learning:autoStart") {
+
     return (async () => {
       try {
         if (!timer.isLearningSessionActive()) {

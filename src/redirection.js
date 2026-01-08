@@ -1125,12 +1125,10 @@ async function talkToContent(tabId, url, originUrl, attempt = 0) {
     }
 
     if (result && result.action === "continue") {
-      try {
-        await storage.stats.skip();
-      } catch (_) {}
       registerProcrastinationGuards();
       await startSession(tabId, "procrastination", originUrl);
       // Log single event for stay decision
+
       await logDeclinedIntervention(originUrl, url);
       await hideImmediatePrompt(tabId);
       await removePreemptiveHide(tabId);

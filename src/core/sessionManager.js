@@ -50,88 +50,6 @@ export function logEventAsync(eventType, data = {}) {
 }
 
 /**
- * Start a session for the given tab.
- * @param {number} tabId - Tab ID
- * @param {string} sessionType - "learning" or "procrastination"
- * @param {string} siteUrl - URL of site being visited
- * @param {string|null} triggerUrl - Procrastination URL that triggered learning
- * @returns {Promise<void>}
- */
-export async function startSession(tabId, sessionType, siteUrl, triggerUrl = null) {
-  if (tabId === undefined || tabId === null || !siteUrl) return;
-  const participantId = await getParticipantId();
-  if (!participantId) return;
-  
-  // Remove any existing session for this tab
-  await storage.activeSessions.remove(tabId);
-  
-  const sessionData = {
-    participantId,
-    sessionType,
-    startedAt: Date.now(),
-  };
-  
-  if (sessionType === "learning") {
-    sessionData.learningUrl = siteUrl;
-    sessionData.procrastinationUrl = triggerUrl;
-  } else {
-    sessionData.procrastinationUrl = siteUrl;
-  }
-  
-  await storage.activeSessions.set(tabId, sessionData);
-}
-
-/**
- * Finalize and log the session for the given tab.
- * @param {number} tabId - Tab ID
- * @param {string} sessionType - "learning" or "procrastination"
- * @param {string} reason - Reason for ending
- * @returns {Promise<void>}
- */
-export async function finalizeSession(tabId, sessionType, reason = "switch") {
-  if (tabId === undefined || tabId === null) return;
-  
-  const session = await storage.activeSessions.get(tabId);
-  if (!session || session.sessionType !== sessionType) return;
-  
-  const durationMs = Date.now() - (session.startedAt || Date.now());
-  
-  // Log session end
-  await logSessionEvent({
-    participantId: session.participantId,
-    sessionType: session.sessionType,
-    startedAt: new Date(session.startedAt).toISOString(),
-    durationMs,
-    learningUrl: session.learningUrl,
-    procrastinationUrl: session.procrastinationUrl,
-  }).catch(() => {});
-  
-  // Remove session
-  await storage.activeSessions.remove(tabId);
-}
-
-/**
- * Finalize all active sessions.
- * @param {string} reason - Reason for ending
- * @returns {Promise<void>}
- */
-export async function finalizeAllSessions(reason = "cleanup") {
-  try {
-    const sessions = await storage.activeSessions.get();
-    if (!sessions || typeof sessions !== "object") return;
-    
-    for (const tabId of Object.keys(sessions)) {
-      const session = sessions[tabId];
-      if (session && session.sessionType) {
-        await finalizeSession(parseInt(tabId), session.sessionType, reason);
-      }
-    }
-  } catch (e) {
-    console.warn("[SessionManager] Failed to finalize all sessions:", e);
-  }
-}
-
-/**
  * Log a controlled variant session (learning or reward).
  * @param {Object} options
  * @param {string} options.sessionType - "learning" or "procrastination" (reward)
@@ -168,9 +86,6 @@ export async function logControlledSession(options = {}) {
 export default {
   logEvent,
   logEventAsync,
-  startSession,
-  finalizeSession,
-  finalizeAllSessions,
   getParticipantId,
   logControlledSession,
 };
