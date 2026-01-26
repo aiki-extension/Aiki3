@@ -2,7 +2,7 @@ import browser from "webextension-polyfill";
 import intervals from "./intervals";
 import storage from "./util/storage";
 import redirection from "./redirection";
-import timer from "./timer";
+import timer from "./services/TimerManager";
 import { setTheme } from "./util/themes";
 import badge from "./badge";
 import { logAuditEvent, saveUserPreferences } from "./util/logger";
@@ -26,10 +26,10 @@ browser.runtime.onMessage.addListener((message, sender) => {
     return (async () => {
       try {
         await timer.sync();
-      } catch (_) {}
-      
+      } catch (_) { }
+
       const timeData = timer.getTime();
-      
+
       // Add controlled mode state if controlled variant
       if (isControlled()) {
         const controlledState = controlledMode.getState();
@@ -45,7 +45,7 @@ browser.runtime.onMessage.addListener((message, sender) => {
           controlledRewardGoal: controlledState.state === "reward" ? controlledState.goalMs : 0,
         };
       }
-      
+
       return { ...timeData, isControlledVariant: false };
     })();
   }
@@ -58,7 +58,7 @@ browser.runtime.onMessage.addListener((message, sender) => {
         if (!timer.isLearningSessionActive()) {
           await timer.startLearningSession();
         }
-      } catch (_) {}
+      } catch (_) { }
       return true;
     })();
   }
@@ -82,7 +82,7 @@ browser.runtime.onMessage.addListener((message, sender) => {
       return true;
     })();
   }
-  
+
   // Handle snooze reward for controlled variant (adds 1 minute)
   if (message.type === "controlled:snoozeReward") {
     return (async () => {
@@ -125,7 +125,7 @@ async function setup() {
   intervals.intervalSetup();
   storage.shouldRedirect.set(true);
   await redirection.start();
-  
+
   // Initialize controlled mode if applicable
   if (isControlled()) {
     await controlledMode.init();
@@ -142,7 +142,7 @@ async function killAiki() {
   } catch (e) {
     console.warn("[Background] Failed to finalize sessions on disable:", e);
   }
-  
+
   // For controlled variant, also cleanup controlledMode state
   if (isControlled()) {
     try {
@@ -152,7 +152,7 @@ async function killAiki() {
       console.warn("[Background] Failed to cleanup controlled mode:", e);
     }
   }
-  
+
   const tabs = await browser.tabs.query({
     active: true,
     currentWindow: true,
@@ -177,7 +177,7 @@ async function killAiki() {
   });
   try {
     await saveUserPreferences({ participantId: user, is_active: false });
-  } catch (_) {}
+  } catch (_) { }
 }
 
 async function reviveAiki() {
@@ -193,14 +193,14 @@ async function reviveAiki() {
   });
   try {
     await saveUserPreferences({ participantId: user, is_active: true });
-  } catch (_) {}
+  } catch (_) { }
 }
 
 async function gotoOriginTab() {
   const origin = await storage.origin.get();
   try {
     await browser.tabs.update(origin.tabId, { active: true });
-  } catch (_) {}
+  } catch (_) { }
 }
 
 // Manifest V3: Use runtime.onConnect for port messaging
@@ -232,7 +232,7 @@ browser.runtime.onConnect.addListener(function (port) {
                 currentWindow: true,
               });
               tabId = activeTab?.id;
-            } catch (_) {}
+            } catch (_) { }
           }
           console.log("[Aiki Debug] Calling redirection.gotoOrigin with:", { action, tabId, type: "popup" });
           redirection.gotoOrigin(action, {
@@ -248,7 +248,7 @@ browser.runtime.onConnect.addListener(function (port) {
         (async () => {
           try {
             await timer.sync();
-          } catch (_) {}
+          } catch (_) { }
           if (isDisconnected) return;
           try {
             const timeData = timer.getTime();

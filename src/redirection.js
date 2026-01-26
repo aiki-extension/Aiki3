@@ -1,7 +1,7 @@
 import storage from "./util/storage";
 import { logEvent } from "./util/logger";
 import browser from "webextension-polyfill";
-import timer from "./timer";
+import timer from "./services/TimerManager";
 import { parseUrl, makeDate, parseTime } from "./util/utilities";
 import { isControlled } from "./util/variantConfig";
 import controlledMode from "./controlledMode";
