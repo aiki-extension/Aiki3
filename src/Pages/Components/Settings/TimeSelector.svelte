@@ -10,7 +10,10 @@
   import { AIKI_VARIANT } from "../../../util/variant";
 
   let minuteOptions = Array.from({ length: 121 }, (_, i) => i); // 0 - 120 minutes
-  let secondsOptions = [0, 15, 30, 45];
+  let secondsOptions = [0, 15, 30, 45]; // 15-second intervals
+  
+  // Minimum learning time for experimental variant: 2 minutes
+  const MIN_LEARNING_MINUTES_EXP = 2;
   export let settings;
   export let update;
   export let user;
@@ -20,12 +23,16 @@
   // Controlled variant detection using imported config
   const isControlledVariant = AIKI_VARIANT === "controlled";
   let controlledLearningMinutes = 5;
+  let controlledLearningSeconds = 0;
   let controlledRewardMinutes = 2;
+  let controlledRewardSeconds = 0;
 
   onMount(async () => {
     if (isControlledVariant) {
       controlledLearningMinutes = await storage.controlledTimerSettings.learningMinutes.get();
+      controlledLearningSeconds = await storage.controlledTimerSettings.learningSeconds.get();
       controlledRewardMinutes = await storage.controlledTimerSettings.rewardMinutes.get();
+      controlledRewardSeconds = await storage.controlledTimerSettings.rewardSeconds.get();
     }
   });
 
@@ -34,8 +41,10 @@
   }
 
   function ensureMinThreshold() {
-    if (learnMin === 0 && learnSec < 30) {
-      learnSec = 30;
+    // Enforce 2-minute minimum for experimental variant
+    if (learnMin < MIN_LEARNING_MINUTES_EXP) {
+      learnMin = MIN_LEARNING_MINUTES_EXP;
+      learnSec = 0;
     }
   }
 
@@ -56,9 +65,14 @@
     update();
   }
   
-  async function setControlledLearningMinutes() {
-    const oldValue = await storage.controlledTimerSettings.learningMinutes.get();
+  async function setControlledLearningTime() {
+    const oldMinutes = await storage.controlledTimerSettings.learningMinutes.get();
+    const oldSeconds = await storage.controlledTimerSettings.learningSeconds.get();
     await storage.controlledTimerSettings.learningMinutes.set(controlledLearningMinutes);
+    await storage.controlledTimerSettings.learningSeconds.set(controlledLearningSeconds);
+    
+    // Calculate total minutes for UserPreferences
+    const totalMinutes = controlledLearningMinutes + controlledLearningSeconds / 60;
     
     // Save to UserPreferences and log the change
     try {
@@ -67,27 +81,32 @@
       // Save to UserPreferences table
       await saveUserPreferences({
         participantId,
-        learning_time_minutes: controlledLearningMinutes,
+        learning_time_minutes: totalMinutes,
       });
       
-      // Log the change event (without redundant timestamp)
+      // Log the change event
       await logEvent({
         participantId,
-        eventType: "audit:setting_change:controlled_learning_minutes",
+        eventType: "audit:setting_change:controlled_learning_time",
         eventData: JSON.stringify({
-          old: oldValue,
-          new: controlledLearningMinutes,
+          old: { min: oldMinutes, sec: oldSeconds },
+          new: { min: controlledLearningMinutes, sec: controlledLearningSeconds },
         }),
       });
     } catch (e) {
-      console.warn("Failed to log controlled learning minutes change", e);
+      console.warn("Failed to log controlled learning time change", e);
     }
     update();
   }
   
-  async function setControlledRewardMinutes() {
-    const oldValue = await storage.controlledTimerSettings.rewardMinutes.get();
+  async function setControlledRewardTime() {
+    const oldMinutes = await storage.controlledTimerSettings.rewardMinutes.get();
+    const oldSeconds = await storage.controlledTimerSettings.rewardSeconds.get();
     await storage.controlledTimerSettings.rewardMinutes.set(controlledRewardMinutes);
+    await storage.controlledTimerSettings.rewardSeconds.set(controlledRewardSeconds);
+    
+    // Calculate total minutes for UserPreferences
+    const totalMinutes = controlledRewardMinutes + controlledRewardSeconds / 60;
     
     // Save to UserPreferences and log the change
     try {
@@ -96,20 +115,20 @@
       // Save to UserPreferences table
       await saveUserPreferences({
         participantId,
-        procrastination_reward_minutes: controlledRewardMinutes,
+        procrastination_reward_minutes: totalMinutes,
       });
       
-      // Log the change event (without redundant timestamp)
+      // Log the change event
       await logEvent({
         participantId,
-        eventType: "audit:setting_change:controlled_reward_minutes",
+        eventType: "audit:setting_change:controlled_reward_time",
         eventData: JSON.stringify({
-          old: oldValue,
-          new: controlledRewardMinutes,
+          old: { min: oldMinutes, sec: oldSeconds },
+          new: { min: controlledRewardMinutes, sec: controlledRewardSeconds },
         }),
       });
     } catch (e) {
-      console.warn("Failed to log controlled reward minutes change", e);
+      console.warn("Failed to log controlled reward time change", e);
     }
     update();
   }
@@ -134,7 +153,7 @@
         }}
         class="custom-select custom-select-sm inline"
       >
-        {#each minuteOptions as value}
+        {#each minuteOptions.filter(v => v >= MIN_LEARNING_MINUTES_EXP) as value}
           <option selected={value === learnMin} {value}
             >{parseNumberToTime(value)}</option
           >
@@ -174,14 +193,25 @@
       <!-- svelte-ignore a11y-no-onchange -->
       <select
         bind:value={controlledLearningMinutes}
-        on:change={setControlledLearningMinutes}
+        on:change={setControlledLearningTime}
         class="custom-select custom-select-sm inline"
       >
         {#each minuteOptions.slice(1, 61) as value}
           <option {value}>{parseNumberToTime(value)}</option>
         {/each}
       </select>
-      <p><small>minutes</small></p>
+      <p>:</p>
+      <!-- svelte-ignore a11y-no-onchange -->
+      <select
+        bind:value={controlledLearningSeconds}
+        on:change={setControlledLearningTime}
+        class="custom-select custom-select-sm inline"
+      >
+        {#each secondsOptions as value}
+          <option {value}>{parseNumberToTime(value)}</option>
+        {/each}
+      </select>
+      <p><small>{"Min/Sec"}</small></p>
     </div>
   </div>
 </div>
@@ -196,14 +226,25 @@
       <!-- svelte-ignore a11y-no-onchange -->
       <select
         bind:value={controlledRewardMinutes}
-        on:change={setControlledRewardMinutes}
+        on:change={setControlledRewardTime}
         class="custom-select custom-select-sm inline"
       >
         {#each minuteOptions.slice(1, 61) as value}
           <option {value}>{parseNumberToTime(value)}</option>
         {/each}
       </select>
-      <p><small>minutes</small></p>
+      <p>:</p>
+      <!-- svelte-ignore a11y-no-onchange -->
+      <select
+        bind:value={controlledRewardSeconds}
+        on:change={setControlledRewardTime}
+        class="custom-select custom-select-sm inline"
+      >
+        {#each secondsOptions as value}
+          <option {value}>{parseNumberToTime(value)}</option>
+        {/each}
+      </select>
+      <p><small>{"Min/Sec"}</small></p>
     </div>
   </div>
 </div>

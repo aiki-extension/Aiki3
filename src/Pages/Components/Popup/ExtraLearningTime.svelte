@@ -3,7 +3,7 @@
   Used in / Parent components: /src/Pages/Popup.svelte
  -->
 <script>
-  import { parseTimerUpLong } from "../../../util/utilities";
+  import { formatDuration } from "../../../util/utilities";
   export let bonusTime;
 </script>
 
@@ -13,7 +13,7 @@
 >
   <h6 class="item">Extra Learning Time:</h6>
   {#if bonusTime > 0}
-    <p class="item">{parseTimerUpLong(bonusTime)}</p>
+    <p class="item">{formatDuration(bonusTime, { longForm: true })}</p>
   {:else}
     <p class="item">Done</p>
   {/if}

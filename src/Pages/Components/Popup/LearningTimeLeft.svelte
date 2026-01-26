@@ -87,17 +87,31 @@
   {/if}
 {:else}
   <!-- Experimental variant display -->
-  <div
-    class="container"
-    data-tooltip="Progress towards your daily learning goal"
-  >
-    <h6 class="item">Daily goal remaining:</h6>
-    <p class="item learning">{remainingLabel}</p>
-    <div class="progress">
-      <div class="progress-bar learning-bar" style={`width: ${percent}%`} />
+  {#if dailyGoal > 0 && dailyProgress >= dailyGoal}
+    <!-- Goal completed view -->
+    <div class="container goal-complete" data-tooltip="Congratulations on completing your daily learning goal!">
+      <h6 class="item">🎉 Daily goal complete!</h6>
+      <p class="item complete">Great work today!</p>
+      <div class="progress">
+        <div class="progress-bar complete-bar" style="width: 100%" />
+      </div>
+      <p class="meta">{progressLabel} learned today</p>
+      <p class="hint">Want to learn more? Increase your daily goal in settings.</p>
     </div>
-    <p class="meta">{progressLabel} / {goalLabel}</p>
-  </div>
+  {:else}
+    <!-- Goal in progress view -->
+    <div
+      class="container"
+      data-tooltip="Progress towards your daily learning goal"
+    >
+      <h6 class="item">Daily goal remaining:</h6>
+      <p class="item learning">{remainingLabel}</p>
+      <div class="progress">
+        <div class="progress-bar learning-bar" style={`width: ${percent}%`} />
+      </div>
+      <p class="meta">{progressLabel} / {goalLabel}</p>
+    </div>
+  {/if}
 {/if}
 
 <style>
@@ -131,18 +145,18 @@
   }
 
   p.reward {
-    color: #ffffff;
+    color: var(--textColor);
   }
 
   p.idle {
-    color: var(--textColorSecondary, rgba(255, 255, 255, 0.7));
+    color: var(--textColorSecondary, rgba(100, 100, 100, 0.7));
   }
 
   .progress {
     width: 100%;
     height: 8px;
     border-radius: 999px;
-    background-color: rgba(255, 255, 255, 0.2);
+    background-color: var(--progressBarBackground, #D1D5DB);
     overflow: hidden;
     margin-top: 6px;
   }
@@ -154,17 +168,39 @@
   }
 
   .progress-bar.learning-bar {
-    background: linear-gradient(135deg, #22c55e, #14b8a6);
+    background: var(--progressBarFill, #22c55e);
   }
 
   .progress-bar.reward-bar {
-    background: linear-gradient(135deg, #ffffff, #ffffff);
+    background: var(--progressBarFill, #22c55e);
   }
 
   .meta {
     font-size: 0.75rem;
     font-weight: 500;
-    color: var(--textColorSecondary, rgba(255, 255, 255, 0.7));
+    color: var(--textColorSecondary, rgba(100, 100, 100, 0.7));
     margin-top: 6px;
+  }
+
+  p.complete {
+    color: #22c55e;
+    font-weight: 700;
+  }
+
+  .progress-bar.complete-bar {
+    background: linear-gradient(135deg, #22c55e, #0ea5e9);
+  }
+
+  .goal-complete h6 {
+    color: #22c55e;
+  }
+
+  .hint {
+    font-size: 0.7rem;
+    font-weight: 400;
+    color: var(--textColorSecondary, rgba(100, 100, 100, 0.6));
+    margin-top: 8px;
+    line-height: 1.4;
+    padding: 0 8px;
   }
 </style>

@@ -85,6 +85,11 @@ async function createParticipant(participantId) {
     assigned_version: getVariant(),
     install_date: now,
   };
+  const isControlledVariant = getVariant() === "controlled";
+
+  const defaultLearningMinutes = isControlledVariant ? 5 : 30;
+  const defaultRewardMinutes = isControlledVariant ? 15 : 0;
+
   const response = await parseRequest("/classes/Participants", {
     method: "POST",
     body: JSON.stringify(payload),
@@ -98,8 +103,8 @@ async function createParticipant(participantId) {
     if (pointer) {
       const prefsPayload = sanitizeUserPreferences({
         is_active: true,
-        learning_time_minutes: 5,
-        procrastination_reward_minutes: 15,
+        learning_time_minutes: defaultLearningMinutes,
+        procrastination_reward_minutes: defaultRewardMinutes,
         operating_hours_start: 480,   // 8:00 AM (8 * 60 = 480 minutes from midnight)
         operating_hours_end: 1290,    // 9:30 PM (21 * 60 + 30 = 1290 minutes from midnight)
       }, pointer);

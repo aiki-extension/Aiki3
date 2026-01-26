@@ -21,7 +21,7 @@ export function parseUrl(site) {
   const tryBuildUrl = (value) => {
     try {
       return new URL(ensureProtocol(value));
-    } catch (error) {
+    } catch (_) {
       return null;
     }
   };
@@ -65,12 +65,6 @@ export function parseUrl(site) {
   return { host, name };
 }
 
-/**
- * @function
- * @returns {object} date
- * @description returns a new object containing a string with the date at time of function call,
- * as well as numbers for hours, minutes, seconds and milliseconds, as well as a timestamp for use in
- * Firestore document creation. */
 export function makeDate() {
   const options = {
     weekday: "long",
@@ -90,93 +84,35 @@ export function makeDate() {
 }
 
 /**
- * @function
+ * Format milliseconds into a human-readable duration.
  * @param {number} milliseconds
- * @returns {string} time
- * @description Parses a given value of milliseconds into a short human-readable string.
- * This function should be used only when counting up.
- * For values greater than or equal to 60 seconds, the string value will be floored
- * to the nearest minute. (eg: 1m). For values lesser than 60 seconds,
- * the string value will be in seconds.
- * For a long string version, use parseTimerUpLong. */
-export function parseTimerUp(milliseconds) {
-  let seconds = milliseconds / 1000;
-  if (seconds < 60) {
-    return `${seconds}s`;
-  } else if (seconds >= 60) {
-    let minutes = seconds / 60;
-    minutes = Math.floor(minutes);
-    return `${minutes}m`;
-  }
-}
+ * @param {{direction?: "up"|"down", longForm?: boolean}} options
+ * direction: "up" for elapsed time (floors minutes), "down" for remaining (rounds up minutes)
+ * longForm: false => short labels (e.g. "1m"), true => long labels (e.g. "1 minutes")
+ */
+export function formatDuration(milliseconds, options = {}) {
+  const { direction = "up", longForm = false } = options;
+  const seconds = Math.max(0, Math.floor(milliseconds / 1000));
 
-/**
- * @function
- * @param {number} milliseconds
- * @returns {string} time
- * @description Parses a given value of milliseconds into a long human-readable string.
- * @ This function should be used only when counting up.
- * For values greater than or equal to 60 seconds, the string value will be rounded down
- * to the nearest minute. (eg: 1m). For values lesser than 60 seconds, the string value will be in seconds.
- * For a short string version, use parseTimerUp. */
-export function parseTimerUpLong(milliseconds) {
-  let seconds = milliseconds / 1000;
-  if (seconds < 60) {
-    return `${seconds} seconds`;
-  } else if (seconds >= 60) {
-    let minutes = seconds / 60;
-    minutes = Math.floor(minutes);
-    return `${minutes} minutes`;
-  }
-}
+  const toSecondsLabel = () => (longForm ? `${seconds} seconds` : `${seconds}s`);
 
-/**
- * @param {number} milliseconds
- * @returns {string} time
- * @description Parses a given value of milliseconds into a short human-readable string.
- * This function should be used only when counting up.
- * For values greater than 60 seconds, the string value will be rounded up
- * to the nearest minute. (eg: 1m). For values lesser than or equal to 60 seconds,
- * the string value will be in seconds.
- * For a long string version, use parseTimerDownLong. */
-export function parseTimerDown(milliseconds) {
-  let seconds = milliseconds / 1000;
-  if (seconds <= 30) {
-    return `${seconds}s`;
-  } else if (seconds >= 31 && seconds <= 59) {
-    return "1m";
-  } else if (seconds >= 60) {
-    let minutes = seconds / 60;
-    minutes = Math.ceil(minutes);
-    return `${minutes}m`;
+  if (direction === "down") {
+    if (seconds === 0) return longForm ? "None" : "0s";
+    if (seconds <= 30) return toSecondsLabel();
+    if (seconds <= 59) return longForm ? "1 minutes" : "1m";
+    const minutes = Math.ceil(seconds / 60);
+    return longForm ? `${minutes} minutes` : `${minutes}m`;
   }
-}
 
-/**
- * @param {number} milliseconds
- * @returns {string} time
- * @description Parses a given value of milliseconds into a short human-readable string.
- * This function should be used only when counting up.
- * For values greater than 60 seconds, the string value will be rounded up
- * to the nearest minute. (eg: 1m). For values lesser than or equal to 60 seconds,
- * the string value will be in seconds.
- * For a short string version, use parseTimerDown. */
-export function parseTimerDownLong(milliseconds) {
-  let seconds = milliseconds / 1000;
-  if (seconds === 0) {
-    return "None";
-  } else if (seconds <= 60) {
-    return `${seconds} seconds`;
-  } else if (seconds >= 60) {
-    let minutes = seconds / 60;
-    minutes = Math.ceil(minutes);
-    return `${minutes} minutes`;
-  }
+  // direction === "up"
+  if (seconds < 60) return toSecondsLabel();
+  const minutes = Math.floor(seconds / 60);
+  return longForm ? `${minutes} minutes` : `${minutes}m`;
 }
 
 export const parseTime = {
   toHumanReadableArray: (time) => {
-    return [ Math.floor(time / 60 / 1000), (time / 1000) % 60 ];
+    return [Math.floor(time / 60 / 1000), (time / 1000) % 60];
   },
 
   toSystem: (time) => {

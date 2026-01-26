@@ -10,21 +10,21 @@ const l = console.log;
 const STYLES = {
   // Base font and reset
   fontBase: `font-family: 'Inter','Segoe UI',sans-serif; font-size: 14px;`,
-  
+
   // Overlay types
   overlayBlocking: `all: initial; position: fixed; inset: 0; background: rgba(3, 7, 18, 0.98); display: flex; align-items: center; justify-content: center; z-index: 2147483646;`,
   overlayTransparent: `all: initial; position: fixed; inset: 0; pointer-events: none; background: transparent; display: flex;`,
-  
+
   // Card containers
   cardLight: `background: #ffffff; color: #0f172a; border-radius: 18px; box-shadow: 0 28px 55px rgba(15, 23, 42, 0.35); display: flex; flex-direction: column;`,
   cardDark: `background: rgba(15, 23, 42, 0.98); color: #f8fafc; border-radius: 22px; box-shadow: 0 32px 70px rgba(15, 23, 42, 0.55); display: flex; flex-direction: column;`,
-  
+
   // Buttons
   btnPrimary: `padding: 10px 14px; border-radius: 999px; border: none; background: linear-gradient(135deg, #2563eb, #7c3aed); color: #ffffff; font-weight: 600; cursor: pointer; box-shadow: 0 10px 20px rgba(37, 99, 235, 0.28); transition: transform 0.15s ease, box-shadow 0.15s ease;`,
   btnPrimaryHover: `padding: 10px 14px; border-radius: 999px; border: none; background: linear-gradient(135deg, #1d4ed8, #5b21b6); color: #ffffff; font-weight: 600; cursor: pointer; box-shadow: 0 12px 24px rgba(29, 78, 216, 0.32); transform: translateY(-1px);`,
   btnSecondary: `padding: 10px 14px; border-radius: 999px; border: 1px solid #cbd5f5; background: #ffffff; color: #1f2937; font-weight: 600; cursor: pointer; transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;`,
   btnSecondaryHover: `padding: 10px 14px; border-radius: 999px; border: 1px solid #3b82f6; background: #eff6ff; color: #1d4ed8; font-weight: 600; cursor: pointer;`,
-  
+
   // Progress bar
   progressShell: `width: 100%; border-radius: 999px; overflow: hidden;`,
   progressFill: `height: 100%; border-radius: inherit; transition: width 0.4s ease;`,
@@ -104,8 +104,8 @@ const createTimerPort = (updateCallback) => {
   const cleanup = () => {
     if (cleanupCalled) return;
     cleanupCalled = true;
-    try { if (port) port.disconnect(); } catch (_) {}
-    try { if (intervalRef) clearInterval(intervalRef); } catch (_) {}
+    try { if (port) port.disconnect(); } catch (_) { }
+    try { if (intervalRef) clearInterval(intervalRef); } catch (_) { }
   };
 
   try {
@@ -116,14 +116,14 @@ const createTimerPort = (updateCallback) => {
     browser.runtime
       .sendMessage({ type: "timer:get" })
       .then(updateCallback)
-      .catch(() => {});
+      .catch(() => { });
 
     intervalRef = setInterval(() => {
-      try { port.postMessage("get: timer"); } catch (_) {}
+      try { port.postMessage("get: timer"); } catch (_) { }
     }, 1000);
 
-    try { port.postMessage("get: timer"); } catch (_) {}
-  } catch (_) {}
+    try { port.postMessage("get: timer"); } catch (_) { }
+  } catch (_) { }
 
   return { port, intervalRef, cleanup };
 };
@@ -140,7 +140,7 @@ const scheduleOverlayEnsure = () => {
   overlayEnsureTimeout = setTimeout(() => {
     overlayEnsureTimeout = null;
     if (!document.getElementById("aiki-overlay")) {
-      renderLearningContent().catch(() => {});
+      renderLearningContent().catch(() => { });
     }
   }, 120);
 };
@@ -158,7 +158,7 @@ function installOverlayPersistence() {
         scheduleOverlayEnsure();
         return result;
       };
-    } catch (_) {}
+    } catch (_) { }
   };
 
   wrapHistory("pushState");
@@ -204,7 +204,7 @@ async function bootstrapLearningOverlayIfNeeded() {
     }
     try {
       await browser.runtime.sendMessage({ type: "learning:autoStart" });
-    } catch (_) {}
+    } catch (_) { }
     await renderLearningContent();
   } catch (_) {
     // swallow
@@ -228,23 +228,23 @@ async function bootstrapRewardOverlayIfNeeded() {
   try {
     // Query background for current timer state
     const timerData = await browser.runtime.sendMessage({ type: "timer:get" });
-    
+
     // If reward timer is active (goal > 0), check if we're on a procrastination site
     if (timerData && timerData.controlledRewardGoal > 0) {
       // Get procrastination sites list
       const result = await browser.storage.local.get("list");
       const procList = result?.list || [];
       const procHosts = procList.map(item => item?.host || item?.name || "").filter(Boolean);
-      
+
       // Check if current page matches any procrastination site
       const currentHost = location.hostname.replace(/^www\./, "");
       const isOnProcrastinationSite = procHosts.some(host => {
         const normalizedHost = host.replace(/^www\./, "");
-        return currentHost === normalizedHost || 
-               currentHost.endsWith("." + normalizedHost) || 
-               normalizedHost.endsWith("." + currentHost);
+        return currentHost === normalizedHost ||
+          currentHost.endsWith("." + normalizedHost) ||
+          normalizedHost.endsWith("." + currentHost);
       });
-      
+
       if (isOnProcrastinationSite) {
         // Small delay to ensure DOM is ready
         setTimeout(() => {
@@ -281,7 +281,7 @@ browser.runtime.onMessage.addListener((request) => {
     try {
       const rewardOverlay = document.getElementById("aiki-reward-overlay");
       if (rewardOverlay) rewardOverlay.remove();
-    } catch (_) {}
+    } catch (_) { }
     return Promise.resolve({ action: "end injection" });
   } else if (request.action === "inject blocker") {
     console.log("Request: ", request);
@@ -307,7 +307,7 @@ function removeOverlay() {
           element.cleanup();
           element.cleanup = undefined;
         }
-      } catch (_) {}
+      } catch (_) { }
       element.remove();
     }
     const elements = document.getElementsByClassName("aiki-overlay");
@@ -321,7 +321,7 @@ function removeOverlay() {
               el.cleanup();
               el.cleanup = undefined;
             }
-          } catch (_) {}
+          } catch (_) { }
           el.remove();
         }
       }
@@ -336,7 +336,7 @@ function renderRedirectPrompt(originUrl) {
     let done = false;
     try {
       removeOverlay();
-    } catch (_) {}
+    } catch (_) { }
 
     const overlay = document.createElement("div");
     overlay.id = "aiki-overlay";
@@ -424,7 +424,7 @@ function renderRedirectPrompt(originUrl) {
       if (action !== "redirect") {
         try {
           removeOverlay();
-        } catch (_) {}
+        } catch (_) { }
       }
       resolve({ action });
     };
@@ -442,7 +442,7 @@ function renderRedirectPrompt(originUrl) {
           updateDescription(host);
         }
       }, 400);
-    } catch (_) {}
+    } catch (_) { }
 
     actions.appendChild(continueButton);
     actions.appendChild(redirectButton);
@@ -469,7 +469,7 @@ function renderLearningContent() {
   return new Promise((resolve) => {
     try {
       removeOverlay();
-    } catch (_) {}
+    } catch (_) { }
 
     const overlay = document.createElement("div");
     overlay.id = "aiki-overlay";
@@ -482,9 +482,9 @@ function renderLearningContent() {
     const panel = document.createElement("div");
     const isCollapsedKey = "aiki-learning-collapsed";
     let isCollapsed = localStorage.getItem(isCollapsedKey) === "true";
-    
+
     const getPanelStyle = (collapsed) => `pointer-events: auto; margin: 24px; padding: ${collapsed ? "10px 14px" : "clamp(16px, 3vw, 22px)"}; min-width: ${collapsed ? "140px" : "260px"}; max-width: ${collapsed ? "180px" : "320px"}; background: rgba(15, 23, 42, 0.96); color: #f8fafc; border-radius: ${collapsed ? "12px" : "18px"}; box-shadow: 0 24px 45px rgba(15, 23, 42, 0.45); font-family: 'Inter', 'Segoe UI', sans-serif; display: flex; flex-direction: column; gap: ${collapsed ? "6px" : "12px"}; cursor: grab; position: relative; font-size: 14px; transition: all 0.3s ease;`;
-    
+
     panel.setAttribute("style", getPanelStyle(isCollapsed));
 
     // Collapse toggle button
@@ -589,11 +589,11 @@ function renderLearningContent() {
 
     const update = (msg) => {
       if (!msg) return;
-      
+
       const isControlledVariant = msg.isControlledVariant === true;
       const controlledState = msg.controlledState;
       const defaultBg = "rgba(15, 23, 42, 0.96)";
-      
+
       if (isControlledVariant) {
         if (controlledState === "learning") {
           const goal = msg.controlledLearningGoal || 0;
@@ -602,13 +602,13 @@ function renderLearningContent() {
           const completed = msg.controlledLearningCompleted || false;
           const progress = Math.max(0, goal - remaining);
           const percent = goal > 0 ? Math.min(100, (progress / goal) * 100) : 0;
-          
+
           barFill.style.width = `${percent}%`;
           barFill.style.background = "linear-gradient(135deg, #22c55e, #14b8a6)";
           heading.textContent = "📚 Learning Session";
           panel.style.background = defaultBg;
           claimRewardBtn.style.display = "none";
-          
+
           if (goal > 0 && (remaining <= 0 || completed)) {
             progressLabel.textContent = `${formatDuration(elapsed)} / ${formatDuration(goal)}`;
             status.textContent = "Session complete! Claim your reward.";
@@ -626,7 +626,7 @@ function renderLearningContent() {
           const remaining = typeof msg.controlledRewardRemaining === "number" ? msg.controlledRewardRemaining : 0;
           const progress = Math.max(0, goal - remaining);
           const percent = goal > 0 ? Math.min(100, (progress / goal) * 100) : 0;
-          
+
           barFill.style.width = `${percent}%`;
           barFill.style.background = "linear-gradient(135deg, #ffffffff, #32CD32)";
           progressLabel.textContent = goal > 0 ? `${formatDuration(progress)} / ${formatDuration(goal)}` : "Enjoy!";
@@ -645,9 +645,9 @@ function renderLearningContent() {
         }
       } else {
         const goal = typeof msg.dailyGoal === "number" ? msg.dailyGoal : 0;
-        const progress = Math.min(goal, typeof msg.dailyProgress === "number" ? msg.dailyProgress : 0);
+        const progress = typeof msg.dailyProgress === "number" ? msg.dailyProgress : 0;
         const remaining = Math.max(goal - progress, 0);
-        const percent = goal > 0 ? Math.min(100, (progress / goal) * 100) : 0;
+        const percent = goal > 0 ? Math.min(100, (progress / goal) * 100) : 0; // Cap bar at 100% visually
 
         barFill.style.width = `${percent}%`;
         barFill.style.background = "linear-gradient(135deg, #22c55e, #14b8a6)";
@@ -676,7 +676,7 @@ function renderLearningContent() {
       cleanupCalled = true;
       dragHandle.cleanup();
       timerPort.cleanup();
-      try { removeOverlay(); } catch (_) {}
+      try { removeOverlay(); } catch (_) { }
     };
 
     overlay.cleanup = cleanup;
@@ -690,7 +690,7 @@ function renderLearningContent() {
 function renderContentBlocker() {
   try {
     removeOverlay();
-  } catch (_) {}
+  } catch (_) { }
 
   const overlay = document.createElement("div");
   overlay.id = "aiki-overlay";
@@ -774,9 +774,9 @@ function renderContentBlocker() {
   const update = (msg) => {
     if (!msg) return;
     const goal = typeof msg.dailyGoal === "number" ? msg.dailyGoal : 0;
-    const progress = Math.min(goal, typeof msg.dailyProgress === "number" ? msg.dailyProgress : 0);
+    const progress = typeof msg.dailyProgress === "number" ? msg.dailyProgress : 0;
     const remaining = Math.max(goal - progress, 0);
-    const percent = goal > 0 ? Math.min(100, (progress / goal) * 100) : 0;
+    const percent = goal > 0 ? Math.min(100, (progress / goal) * 100) : 0; // Cap bar at 100% visually
 
     barFill.style.width = `${percent}%`;
     progressLabel.textContent = goal > 0
@@ -800,14 +800,14 @@ function renderContentBlocker() {
     if (cleanupCalled) return;
     cleanupCalled = true;
     timerPort.cleanup();
-    try { overlay.remove(); } catch (_) {}
+    try { overlay.remove(); } catch (_) { }
   };
 
   overlay.cleanup = cleanup;
 
   continueButton.addEventListener("click", async () => {
-    try { await browser.runtime.sendMessage({ type: "stats:skip" }); } catch (_) {}
-    try { await browser.runtime.sendMessage({ type: "blocker:release" }); } catch (_) {}
+    try { await browser.runtime.sendMessage({ type: "stats:skip" }); } catch (_) { }
+    try { await browser.runtime.sendMessage({ type: "blocker:release" }); } catch (_) { }
     cleanup();
   });
 
@@ -820,7 +820,7 @@ function renderContentBlocker() {
         location.href = uri;
         return;
       }
-    } catch (_) {}
+    } catch (_) { }
 
     try {
       if (timerPort.port) {
@@ -828,9 +828,9 @@ function renderContentBlocker() {
       } else {
         const keepAlive = browser.runtime.connect({ name: "Content Communication" });
         keepAlive.postMessage("goto: originTab");
-        setTimeout(() => { try { keepAlive.disconnect(); } catch (_) {} }, 150);
+        setTimeout(() => { try { keepAlive.disconnect(); } catch (_) { } }, 150);
       }
-    } catch (_) {}
+    } catch (_) { }
 
     cleanup();
   });
@@ -855,20 +855,20 @@ const scheduleRewardOverlayEnsure = () => {
         const result = await browser.storage.local.get("list");
         const procList = result?.list || [];
         const procHosts = procList.map(item => item?.host || item?.name || "").filter(Boolean);
-        
+
         const currentHost = location.hostname.replace(/^www\./, "");
         const isOnProcrastinationSite = procHosts.some(host => {
           const normalizedHost = host.replace(/^www\./, "");
-          return currentHost === normalizedHost || 
-                 currentHost.endsWith("." + normalizedHost) || 
-                 normalizedHost.endsWith("." + currentHost);
+          return currentHost === normalizedHost ||
+            currentHost.endsWith("." + normalizedHost) ||
+            normalizedHost.endsWith("." + currentHost);
         });
-        
+
         if (isOnProcrastinationSite) {
           renderProcrastinationRewardOverlay();
         }
       }
-    } catch (_) {}
+    } catch (_) { }
   }, 120);
 };
 
@@ -889,7 +889,7 @@ function installRewardOverlayPersistence() {
       };
       wrapped._aikiRewardWrapped = true;
       history[method] = wrapped;
-    } catch (_) {}
+    } catch (_) { }
   };
 
   wrapHistory("pushState");
@@ -913,7 +913,7 @@ function installRewardOverlayPersistence() {
 function renderProcrastinationRewardOverlay() {
   // Install persistence guards on first render
   installRewardOverlayPersistence();
-  
+
   // Check if overlay already exists
   if (document.getElementById("aiki-reward-overlay")) return;
 
@@ -927,9 +927,9 @@ function renderProcrastinationRewardOverlay() {
   const panel = document.createElement("div");
   const isCollapsedKey = "aiki-reward-collapsed";
   let isCollapsed = localStorage.getItem(isCollapsedKey) === "true";
-  
+
   const getPanelStyle = (collapsed, bg = "linear-gradient(135deg, #ADD8E6, #32CD32)") => `pointer-events: auto; margin: 24px; padding: ${collapsed ? "8px 12px" : "clamp(14px, 2.5vw, 18px)"}; min-width: ${collapsed ? "120px" : "220px"}; max-width: ${collapsed ? "160px" : "280px"}; background: ${bg}; color: #ffffff; border-radius: ${collapsed ? "10px" : "16px"}; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25); font-family: 'Inter', 'Segoe UI', sans-serif; display: flex; flex-direction: column; gap: ${collapsed ? "4px" : "10px"}; cursor: grab; position: relative; font-size: 13px; transition: all 0.3s ease;`;
-  
+
   let currentBg = "linear-gradient(135deg, #ADD8E6, #32CD32)";
   panel.setAttribute("style", getPanelStyle(isCollapsed, currentBg));
 
@@ -1045,25 +1045,25 @@ function renderProcrastinationRewardOverlay() {
     if (!msg) return;
     const goal = typeof msg.controlledRewardGoal === "number" ? msg.controlledRewardGoal : 0;
     const remaining = typeof msg.controlledRewardRemaining === "number" ? msg.controlledRewardRemaining : 0;
-    
+
     if (goal <= 0) {
       cleanup();
       return;
     }
-    
+
     if (!document.getElementById("aiki-reward-overlay")) {
       console.log("[Aiki] Reward overlay missing from DOM, re-rendering...");
       cleanup();
       renderProcrastinationRewardOverlay();
       return;
     }
-    
+
     const progress = Math.max(0, goal - remaining);
     const percent = goal > 0 ? Math.min(100, (progress / goal) * 100) : 0;
-    
+
     barFill.style.width = `${percent}%`;
     progressLabel.textContent = `${formatDuration(remaining)} remaining`;
-    
+
     if (remaining <= 5000 && remaining > 0) {
       if (!warningShown) {
         warningShown = true;
@@ -1101,7 +1101,7 @@ function renderProcrastinationRewardOverlay() {
     cleanupCalled = true;
     dragHandle.cleanup();
     timerPort.cleanup();
-    try { overlay.remove(); } catch (_) {}
+    try { overlay.remove(); } catch (_) { }
   };
 
   overlay.cleanup = cleanup;

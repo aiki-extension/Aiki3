@@ -17,7 +17,10 @@
 
   /* LIGHT MODE THEME */
   /* Colours - Content */
-  --textColor: #444444;
+  --textColor: #222222;
+  --textColorSecondary: rgba(34, 34, 34, 0.7);
+  --progressBarBackground: #ffffff;
+  --progressBarFill: #9aa5b1;
   --backgroundColorPrimary: #f0f2f5;
   --backgroundColorSecondary: #ffffff;
   --borderColor: #aaaaaa;

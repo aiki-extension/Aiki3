@@ -5,13 +5,13 @@ const storage = browser.storage.local;
 /**
  * Factory for creating keyed storage accessors (maps with set/get/remove/clear).
  * @param {string} storageKey - The key to use in browser.storage
- */
+  */
 function createKeyedStore(storageKey) {
   return {
     async set(key, value) {
-      if (!key || !value) return;
+      if (key === null || key === undefined) return;
       const data = await storage.get(storageKey);
-      const current = data[storageKey] && typeof data[storageKey] === "object" 
+      const current = data[storageKey] && typeof data[storageKey] === "object"
         ? { ...data[storageKey] } : {};
       current[String(key)] = value;
       return storage.set({ [storageKey]: current });
@@ -165,10 +165,6 @@ async function getLearningUri() {
   return "";
 }
 
-// function setLearningUri (uri){
-//   storage.set({learningUri: uri});
-// }
-
 /**
  * @async @function
  * @returns {number} learningTime
@@ -306,7 +302,7 @@ async function storeSession(data) {
   const { sessionData } = await storage.get("sessionData");
   const { learningUri } = await storage.get("learningUri");
   const learningName = learningUri ? parseUrl(learningUri).name : null;
-  
+
   let newData = sessionData || {
     procrastinationDuration: 0,
     learningDuration: 0,
@@ -376,21 +372,6 @@ async function getAllStats() {
     history,
   };
 }
-
-// async function testStatsFlow() {
-//   await storage.set({ statsDate: new Date(2021, 5, 9).toDateString() });
-//   console.log(await storage.get("statsDate"))
-// await storeSession({ theguardian: 60, sololearn: 60 });
-// await incrContinueCount();
-// await storage.set({ statsDate: new Date(2021, 5, 10).dateString });
-// await storeSession({ theguardian: 60, sololearn: 60 });
-// await incrContinueCount();
-// await storage.set({ statsDate: new Date(2021, 5, 11).dateString });
-// await storeSession({ theguardian: 60, sololearn: 60 });
-// await incrContinueCount();
-// }
-
-// testStatsFlow();
 
 function initializeStats() {
   storage.set({
@@ -586,6 +567,28 @@ async function setControlledRewardMinutes(minutes) {
   await storage.set({ controlledRewardMinutes: minutes });
 }
 
+async function getControlledLearningSeconds() {
+  const result = await storage.get("controlledLearningSeconds");
+  return typeof result.controlledLearningSeconds === "number"
+    ? result.controlledLearningSeconds
+    : 0; // Default 0 seconds
+}
+
+async function setControlledLearningSeconds(seconds) {
+  await storage.set({ controlledLearningSeconds: seconds });
+}
+
+async function getControlledRewardSeconds() {
+  const result = await storage.get("controlledRewardSeconds");
+  return typeof result.controlledRewardSeconds === "number"
+    ? result.controlledRewardSeconds
+    : 0; // Default 0 seconds
+}
+
+async function setControlledRewardSeconds(seconds) {
+  await storage.set({ controlledRewardSeconds: seconds });
+}
+
 export default {
   timeSettings: {
     getAll: getUserTimes,
@@ -660,8 +663,9 @@ export default {
   },
   controlledTimerSettings: {
     learningMinutes: { get: getControlledLearningMinutes, set: setControlledLearningMinutes },
+    learningSeconds: { get: getControlledLearningSeconds, set: setControlledLearningSeconds },
     rewardMinutes: { get: getControlledRewardMinutes, set: setControlledRewardMinutes },
+    rewardSeconds: { get: getControlledRewardSeconds, set: setControlledRewardSeconds },
   },
   forgetOrigin: () => storage.remove("origin"),
 };
-

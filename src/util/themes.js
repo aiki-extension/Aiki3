@@ -64,6 +64,9 @@ export function drawDarkMode() {
   const r = getRoot();
   if (!r) return;
   r.setProperty("--textColor", "#FFFFFF");
+  r.setProperty("--textColorSecondary", "rgba(255, 255, 255, 0.7)");
+  r.setProperty("--progressBarBackground", "#D1D5DB");
+  r.setProperty("--progressBarFill", "#22c55e");
   r.setProperty("--backgroundColorPrimary", "#1F2933");
   r.setProperty("--backgroundColorSecondary", "#323F4B");
   r.setProperty("--borderColor", "#12171D");
@@ -81,7 +84,10 @@ export function drawDarkMode() {
 export function drawLightMode() {
   const r = getRoot();
   if (!r) return;
-  r.setProperty("--textColor", "#444444");
+  r.setProperty("--textColor", "#222222");
+  r.setProperty("--textColorSecondary", "rgba(34, 34, 34, 0.7)");
+  r.setProperty("--progressBarBackground", "#D1D5DB");
+  r.setProperty("--progressBarFill", "#22c55e");
   r.setProperty("--backgroundColorPrimary", "#f0f2f5");
   r.setProperty("--backgroundColorSecondary", "#FFFFFF");
   r.setProperty("--borderColor", "#AAAAAA");
@@ -100,6 +106,9 @@ export function drawBlueMode() {
   const r = getRoot();
   if (!r) return;
   r.setProperty("--textColor", "#212121");
+  r.setProperty("--textColorSecondary", "rgba(33, 33, 33, 0.7)");
+  r.setProperty("--progressBarBackground", "#D1D5DB");
+  r.setProperty("--progressBarFill", "#22c55e");
   r.setProperty("--backgroundColorPrimary", "#F5F6FB");
   r.setProperty("--backgroundColorSecondary", "#FFFFFF");
   r.setProperty("--borderColor", "#EDEDED");
@@ -118,6 +127,9 @@ export function drawZeeguuMode() {
   const r = getRoot();
   if (!r) return;
   r.setProperty("--textColor", "#263238");
+  r.setProperty("--textColorSecondary", "rgba(38, 50, 56, 0.7)");
+  r.setProperty("--progressBarBackground", "#D1D5DB");
+  r.setProperty("--progressBarFill", "#22c55e");
   r.setProperty("--backgroundColorPrimary", "#F7F7F7");
   r.setProperty("--backgroundColorSecondary", "#FFFFFF");
   r.setProperty("--borderColor", "#EFEFEF");

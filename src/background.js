@@ -124,15 +124,11 @@ async function installationSetup() {
 async function setup() {
   intervals.intervalSetup();
   storage.shouldRedirect.set(true);
-  redirection.navigationListener.start();
-  redirection.tabChangeListener.start();
-  redirection.windowChangeListener.start();
-  redirection.addOriginTabCloseListener();
+  await redirection.start();
   
   // Initialize controlled mode if applicable
   if (isControlled()) {
     await controlledMode.init();
-    redirection.registerProcrastinationGuards(); // Register tab close listeners for session logging
     console.log("[Background] Controlled mode initialized");
   }
 }
