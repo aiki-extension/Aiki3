@@ -6,7 +6,11 @@
     "predev": "node scripts/generateBack4AppConfig.js",
     "build": "rollup -c",
     "dev": "rollup -c -w",
-    "start": "sirv public"
+    "start": "sirv public",
+    "build:firefox": "node scripts/buildFirefox.js && npm run build",
+    "build:chrome": "node scripts/buildChrome.js && npm run build",
+    "dev:firefox": "node scripts/buildFirefox.js && npm run dev",
+    "dev:chrome": "node scripts/buildChrome.js && npm run dev"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^17.0.0",

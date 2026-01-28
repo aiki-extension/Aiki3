@@ -19,7 +19,7 @@ class ControlledStrategy {
       await applyPreemptiveHide(tabId);
     }
 
-    const handled = controlledMode.handleNavigation(
+    const handled = await controlledMode.handleNavigation(
       tabId,
       url,
       procrastinationHosts || [],
@@ -49,7 +49,7 @@ class ControlledStrategy {
     const procHosts = (procList || []).map((item) => item?.host || item?.name || "").filter(Boolean);
     const learningUrl = await storage.learningUri.get();
 
-    controlledMode.handleNavigation(details.tabId, details.url, procHosts, learningUrl);
+    await controlledMode.handleNavigation(details.tabId, details.url, procHosts, learningUrl);
   }
 }
 

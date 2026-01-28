@@ -250,10 +250,10 @@ async function redirect(details) {
             l("Skipping prompt due to recent eventData for tab", details.tabId);
             return;
           }
-          await storage.promptLocks.set(details.tabId, {
-            host: hostName,
-            timestamp: now,
-          });
+
+          // Note: We don't set promptLock here - it's set in promptRedirect callbacks
+          // Setting it before the prompt succeeds would block retries in Firefox
+          // where navigation events fire before content script is ready
 
           // Experimental variant: show consent prompt
           promptRedirect(details.tabId, learningUri, details.url);
@@ -725,6 +725,13 @@ async function gotoOrigin(event, sourceContext = {}) {
 async function promptRedirect(tabId, url, originUrl) {
   await promptCoordinator.promptRedirect(tabId, url, originUrl, {
     onContinue: async () => {
+      // Set prompt lock now that user has explicitly clicked Stay
+      // This prevents the prompt from appearing again for 2 minutes
+      const hostName = parseUrl(originUrl).name;
+      await storage.promptLocks.set(tabId, {
+        host: hostName,
+        timestamp: Date.now(),
+      });
       navigationGuards.install();
       await SessionService.startSession(tabId, "procrastination", originUrl);
       await logDeclinedIntervention(originUrl, url);

@@ -60,8 +60,15 @@ export async function init() {
  * @param {string} learningUrl - Configured learning URL
  * @returns {boolean} true if handled, false otherwise
  */
-export function handleNavigation(tabId, url, procrastinationHosts, learningUrl) {
+export async function handleNavigation(tabId, url, procrastinationHosts, learningUrl) {
   if (!learningUrl) return false;
+
+  // Check operating hours - don't redirect outside active hours
+  const isWithinOperatingHours = await checkActiveTime();
+  if (!isWithinOperatingHours) {
+    console.log("[ControlledMode] Outside operating hours, not redirecting");
+    return false;
+  }
 
   const isProcrastination = siteDetector.isProcrastinationSite(url, procrastinationHosts);
   const isLearning = siteDetector.isLearningSite(url, learningUrl);
@@ -108,6 +115,30 @@ export function handleNavigation(tabId, url, procrastinationHosts, learningUrl) 
   }
 
   return false;
+}
+
+/**
+ * Check if current time is within operating hours.
+ * @returns {Promise<boolean>}
+ */
+async function checkActiveTime() {
+  const fromTime = await storage.operatingHours.from.get();
+  const toTime = await storage.operatingHours.to.get();
+  const now = new Date();
+  const hours = now.getHours();
+  const minutes = now.getMinutes();
+
+  if (hours < fromTime.hrs) {
+    return false;
+  } else if (hours === fromTime.hrs && minutes < fromTime.min) {
+    return false;
+  }
+  if (hours > toTime.hrs) {
+    return false;
+  } else if (hours === toTime.hrs && minutes > toTime.min) {
+    return false;
+  }
+  return true;
 }
 
 /**

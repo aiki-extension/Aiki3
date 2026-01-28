@@ -1,11 +1,10 @@
 // Badge renderer: keeps the Aiki logo visible and overlays a green progress strip.
+import browser from "webextension-polyfill";
 
-const actionApi = typeof chrome !== "undefined" && (chrome.action || chrome.browserAction);
+const actionApi = browser.action || browser.browserAction;
 const ICON_SIZES = [32, 48, 64, 96, 128];
 const MAX_ICON_DIMENSION = 128;
-const BASE_ICON_PATH = (typeof chrome !== "undefined" && chrome.runtime?.getURL)
-  ? chrome.runtime.getURL("images/AikiLogo.png")
-  : "images/AikiLogo.png";
+const BASE_ICON_PATH = browser.runtime.getURL("images/AikiLogo.png");
 
 const STRIP_BACKGROUND = "rgba(15,23,42,0.65)";
 const STRIP_FILL_BACKGROUND = "rgba(255,255,255,0.08)";
@@ -55,7 +54,7 @@ async function loadBaseIcon() {
           img.src = URL.createObjectURL(blob);
         });
       }
-    } catch (_) {}
+    } catch (_) { }
     return null;
   })();
   return baseIconBitmapPromise;
@@ -183,7 +182,7 @@ function remove() {
   if (actionApi && actionApi.setIcon) {
     try {
       actionApi.setIcon({ imageData: {} });
-    } catch (_) {}
+    } catch (_) { }
   }
   setBadgeText("");
 }
