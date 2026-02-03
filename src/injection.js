@@ -129,76 +129,102 @@ const createTimerPort = (updateCallback) => {
 };
 
 // ============================================
-// OVERLAY PERSISTENCE GUARDS
+// UNIFIED OVERLAY PERSISTENCE SYSTEM
 // ============================================
 
-let overlayGuardsInstalled = false;
-let overlayEnsureTimeout = null;
+// Shared state for all overlay persistence
+let persistenceInstalled = false;
+const persistenceCallbacks = new Set();
 
-const scheduleOverlayEnsure = () => {
-  if (overlayEnsureTimeout) return;
-  overlayEnsureTimeout = setTimeout(() => {
-    overlayEnsureTimeout = null;
-    if (!document.getElementById("aiki-overlay")) {
-      renderLearningContent().catch(() => { });
-    }
-  }, 120);
+/**
+ * Register a callback to be invoked on navigation/visibility events.
+ * Used by both learning and reward overlays.
+ */
+const registerPersistenceCallback = (callback) => {
+  persistenceCallbacks.add(callback);
+  installUnifiedPersistence();
 };
 
-function installOverlayPersistence() {
-  if (overlayGuardsInstalled) return;
-  overlayGuardsInstalled = true;
+const invokePersistenceCallbacks = () => {
+  for (const cb of persistenceCallbacks) {
+    try { cb(); } catch (_) { }
+  }
+};
 
+function installUnifiedPersistence() {
+  if (persistenceInstalled) return;
+  persistenceInstalled = true;
+
+  // Wrap history methods once for all overlays
   const wrapHistory = (method) => {
     try {
       const original = history[method];
-      if (typeof original !== "function") return;
-      history[method] = function (...args) {
+      if (typeof original !== "function" || original._aikiWrapped) return;
+      const wrapped = function (...args) {
         const result = original.apply(this, args);
-        scheduleOverlayEnsure();
+        invokePersistenceCallbacks();
         return result;
       };
+      wrapped._aikiWrapped = true;
+      history[method] = wrapped;
     } catch (_) { }
   };
 
   wrapHistory("pushState");
   wrapHistory("replaceState");
 
-  window.addEventListener("popstate", scheduleOverlayEnsure);
-  window.addEventListener("hashchange", scheduleOverlayEnsure);
-  window.addEventListener("focus", scheduleOverlayEnsure);
+  // Single set of event listeners for all overlays
+  window.addEventListener("popstate", invokePersistenceCallbacks);
+  window.addEventListener("hashchange", invokePersistenceCallbacks);
+  window.addEventListener("focus", invokePersistenceCallbacks);
   document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) {
-      scheduleOverlayEnsure();
-    }
+    if (!document.hidden) invokePersistenceCallbacks();
   });
 }
 
-let bootstrapAttemptPending = false;
-
-const matchesLearningHost = (learningUri) => {
-  if (typeof learningUri !== "string" || !learningUri.trim()) return false;
+// Shared host matching helper
+const matchesHost = (targetUri, currentHost = location.hostname.replace(/^www\./, "")) => {
+  if (typeof targetUri !== "string" || !targetUri.trim()) return false;
   try {
-    const targetHost = new URL(learningUri).hostname.replace(/^www\./, "");
-    const currentHost = location.hostname.replace(/^www\./, "");
-    return (
-      targetHost === currentHost ||
+    const targetHost = new URL(targetUri).hostname.replace(/^www\./, "");
+    return targetHost === currentHost ||
       currentHost.endsWith(`.${targetHost}`) ||
-      targetHost.endsWith(`.${currentHost}`)
-    );
+      targetHost.endsWith(`.${currentHost}`);
   } catch (_) {
     return false;
   }
 };
+
+const matchesProcrastinationHost = (procHosts, currentHost = location.hostname.replace(/^www\./, "")) => {
+  return procHosts.some(host => {
+    const normalizedHost = host.replace(/^www\./, "");
+    return currentHost === normalizedHost ||
+      currentHost.endsWith("." + normalizedHost) ||
+      normalizedHost.endsWith("." + currentHost);
+  });
+};
+
+
+let learningEnsureTimeout = null;
+const scheduleLearningEnsure = () => {
+  if (learningEnsureTimeout) return;
+  learningEnsureTimeout = setTimeout(() => {
+    learningEnsureTimeout = null;
+    if (!document.getElementById("aiki-overlay")) {
+      renderLearningContent().catch(() => { });
+    }
+  }, 120);
+};
+
+let bootstrapAttemptPending = false;
 
 async function bootstrapLearningOverlayIfNeeded() {
   if (bootstrapAttemptPending) return;
   bootstrapAttemptPending = true;
   try {
     const result = await browser.storage.local.get("learningUri");
-    const learningUri =
-      result && typeof result.learningUri === "string" ? result.learningUri.trim() : "";
-    if (!learningUri || !matchesLearningHost(learningUri)) {
+    const learningUri = result?.learningUri?.trim?.() || "";
+    if (!learningUri || !matchesHost(learningUri)) {
       bootstrapAttemptPending = false;
       return;
     }
@@ -207,7 +233,6 @@ async function bootstrapLearningOverlayIfNeeded() {
     } catch (_) { }
     await renderLearningContent();
   } catch (_) {
-    // swallow
   } finally {
     bootstrapAttemptPending = false;
   }
@@ -219,34 +244,32 @@ if (document.readyState === "loading") {
   bootstrapLearningOverlayIfNeeded();
 }
 
-/**
- * Bootstrap reward overlay on page load if we're in reward mode.
- * This handles full page reloads on procrastination sites.
- * Only shows on procrastination sites to avoid appearing on other pages.
- */
+// Reward overlay persistence
+let rewardEnsureTimeout = null;
+const scheduleRewardEnsure = async () => {
+  if (rewardEnsureTimeout) return;
+  rewardEnsureTimeout = setTimeout(async () => {
+    rewardEnsureTimeout = null;
+    try {
+      const data = await browser.runtime.sendMessage({ type: "timer:get" });
+      if (data?.controlledRewardGoal > 0 && !document.getElementById("aiki-reward-overlay")) {
+        const result = await browser.storage.local.get("list");
+        const procHosts = (result?.list || []).map(item => item?.host || item?.name || "").filter(Boolean);
+        if (matchesProcrastinationHost(procHosts)) {
+          renderProcrastinationRewardOverlay();
+        }
+      }
+    } catch (_) { }
+  }, 120);
+};
+
 async function bootstrapRewardOverlayIfNeeded() {
   try {
-    // Query background for current timer state
     const timerData = await browser.runtime.sendMessage({ type: "timer:get" });
-
-    // If reward timer is active (goal > 0), check if we're on a procrastination site
-    if (timerData && timerData.controlledRewardGoal > 0) {
-      // Get procrastination sites list
+    if (timerData?.controlledRewardGoal > 0) {
       const result = await browser.storage.local.get("list");
-      const procList = result?.list || [];
-      const procHosts = procList.map(item => item?.host || item?.name || "").filter(Boolean);
-
-      // Check if current page matches any procrastination site
-      const currentHost = location.hostname.replace(/^www\./, "");
-      const isOnProcrastinationSite = procHosts.some(host => {
-        const normalizedHost = host.replace(/^www\./, "");
-        return currentHost === normalizedHost ||
-          currentHost.endsWith("." + normalizedHost) ||
-          normalizedHost.endsWith("." + currentHost);
-      });
-
-      if (isOnProcrastinationSite) {
-        // Small delay to ensure DOM is ready
+      const procHosts = (result?.list || []).map(item => item?.host || item?.name || "").filter(Boolean);
+      if (matchesProcrastinationHost(procHosts)) {
         setTimeout(() => {
           if (!document.getElementById("aiki-reward-overlay")) {
             renderProcrastinationRewardOverlay();
@@ -254,12 +277,9 @@ async function bootstrapRewardOverlayIfNeeded() {
         }, 50);
       }
     }
-  } catch (_) {
-    // Ignore errors - background might not be ready
-  }
+  } catch (_) { }
 }
 
-// Bootstrap reward overlay on page load
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", bootstrapRewardOverlayIfNeeded, { once: true });
 } else {
@@ -287,8 +307,10 @@ browser.runtime.onMessage.addListener((request) => {
     console.log("Request: ", request);
     l("Render blocking function should fire now");
     renderContentBlocker();
+    return Promise.resolve({ action: "blocker injected" });
   } else if (request.action === "remove blocker") {
     removeOverlay();
+    return Promise.resolve({ action: "blocker removed" });
   }
 });
 
@@ -582,7 +604,7 @@ function renderLearningContent() {
     panel.appendChild(claimRewardBtn);
     overlay.appendChild(panel);
     document.body.appendChild(overlay);
-    installOverlayPersistence();
+    registerPersistenceCallback(scheduleLearningEnsure);
 
     // Use shared drag utility
     const dragHandle = makeDraggable(panel);
@@ -652,7 +674,7 @@ function renderLearningContent() {
         barFill.style.width = `${percent}%`;
         barFill.style.background = "linear-gradient(135deg, #22c55e, #14b8a6)";
         progressLabel.textContent = goal > 0 ? `${formatDuration(progress)} / ${formatDuration(goal)}` : "No goal set yet";
-        heading.textContent = "Learning progress";
+        heading.textContent = "Daily Learning Progress";
         claimRewardBtn.style.display = "none";
         panel.style.background = defaultBg;
 
@@ -813,10 +835,15 @@ function renderContentBlocker() {
 
   button.addEventListener("click", async () => {
     try {
+     
+      await browser.runtime.sendMessage({ type: "blocker:returnToLearning" });
+    } catch (_) { }
+
+    try {
       const result = await browser.storage.local.get("learningUri");
       const uri = result && typeof result.learningUri === "string" ? result.learningUri.trim() : "";
       if (uri) {
-        cleanup();
+        
         location.href = uri;
         return;
       }
@@ -831,77 +858,7 @@ function renderContentBlocker() {
         setTimeout(() => { try { keepAlive.disconnect(); } catch (_) { } }, 150);
       }
     } catch (_) { }
-
-    cleanup();
-  });
-}
-
-// ============================================
-// Reward Overlay Persistence Guards
-// ============================================
-
-let rewardOverlayGuardsInstalled = false;
-let rewardOverlayEnsureTimeout = null;
-
-const scheduleRewardOverlayEnsure = () => {
-  if (rewardOverlayEnsureTimeout) return;
-  rewardOverlayEnsureTimeout = setTimeout(async () => {
-    rewardOverlayEnsureTimeout = null;
-    try {
-      // Check with background if we're in reward mode
-      const data = await browser.runtime.sendMessage({ type: "timer:get" });
-      if (data && data.controlledRewardGoal > 0 && !document.getElementById("aiki-reward-overlay")) {
-        // Also check if we're on a procrastination site
-        const result = await browser.storage.local.get("list");
-        const procList = result?.list || [];
-        const procHosts = procList.map(item => item?.host || item?.name || "").filter(Boolean);
-
-        const currentHost = location.hostname.replace(/^www\./, "");
-        const isOnProcrastinationSite = procHosts.some(host => {
-          const normalizedHost = host.replace(/^www\./, "");
-          return currentHost === normalizedHost ||
-            currentHost.endsWith("." + normalizedHost) ||
-            normalizedHost.endsWith("." + currentHost);
-        });
-
-        if (isOnProcrastinationSite) {
-          renderProcrastinationRewardOverlay();
-        }
-      }
-    } catch (_) { }
-  }, 120);
-};
-
-function installRewardOverlayPersistence() {
-  if (rewardOverlayGuardsInstalled) return;
-  rewardOverlayGuardsInstalled = true;
-
-  const wrapHistory = (method) => {
-    try {
-      const original = history[method];
-      if (typeof original !== "function") return;
-      // Only wrap once - check if already wrapped
-      if (original._aikiRewardWrapped) return;
-      const wrapped = function (...args) {
-        const result = original.apply(this, args);
-        scheduleRewardOverlayEnsure();
-        return result;
-      };
-      wrapped._aikiRewardWrapped = true;
-      history[method] = wrapped;
-    } catch (_) { }
-  };
-
-  wrapHistory("pushState");
-  wrapHistory("replaceState");
-
-  window.addEventListener("popstate", scheduleRewardOverlayEnsure);
-  window.addEventListener("hashchange", scheduleRewardOverlayEnsure);
-  window.addEventListener("focus", scheduleRewardOverlayEnsure);
-  document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) {
-      scheduleRewardOverlayEnsure();
-    }
+    
   });
 }
 
@@ -911,8 +868,8 @@ function installRewardOverlayPersistence() {
  * Shows snooze button at 5 seconds remaining.
  */
 function renderProcrastinationRewardOverlay() {
-  // Install persistence guards on first render
-  installRewardOverlayPersistence();
+  // Register with unified persistence system
+  registerPersistenceCallback(scheduleRewardEnsure);
 
   // Check if overlay already exists
   if (document.getElementById("aiki-reward-overlay")) return;
@@ -1107,9 +1064,3 @@ function renderProcrastinationRewardOverlay() {
   overlay.cleanup = cleanup;
   window.addEventListener("beforeunload", cleanup, { once: true });
 }
-
-// Export for potential use from background
-if (typeof window !== "undefined") {
-  window.renderProcrastinationRewardOverlay = renderProcrastinationRewardOverlay;
-}
-

@@ -24,6 +24,7 @@
 
   let siteName = "";
   let origin = {};
+  let isOnLearningSite = false;
 
   let timeValues = new Promise((resolve) => {});
 
@@ -49,8 +50,23 @@
     }
   }, 1000);
 
+  async function checkIfOnLearningSite() {
+    try {
+      const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
+      if (!activeTab?.url) return false;
+      const learningUri = await storage.learningUri.get();
+      if (!learningUri) return false;
+      const learningName = parseUrl(learningUri).name;
+      if (!learningName) return false;
+      return activeTab.url.includes(learningName);
+    } catch (_) {
+      return false;
+    }
+  }
+
   async function setup() {
     origin = await storage.origin.get();
+    isOnLearningSite = await checkIfOnLearningSite();
   }
 
   $: if (origin) {
@@ -101,7 +117,7 @@
       controlledRewardGoal={values.controlledRewardGoal || 0}
     />
     <hr />
-    {#if siteName !== "" || (isControlled && values.controlledState === "learning")}
+    {#if siteName !== "" || isOnLearningSite || (isControlled && values.controlledState === "learning")}
       <div class="container">
         <ContinueButton {gotoOrigin} />
       </div>

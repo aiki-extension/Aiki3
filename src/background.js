@@ -30,7 +30,7 @@ browser.runtime.onMessage.addListener((message, sender) => {
 
       const timeData = timer.getTime();
 
-      // Add controlled mode state if controlled variant
+      
       if (isControlled()) {
         const controlledState = controlledMode.getState();
         return {
@@ -67,6 +67,7 @@ browser.runtime.onMessage.addListener((message, sender) => {
     storage.blockedTabs.remove(sender.tab.id);
     storage.blockedOrigins.remove(sender.tab.id);
   }
+
 
   // Handle claim reward for controlled variant
   if (message.type === "controlled:claimReward" && sender && sender.tab) {
@@ -218,6 +219,7 @@ browser.runtime.onConnect.addListener(function (port) {
       case "list":
         intervals.counter.restart();
         redirection.navigationListener.restart();
+        redirection.checkActiveTab();
         break;
       case "origin": {
         const segments = msg.split(": ");

@@ -97,23 +97,23 @@
     }
   }
 
-  function pingSite(site) {
-    return new Promise(function (resolve, reject) {
-      let link = document.createElement("img");
-      link.src = `https://${site}/favicon.ico`;
-      link.style = "display: none;";
-      link.onload = function () {
-        resolve(true);
-      };
-      link.onerror = function () {
-        const confirmation = confirm(`
-          We could not get the icon from https://${site}/. This either means the website does not exist, or it may not be an issue at all.\n
-          Be sure to check the spelling or copy-paste the website address into the input field. \n
-          If you are certain it is correct, click "yes"`);
-        confirmation ? resolve(true) : resolve(false);
-      };
-      document.body.appendChild(link);
-    });
+  async function pingSite(site) {
+    try {
+      
+      await fetch(`https://${site}/`, { 
+        mode: 'no-cors',
+        method: 'HEAD'
+      });
+      return true;
+    } catch (error) {
+
+      const confirmation = confirm(
+        `We could not reach https://${site}/. This may mean the website does not exist.\n\n` +
+        `Please check the spelling or copy-paste the website address.\n\n` +
+        `If you are certain it is correct, click "OK" to add it anyway.`
+      );
+      return confirmation;
+    }
   }
 
   async function syncPreferences() {

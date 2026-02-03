@@ -88,6 +88,20 @@ async function removePreemptiveHide(tabId) {
   return navigationGuards.removePreemptiveHide(tabId);
 }
 
+
+async function triggerLearningOverlay(tabId) {
+  if (!tabId) return;
+  try {
+    await browser.tabs.sendMessage(tabId, {
+      action: "display: encouragement",
+      countdown: timer.getTime().learningTimeRemaining,
+      shouldShowWelcome: shouldShowWelcome,
+    });
+    shouldShowWelcome = false;
+  } catch (_) {
+  }
+}
+
 async function createFilter() {
   const procList = await storage.list.get();
   const url = buildProcrastinationUrlFilters(procList || []);
@@ -250,12 +264,6 @@ async function redirect(details) {
             l("Skipping prompt due to recent eventData for tab", details.tabId);
             return;
           }
-
-          // Note: We don't set promptLock here - it's set in promptRedirect callbacks
-          // Setting it before the prompt succeeds would block retries in Firefox
-          // where navigation events fire before content script is ready
-
-          // Experimental variant: show consent prompt
           promptRedirect(details.tabId, learningUri, details.url);
         }
       }
@@ -346,26 +354,6 @@ async function addLearningSiteLoadedListener() {
  * Add listener for learning site navigation (controlled variant only).
  * This enables direct learning session start when user navigates to learning site.
  */
-async function addControlledLearningSiteListener() {
-  if (!isControlled()) return;
-
-  const currentLearning = await storage.learningUri.get();
-  if (!currentLearning) return;
-  const learningName = parseUrl(currentLearning).name;
-  if (!learningName) return;
-
-  browser.webNavigation.onCompleted.addListener(strategy.onLearningSiteNavigation?.bind(strategy) || (() => { }), {
-    url: [{ hostContains: learningName }],
-  });
-  console.log("[Redirection] Added controlled learning site listener for:", learningName);
-}
-
-// Fallback trigger in case webNavigation timing misses injection readiness
-async function triggerLearningOverlay(tabId) {
-  try {
-    await messageLearningResource({ tabId });
-  } catch (_) { }
-}
 
 function removeLearningSiteLoadedListener() {
   l("Removing Leaning site loaded listener");
@@ -462,23 +450,54 @@ async function checkActiveTab() {
         const procHosts = procList.map(item => item?.host || item?.name || "").filter(Boolean);
         const handled = await strategy.handleNavigation(
           { tabId: tab.id, url: tab.url },
-          { procrastinationHosts: procHosts, learningUrl }
+          { procrastinationHosts: procHosts, learningUrl: learningUri }
         );
         if (handled) return;
 
-        // EXPERIMENTAL VARIANT: Show redirect prompt
-        addRedirectionLog(
-          `Interception: initiating countdown`,
-          tabSiteName,
-          parseUrl(learningUri).name,
-          {
-            eventType: "redirection_prompt",
-            action: "prompt_shown",
-            procrastinationUrl: tab.url,
-            learningUrl: learningUri,
+        // Check if there's a valid learning session (same logic as checkTab)
+        const origin = await storage.origin.get();
+        let isOriginValid = false;
+        if (origin && origin.tabId !== undefined) {
+          try {
+            const originTab = await browser.tabs.get(origin.tabId);
+            if (originTab && learningUri) {
+              const learningName = parseUrl(learningUri).name;
+              if (learningName && originTab.url && originTab.url.includes(learningName)) {
+                isOriginValid = true;
+              }
+            }
+          } catch (_) {
+            // Tab doesn't exist - origin is stale
           }
-        );
-        promptRedirect(tab.id, learningUri, tab.url);
+
+          // Clear stale origin if tab no longer exists or isn't on learning site
+          if (!isOriginValid) {
+            await storage.origin.remove();
+            removeOriginUpdatedListener();
+            removeAllContentBlockers();
+            timer.stopBonusTime();
+            timer.stopLearningSession();
+          }
+        }
+
+        if (isOriginValid) {
+          // Show "Keep learning" blocker (active learning session exists)
+          renderContentBlocker({ tabId: tab.id, frameId: 0, url: tab.url });
+        } else {
+          // Show "Redirect to learning?" prompt (no active session)
+          addRedirectionLog(
+            `Interception: initiating countdown`,
+            tabSiteName,
+            parseUrl(learningUri).name,
+            {
+              eventType: "redirection_prompt",
+              action: "prompt_shown",
+              procrastinationUrl: tab.url,
+              learningUrl: learningUri,
+            }
+          );
+          promptRedirect(tab.id, learningUri, tab.url);
+        }
       }
     }
   } catch (error) {
@@ -511,7 +530,34 @@ async function checkTab(tab) {
   const procListNames = procList.map((site) => site.name);
   if (procListNames.includes(tabSiteName)) {
     const origin = await storage.origin.get();
-    if (origin) {
+
+    // Validate that the origin learning tab still exists before showing blocker
+    let isOriginValid = false;
+    if (origin && origin.tabId !== undefined) {
+      try {
+        const originTab = await browser.tabs.get(origin.tabId);
+        const learningUri = await storage.learningUri.get();
+        if (originTab && learningUri) {
+          const learningName = parseUrl(learningUri).name;
+          if (learningName && originTab.url && originTab.url.includes(learningName)) {
+            isOriginValid = true;
+          }
+        }
+      } catch (_) {
+        // Tab doesn't exist - origin is stale
+      }
+
+      // Clear stale origin if tab no longer exists or isn't on learning site
+      if (!isOriginValid) {
+        await storage.origin.remove();
+        removeOriginUpdatedListener();
+        removeAllContentBlockers();
+        timer.stopBonusTime();
+        timer.stopLearningSession();
+      }
+    }
+
+    if (isOriginValid) {
       renderContentBlocker({ tabId: tab.id, frameId: 0, url: tab.url });
     } else {
       redirect({ frameId: 0, url: tab.url, tabId: tab.id });
@@ -639,6 +685,16 @@ async function gotoOrigin(event, sourceContext = {}) {
         await browser.tabs.update(targetTabId, { url: blockedOrigin });
         destinationUrl = blockedOrigin;
         await setPromptCooldown(targetTabId, blockedOrigin);
+        restoredTabIds.add(targetTabId);
+      } catch (error) {
+        l(error);
+      }
+    } else if (origin && origin.url) {
+      
+      try {
+        await browser.tabs.update(targetTabId, { url: origin.url });
+        destinationUrl = origin.url;
+        await setPromptCooldown(targetTabId, origin.url);
         restoredTabIds.add(targetTabId);
       } catch (error) {
         l(error);
@@ -856,4 +912,6 @@ export default {
   removeLearningSiteLoadedListener,
   checkActiveTab,
   finalizeAllActiveSessions,
+  applyPreemptiveHide: (tabId) => navigationGuards.applyPreemptiveHide(tabId),
+  scheduleRevealOnLoad,
 };

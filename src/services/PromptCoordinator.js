@@ -71,6 +71,38 @@ class PromptCoordinator {
 
   async renderContentBlocker(details) {
     if (details.frameId === 0) {
+      
+      const origin = await storage.origin.get();
+      let isOriginValid = false;
+
+      if (origin && origin.tabId !== undefined) {
+        try {
+          const originTab = await browser.tabs.get(origin.tabId);
+          const learningUri = await storage.learningUri.get();
+          if (originTab && learningUri) {
+            
+            let learningName = "";
+            try {
+              learningName = new URL(learningUri).hostname.replace(/^www\./, "");
+            } catch (_) { }
+            if (learningName && originTab.url && originTab.url.includes(learningName)) {
+              isOriginValid = true;
+            }
+          }
+        } catch (_) {
+          
+        }
+      }
+
+      
+      if (!isOriginValid) {
+        
+        if (origin) {
+          await storage.origin.remove();
+        }
+        return; 
+      }
+
       storage.blockedTabs.add(details.tabId);
       if (details.url) {
         storage.blockedOrigins.add(details.tabId, details.url);
@@ -79,13 +111,22 @@ class PromptCoordinator {
       try {
         await this.applyPreemptiveHide(details.tabId);
         await this.showImmediatePrompt(details.tabId);
-        await browser.tabs.sendMessage(details.tabId, {
+        // Send message to inject blocker and wait for response
+        const response = await browser.tabs.sendMessage(details.tabId, {
           action: "inject blocker",
-        });
-        setTimeout(() => {
-          this.hideImmediatePrompt(details.tabId).catch(() => { });
-          this.removePreemptiveHide(details.tabId).catch(() => { });
-        }, 150);
+        }).catch(() => null);
+
+        // Only remove preemptive hide after blocker is successfully injected
+        if (response) {
+          await this.hideImmediatePrompt(details.tabId);
+          await this.removePreemptiveHide(details.tabId);
+        } else {
+          // Blocker injection failed/pending, use shorter timeout as fallback
+          setTimeout(() => {
+            this.hideImmediatePrompt(details.tabId).catch(() => { });
+            this.removePreemptiveHide(details.tabId).catch(() => { });
+          }, 300);
+        }
       } catch (_) { }
     }
   }

@@ -15,8 +15,7 @@
 
 <h5>Set Learning Time:</h5>
 <p>
-  Set a daily learning goal so Aiki knows how long to keep you on your
-  learning platform before letting procrastination sites through.
+  Set your daily learning goal. Aiki will intervene during your selected operating hours until this goal is completed.
 </p>
 {#await timeSettings}
   LOADING...
