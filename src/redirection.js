@@ -206,7 +206,7 @@ async function redirect(details) {
         }
       }
 
-      const goal = parseTime.toSystem(await storage.timeSettings.learningTime.get());
+      const goal = parseTime.toSystem(await storage.timeSettings.dailyGoal.get());
       const progress = await storage.dailyProgress.get();
       const goalMet = goal > 0 && progress >= goal;
 
@@ -690,7 +690,7 @@ async function gotoOrigin(event, sourceContext = {}) {
         l(error);
       }
     } else if (origin && origin.url) {
-      
+
       try {
         await browser.tabs.update(targetTabId, { url: origin.url });
         destinationUrl = origin.url;
@@ -763,8 +763,10 @@ async function gotoOrigin(event, sourceContext = {}) {
 
   const redirectionToggled = await storage.redirection.get();
   if (redirectionToggled && !hasRemainingLearningTabs) {
-    const rewardSetting = await storage.timeSettings.rewardTime.get();
-    let rewardTime = parseTime.toSystem(rewardSetting);
+    // Read reward time from controlledTimerSettings (unified for both variants)
+    const rewardMinutes = await storage.controlledTimerSettings.rewardMinutes.get();
+    const rewardSeconds = await storage.controlledTimerSettings.rewardSeconds.get();
+    let rewardTime = (rewardMinutes * 60 + rewardSeconds) * 1000;
 
     if (rewardTime <= 0) {
       // Provide a short grace period so the skip/continue action actually unlocks the site.
@@ -791,6 +793,22 @@ async function promptRedirect(tabId, url, originUrl) {
       navigationGuards.install();
       await SessionService.startSession(tabId, "procrastination", originUrl);
       await logDeclinedIntervention(originUrl, url);
+
+      // Start the reward timer (this sets rewardUnlockAt for the overlay to track)
+      // Read from controlledTimerSettings (unified for both variants)
+      const rewardMinutes = await storage.controlledTimerSettings.rewardMinutes.get();
+      const rewardSeconds = await storage.controlledTimerSettings.rewardSeconds.get();
+      let rewardTime = (rewardMinutes * 60 + rewardSeconds) * 1000;
+      if (rewardTime <= 0) {
+        rewardTime = 60 * 1000; // Default 1 minute if not set
+      }
+      await storage.shouldRedirect.set(false);
+      await timer.startProcrastinationSession(checkActiveTab, rewardTime);
+
+      // Show reward progress bar (same as controlled variant)
+      try {
+        await browser.tabs.sendMessage(tabId, { action: "display: rewardOverlay" });
+      } catch (_) { }
     },
     onAccept: async () => {
       addLearningSiteLoadedListener();
@@ -803,16 +821,19 @@ async function promptRedirect(tabId, url, originUrl) {
         learningSite: url,
         eventData: "accept",
       });
-      await timer.startLearningSession();
-      storage.origin.set({ url: originUrl, tabId: tabId });
-      addOriginUpdatedListener(tabId);
+
+      // Use controlledMode to handle learning session (same as controlled variant)
+      // This provides: session countdown, claim reward button, redirect to procrastination
+      const procList = await storage.list.get();
+      const procHosts = (procList || []).map(item => item?.host || item?.name || "").filter(Boolean);
+      await controlledMode.handleNavigation(tabId, originUrl, procHosts, url);
+
       await storage.promptLocks.remove(tabId);
       try {
         scheduleRevealOnLoad(tabId);
         await browser.tabs.update(tabId, {
           url: url,
         });
-        setTimeout(() => triggerLearningOverlay(tabId), 1500);
       } catch (error) {
         l(error);
       }

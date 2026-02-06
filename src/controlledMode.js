@@ -10,6 +10,7 @@ import siteDetector from "./services/siteDetector";
 import SessionService from "./services/SessionService";
 import timer from "./services/TimerManager";
 import storage from "./util/storage";
+import { isControlled } from "./util/variantConfig";
 
 // ============================================
 // State Machine
@@ -289,10 +290,16 @@ export function cleanup() {
 
 /**
  * Snooze the reward timer by adding 1 minute.
- * Only works when in REWARD state.
+ * Works when in REWARD state, or in IDLE state for experimental variant
+ * (when prompt was shown but user wants to dismiss and continue procrastinating).
  */
 export function snoozeReward() {
   console.log("[ControlledMode] snoozeReward called", { state: currentState });
+
+  if (currentState === State.IDLE && !isControlled()) {
+    console.log("[ControlledMode] Experimental: restoring REWARD state from IDLE");
+    currentState = State.REWARD;
+  }
 
   if (currentState !== State.REWARD) {
     console.log("[ControlledMode] Not in REWARD state, cannot snooze");
@@ -484,6 +491,51 @@ export async function claimReward(tabId) {
 
   await storage.activeSessions.remove(tabId);
 
+  // CHECK IF DAILY GOAL IS MET
+  const dailyProgress = await storage.dailyProgress.get();
+  const dailyGoalSettings = await storage.timeSettings.dailyGoal.get();
+  const dailyGoalMs = ((dailyGoalSettings?.min || 0) * 60 + (dailyGoalSettings?.sec || 0)) * 1000;
+
+  console.log("[ControlledMode] Daily goal check:", { dailyProgress, dailyGoalMs, met: dailyProgress >= dailyGoalMs });
+
+  if (dailyGoalMs > 0 && dailyProgress >= dailyGoalMs) {
+    // DAILY GOAL IS MET! Grant unlimited access for the day
+    console.log("[ControlledMode] Daily goal met! Granting unlimited access.");
+
+    currentState = State.IDLE;
+    timer.stopAllTimers();
+
+    // Log event
+    SessionService.logEventAsync("daily_goal_completed", {
+      procrastinationSite: procrastinationUrl,
+      learningSite: learningUrl,
+      dailyProgress,
+      dailyGoalMs,
+    });
+
+    // Disable interception for the day by setting shouldRedirect to false
+    await storage.shouldRedirect.set(false);
+
+    // Redirect to procrastination site without any overlay
+    if (tabId && procrastinationUrl) {
+      try {
+        await browser.tabs.update(tabId, { url: procrastinationUrl });
+        // Remove any overlays
+        setTimeout(async () => {
+          try {
+            await browser.tabs.sendMessage(tabId, { action: "kill aiki" });
+          } catch (_) { }
+        }, 1500);
+      } catch (e) {
+        console.log("[ControlledMode] Failed to redirect:", e);
+      }
+    }
+
+    console.log("[ControlledMode] Daily goal achieved - unlimited access granted");
+    return;
+  }
+
+  // DAILY GOAL NOT MET - proceed with standard reward mode
   // Transition to REWARD
   currentState = State.REWARD;
   sessionData.tabId = tabId;
@@ -580,6 +632,41 @@ async function onRewardComplete() {
     procrastinationSite: procrastinationUrl,
     learningSite: learningUrl,
   });
+
+  // VARIANT-SPECIFIC BEHAVIOR:
+  // Controlled: auto-redirect to learning
+  // Experimental: show "keep learning" overlay (user chooses)
+  if (!isControlled()) {
+    // EXPERIMENTAL: Reset to IDLE and show consent prompt overlay
+    currentState = State.IDLE;
+    console.log("[ControlledMode] Experimental variant: showing consent prompt overlay");
+
+    // Find active procrastination tab and show the prompt overlay
+    try {
+      const procList = await storage.list.get();
+      const procHosts = (procList || []).map(item => item?.host || item?.name || "").filter(Boolean);
+      const allTabs = await browser.tabs.query({});
+
+      for (const tab of allTabs) {
+        if (tab.url && siteDetector.isProcrastinationSite(tab.url, procHosts)) {
+          // Send message to show redirect prompt overlay
+          try {
+            await browser.tabs.sendMessage(tab.id, {
+              action: "display: redirectPrompt",
+              url: learningUrl,
+              originUrl: tab.url,
+            });
+            console.log("[ControlledMode] Sent redirect prompt to tab:", tab.id);
+          } catch (_) {
+            // Tab might not have content script
+          }
+        }
+      }
+    } catch (e) {
+      console.log("[ControlledMode] Failed to show prompt overlay:", e);
+    }
+    return; // Don't auto-redirect for experimental
+  }
 
   // Transition back to LEARNING
   currentState = State.LEARNING;

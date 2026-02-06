@@ -266,7 +266,11 @@ const scheduleRewardEnsure = async () => {
 async function bootstrapRewardOverlayIfNeeded() {
   try {
     const timerData = await browser.runtime.sendMessage({ type: "timer:get" });
-    if (timerData?.controlledRewardGoal > 0) {
+    // Check for both controlled variant reward AND experimental variant reward
+    const hasControlledReward = timerData?.controlledRewardGoal > 0;
+    const hasExperimentalReward = timerData?.rewardUnlockAt > Date.now();
+
+    if (hasControlledReward || hasExperimentalReward) {
       const result = await browser.storage.local.get("list");
       const procHosts = (result?.list || []).map(item => item?.host || item?.name || "").filter(Boolean);
       if (matchesProcrastinationHost(procHosts)) {
@@ -552,7 +556,7 @@ function renderLearningContent() {
 
     // Claim Reward button for controlled variant (initially hidden)
     const claimRewardBtn = document.createElement("button");
-    claimRewardBtn.textContent = "Claim Reward";
+    claimRewardBtn.textContent = "Continue";
     claimRewardBtn.setAttribute(
       "style",
       "display: none; margin-top: 8px; padding: 12px 20px; background: linear-gradient(135deg, #f59e0b, #f97316); color: white; border: none; border-radius: 10px; font-size: 0.95em; font-weight: 600; cursor: pointer; transition: all 0.2s ease; text-align: center;"
@@ -835,7 +839,7 @@ function renderContentBlocker() {
 
   button.addEventListener("click", async () => {
     try {
-     
+
       await browser.runtime.sendMessage({ type: "blocker:returnToLearning" });
     } catch (_) { }
 
@@ -843,7 +847,7 @@ function renderContentBlocker() {
       const result = await browser.storage.local.get("learningUri");
       const uri = result && typeof result.learningUri === "string" ? result.learningUri.trim() : "";
       if (uri) {
-        
+
         location.href = uri;
         return;
       }
@@ -858,7 +862,7 @@ function renderContentBlocker() {
         setTimeout(() => { try { keepAlive.disconnect(); } catch (_) { } }, 150);
       }
     } catch (_) { }
-    
+
   });
 }
 
@@ -1000,10 +1004,23 @@ function renderProcrastinationRewardOverlay() {
 
   const update = (msg) => {
     if (!msg) return;
-    const goal = typeof msg.controlledRewardGoal === "number" ? msg.controlledRewardGoal : 0;
-    const remaining = typeof msg.controlledRewardRemaining === "number" ? msg.controlledRewardRemaining : 0;
 
-    if (goal <= 0) {
+    // Support both controlled and experimental variants
+    const isControlledReward = msg.controlledRewardGoal > 0;
+    let goal, remaining;
+
+    if (isControlledReward) {
+      goal = msg.controlledRewardGoal;
+      remaining = typeof msg.controlledRewardRemaining === "number" ? msg.controlledRewardRemaining : 0;
+    } else {
+      // Experimental variant: compute from rewardUnlockAt
+      const unlockAt = msg.rewardUnlockAt || 0;
+      remaining = Math.max(0, unlockAt - Date.now());
+      // For experimental, goal is the initial reward time (we use remaining as approximation if no explicit goal)
+      goal = remaining > 0 ? (msg.rewardTimeRemaining > remaining ? msg.rewardTimeRemaining : remaining) : 0;
+    }
+
+    if (goal <= 0 && remaining <= 0) {
       cleanup();
       return;
     }

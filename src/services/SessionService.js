@@ -56,7 +56,7 @@ async function getGoalSeconds() {
     return cachedGoalSeconds;
   }
   try {
-    const timeSetting = await storage.timeSettings.learningTime.get();
+    const timeSetting = await storage.timeSettings.dailyGoal.get();
     if (timeSetting && typeof timeSetting.min === "number" && typeof timeSetting.sec === "number") {
       cachedGoalSeconds = Math.max(0, Math.round(timeSetting.min * 60 + timeSetting.sec));
       lastGoalFetch = now;

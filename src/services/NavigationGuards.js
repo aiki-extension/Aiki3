@@ -2,7 +2,6 @@ import browser from "webextension-polyfill";
 import SessionService from "./SessionService";
 import siteDetector from "./siteDetector";
 import storage from "../util/storage";
-import PreemptiveHide from "./PreemptiveHide";
 
 /**
  * NavigationGuards centralizes tab/window listeners and delegates session handling.
@@ -113,15 +112,15 @@ class NavigationGuards {
   }
 
   scheduleRevealOnLoad(tabId) {
-    PreemptiveHide.scheduleReveal(tabId);
+    // No-op: preemptive hide removed
   }
 
   async applyPreemptiveHide(tabId) {
-    return PreemptiveHide.apply(tabId);
+    // No-op: preemptive hide removed
   }
 
   async removePreemptiveHide(tabId) {
-    return PreemptiveHide.remove(tabId);
+    // No-op: preemptive hide removed
   }
 
   async hideImmediatePrompt(tabId) {
@@ -184,14 +183,14 @@ class NavigationGuards {
         await this.handleTabNavigation(tabId, changeInfo.url);
       }
       if (changeInfo.status === "complete") {
-        await PreemptiveHide.revealIfPending(tabId, this.hideImmediatePrompt.bind(this));
+        await this.hideImmediatePrompt(tabId);
       }
     };
     browser.tabs.onUpdated.addListener(this.onUpdatedHandler);
 
     this.onCommittedHandler = async (details) => {
       if (details.frameId !== 0) return;
-      await PreemptiveHide.revealIfPending(details.tabId, this.hideImmediatePrompt.bind(this));
+      await this.hideImmediatePrompt(details.tabId);
       if (this.strategy?.onLearningSiteNavigation && details.url) {
         await this.strategy.onLearningSiteNavigation(details);
       }

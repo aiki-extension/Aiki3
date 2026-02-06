@@ -213,15 +213,53 @@ function setRewardTime(time) {
 
 /**
  * @async @function
- * @returns {object} userTimes
- * @description returns an object containing the time-related
- * values set by the user: rewardTime and learningTime. */
+ * @returns {object} dailyGoal {min, sec}
+ * @description returns the user's daily learning goal. */
+async function getDailyGoal() {
+  const result = await storage.get("dailyGoal");
+  const dg = result.dailyGoal;
+  if (dg && typeof dg.min === "number" && typeof dg.sec === "number") {
+    return dg;
+  }
+  return { min: 30, sec: 0 }; // Default 30 minutes
+}
+
+/**
+ * @function
+ * @param {object} goal {min, sec}
+ * @description sets the user's daily learning goal. */
+function setDailyGoal(goal) {
+  storage.set({ dailyGoal: goal });
+}
+
+/**
+ * @async @function
+ * @returns {object} sessionDuration {min, sec}
+ * @description returns the per-session learning duration. */
+async function getSessionDuration() {
+  const result = await storage.get("sessionDuration");
+  const sd = result.sessionDuration;
+  if (sd && typeof sd.min === "number" && typeof sd.sec === "number") {
+    return sd;
+  }
+  return { min: 5, sec: 0 }; // Default 5 minutes
+}
+
+/**
+ * @function
+ * @param {object} duration {min, sec}
+ * @description sets the per-session learning duration. */
+function setSessionDuration(duration) {
+  storage.set({ sessionDuration: duration });
+}
+
 async function getUserTimes() {
-  const [rewardTime, learningTime] = await Promise.all([
+  const [rewardTime, dailyGoal, sessionDuration] = await Promise.all([
     getRewardTime(),
-    getLearningTime(),
+    getDailyGoal(),
+    getSessionDuration(),
   ]);
-  return { rewardTime, learningTime };
+  return { rewardTime, dailyGoal, sessionDuration };
 }
 
 function getTodayKey() {
@@ -271,8 +309,9 @@ async function getRewardUnlock() {
 /**
  * @description Initializes the time settings in storage upon app installation. */
 function userTimeInit() {
-  setLearningTime({ min: 30, sec: 0 });
-  setRewardTime({ min: 0, sec: 0 });
+  setDailyGoal({ min: 30, sec: 0 });
+  setSessionDuration({ min: 5, sec: 0 });
+  setRewardTime({ min: 2, sec: 0 });
 }
 
 /**
@@ -593,8 +632,11 @@ export default {
   timeSettings: {
     getAll: getUserTimes,
     init: userTimeInit,
-    learningTime: { get: getLearningTime, set: setLearningTime },
+    dailyGoal: { get: getDailyGoal, set: setDailyGoal },
+    sessionDuration: { get: getSessionDuration, set: setSessionDuration },
     rewardTime: { get: getRewardTime, set: setRewardTime },
+    // Legacy - keep for backwards compatibility
+    learningTime: { get: getLearningTime, set: setLearningTime },
   },
   dailyProgress: {
     get: getDailyProgress,

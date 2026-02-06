@@ -15,7 +15,6 @@
 
 <h5>Set Operating Hours:</h5>
 
-<p>Choose the window of time you would like Aiki to be ON during the day.</p>
 {#await operatingHours}
   LOADING...
 {:then settings}

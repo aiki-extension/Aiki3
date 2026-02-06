@@ -29,10 +29,10 @@ browser.runtime.onMessage.addListener((message, sender) => {
       } catch (_) { }
 
       const timeData = timer.getTime();
+      const controlledState = controlledMode.getState();
 
-      
-      if (isControlled()) {
-        const controlledState = controlledMode.getState();
+     
+      if (controlledState.state !== "idle") {
         return {
           ...timeData,
           isControlledVariant: true,
@@ -73,10 +73,7 @@ browser.runtime.onMessage.addListener((message, sender) => {
   if (message.type === "controlled:claimReward" && sender && sender.tab) {
     return (async () => {
       try {
-        if (isControlled()) {
-          // Use the dedicated claimReward function which handles the full transition
-          await controlledMode.claimReward(sender.tab.id);
-        }
+        await controlledMode.claimReward(sender.tab.id);
       } catch (e) {
         console.log("[Background] Failed to claim reward:", e);
       }
@@ -84,14 +81,11 @@ browser.runtime.onMessage.addListener((message, sender) => {
     })();
   }
 
-  // Handle snooze reward for controlled variant (adds 1 minute)
   if (message.type === "controlled:snoozeReward") {
     return (async () => {
       try {
-        if (isControlled()) {
-          const success = controlledMode.snoozeReward();
-          console.log("[Background] Snooze reward result:", success);
-        }
+        const success = controlledMode.snoozeReward();
+        console.log("[Background] Snooze reward result:", success);
       } catch (e) {
         console.log("[Background] Failed to snooze reward:", e);
       }
@@ -254,9 +248,9 @@ browser.runtime.onConnect.addListener(function (port) {
           if (isDisconnected) return;
           try {
             const timeData = timer.getTime();
-            // Add controlled mode state if controlled variant
-            if (isControlled()) {
-              const controlledState = controlledMode.getState();
+            const controlledState = controlledMode.getState();
+            // Return controlled state for both variants when session is active
+            if (controlledState.state !== "idle") {
               port.postMessage({
                 ...timeData,
                 isControlledVariant: true,
@@ -291,3 +285,27 @@ browser.runtime.onConnect.addListener(function (port) {
 
 // Run setup on service worker start
 setup();
+
+browser.storage.onChanged.addListener(async (changes, areaName) => {
+  if (areaName !== "local") return;
+
+  if (changes.dailyGoal) {
+    console.log("[Background] Daily goal changed:", changes.dailyGoal);
+
+    const newGoal = changes.dailyGoal.newValue;
+    if (!newGoal) return;
+
+    const newGoalMs = ((newGoal.min || 0) * 60 + (newGoal.sec || 0)) * 1000;
+
+    const dailyProgress = await storage.dailyProgress.get();
+
+    console.log("[Background] Re-evaluating goal:", { dailyProgress, newGoalMs, stillMet: dailyProgress >= newGoalMs });
+
+    if (newGoalMs > 0 && dailyProgress < newGoalMs) {
+      console.log("[Background] Daily goal no longer met - resuming interception");
+      await storage.shouldRedirect.set(true);
+
+      redirection.checkActiveTab();
+    }
+  }
+});

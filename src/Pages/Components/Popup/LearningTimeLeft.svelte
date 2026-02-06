@@ -55,63 +55,31 @@
     : 0;
 </script>
 
-{#if isControlled}
-  <!-- Controlled variant display -->
-  {#if isLearning}
-    <div class="container" data-tooltip="Your learning session progress">
-      <h6 class="item">Learning remaining:</h6>
-      <p class="item learning">{formatDuration(controlledLearningRemaining)}</p>
-      <div class="progress">
-        <div class="progress-bar learning-bar" style={`width: ${learningPercent}%`} />
-      </div>
-      {#if controlledLearningCompleted || controlledLearningRemaining <= 0}
-        <p class="meta">{formatDuration(controlledLearningElapsed)} / {formatDuration(controlledLearningGoal)}</p>
-      {:else}
-        <p class="meta">{formatDuration(learningProgress)} / {formatDuration(controlledLearningGoal)}</p>
-      {/if}
+<!-- Unified display for both variants - Daily Goal Progress -->
+{#if dailyGoal > 0 && dailyProgress >= dailyGoal}
+  <!-- Goal completed view -->
+  <div class="container goal-complete" data-tooltip="Congratulations on completing your daily learning goal!">
+    <h6 class="item">🎉 Daily goal complete!</h6>
+    <p class="item complete">Great work today!</p>
+    <div class="progress">
+      <div class="progress-bar complete-bar" style="width: 100%" />
     </div>
-  {:else if isReward}
-    <div class="container" data-tooltip="Your reward time remaining">
-      <h6 class="item">🎉 Reward time remaining:</h6>
-      <p class="item reward">{formatDuration(controlledRewardRemaining)}</p>
-      <div class="progress">
-        <div class="progress-bar reward-bar" style={`width: ${rewardPercent}%`} />
-      </div>
-      <p class="meta">{formatDuration(rewardProgress)} / {formatDuration(controlledRewardGoal)}</p>
-    </div>
-  {:else}
-    <div class="container" data-tooltip="Start learning by visiting a procrastination site">
-      <h6 class="item">Session status:</h6>
-      <p class="item idle">Ready to learn</p>
-    </div>
-  {/if}
+    <p class="meta">{progressLabel} learned today</p>
+    <p class="hint">Want to learn more? Increase your daily goal in settings.</p>
+  </div>
 {:else}
-  <!-- Experimental variant display -->
-  {#if dailyGoal > 0 && dailyProgress >= dailyGoal}
-    <!-- Goal completed view -->
-    <div class="container goal-complete" data-tooltip="Congratulations on completing your daily learning goal!">
-      <h6 class="item">🎉 Daily goal complete!</h6>
-      <p class="item complete">Great work today!</p>
-      <div class="progress">
-        <div class="progress-bar complete-bar" style="width: 100%" />
-      </div>
-      <p class="meta">{progressLabel} learned today</p>
-      <p class="hint">Want to learn more? Increase your daily goal in settings.</p>
+  <!-- Goal in progress view -->
+  <div
+    class="container"
+    data-tooltip="Progress towards your daily learning goal"
+  >
+    <h6 class="item">Daily goal remaining:</h6>
+    <p class="item learning">{remainingLabel}</p>
+    <div class="progress">
+      <div class="progress-bar learning-bar" style={`width: ${percent}%`} />
     </div>
-  {:else}
-    <!-- Goal in progress view -->
-    <div
-      class="container"
-      data-tooltip="Progress towards your daily learning goal"
-    >
-      <h6 class="item">Daily goal remaining:</h6>
-      <p class="item learning">{remainingLabel}</p>
-      <div class="progress">
-        <div class="progress-bar learning-bar" style={`width: ${percent}%`} />
-      </div>
-      <p class="meta">{progressLabel} / {goalLabel}</p>
-    </div>
-  {/if}
+    <p class="meta">{progressLabel} / {goalLabel}</p>
+  </div>
 {/if}
 
 <style>

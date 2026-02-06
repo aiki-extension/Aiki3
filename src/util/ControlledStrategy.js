@@ -1,6 +1,5 @@
 import controlledMode from "../controlledMode";
 import storage from "../util/storage";
-import siteDetector from "../services/siteDetector";
 import SessionService from "../services/SessionService";
 
 class ControlledStrategy {

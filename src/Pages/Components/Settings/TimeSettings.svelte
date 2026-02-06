@@ -1,10 +1,12 @@
 <!-- 
-  TODO: Description goes here
+  Time settings container showing DailyGoal, SessionDuration, and RewardTime.
   Used in / Parent components: /src/Pages/Settings.svelte
  -->
 <script>
   import storage from "../../../util/storage";
+  import DailyGoal from "./DailyGoal.svelte";
   import TimeSelector from "./TimeSelector.svelte";
+  
   let timeSettings = storage.timeSettings.getAll();
   function update() {
     timeSettings = storage.timeSettings.getAll();
@@ -13,14 +15,15 @@
   export let user;
 </script>
 
-<h5>Set Learning Time:</h5>
+<h5>Learning Settings:</h5>
 <p>
-  Set your daily learning goal. Aiki will intervene during your selected operating hours until this goal is completed.
+  Configure your daily goal, session duration, and reward time.
 </p>
 {#await timeSettings}
   LOADING...
 {:then settings}
-  <TimeSelector {update} {settings} {user} />
+  <DailyGoal {update} {user} />
+  <TimeSelector {update} {user} />
 {/await}
 
 <style>
