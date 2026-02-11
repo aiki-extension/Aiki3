@@ -116,6 +116,8 @@ export const parseTime = {
   },
 
   toSystem: (time) => {
-    return 1000 * (time.min * 60 + time.sec);
+    const min = Number(time?.min) || 0;
+    const sec = Number(time?.sec) || 0;
+    return Math.max(0, 1000 * (min * 60 + sec));
   },
 };

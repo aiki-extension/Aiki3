@@ -87,7 +87,13 @@ async function createParticipant(participantId) {
   };
   const isControlledVariant = getVariant() === "controlled";
 
-  const defaultLearningMinutes = isControlledVariant ? 5 : 30;
+  let defaultLearningMinutes = 5;
+  try {
+    const sessionDuration = await storage.timeSettings.sessionDuration.get();
+    if (sessionDuration && typeof sessionDuration.min === "number" && typeof sessionDuration.sec === "number") {
+      defaultLearningMinutes = sessionDuration.min + sessionDuration.sec / 60;
+    }
+  } catch (_) { }
   const defaultRewardMinutes = isControlledVariant ? 15 : 0;
 
   const response = await parseRequest("/classes/Participants", {
@@ -105,6 +111,7 @@ async function createParticipant(participantId) {
         is_active: true,
         learning_time_minutes: defaultLearningMinutes,
         procrastination_reward_minutes: defaultRewardMinutes,
+        daily_goal: 30,
         operating_hours_start: 480,   // 8:00 AM (8 * 60 = 480 minutes from midnight)
         operating_hours_end: 1290,    // 9:30 PM (21 * 60 + 30 = 1290 minutes from midnight)
       }, pointer);
@@ -263,6 +270,18 @@ function sanitizeSessionPayload(details, participantPointer) {
 
 function sanitizeUserPreferences(payload, participantPointer) {
   if (!participantPointer) return null;
+  const resolvedLearningTimeMinutes =
+    typeof payload?.learning_time_minutes === "number"
+      ? payload.learning_time_minutes
+      : typeof payload?.session_duration_minutes === "number"
+      ? payload.session_duration_minutes
+      : undefined;
+  const resolvedDailyGoal =
+    typeof payload?.daily_goal === "number"
+      ? payload.daily_goal
+      : typeof payload?.daily_goal_minutes === "number"
+      ? payload.daily_goal_minutes
+      : undefined;
 
   const normalizeSite = (value) => {
     if (!value || typeof value !== "string") return null;
@@ -288,10 +307,7 @@ function sanitizeUserPreferences(payload, participantPointer) {
 
   const normalizedPrefs = {
     participant_id: participantPointer,
-    learning_time_minutes:
-      typeof payload?.learning_time_minutes === "number"
-        ? payload.learning_time_minutes
-        : undefined,
+    learning_time_minutes: resolvedLearningTimeMinutes,
     operating_hours_start:
       typeof payload?.operating_hours_start === "number"
         ? payload.operating_hours_start
@@ -304,6 +320,7 @@ function sanitizeUserPreferences(payload, participantPointer) {
       typeof payload?.procrastination_reward_minutes === "number"
         ? payload.procrastination_reward_minutes
         : undefined,
+    daily_goal: resolvedDailyGoal,
     is_active:
       typeof payload?.is_active === "boolean" ? payload.is_active : undefined,
   };
@@ -502,6 +519,7 @@ export async function saveUserPreferences(preferences = {}) {
         before.procrastination_reward_minutes ?? null,
         after.procrastination_reward_minutes ?? null
       );
+      await logPrefChange("daily_goal", before.daily_goal ?? null, after.daily_goal ?? null);
       await logPrefChange(
         "procrastination_sites",
         before.procrastination_sites || [],

@@ -16,28 +16,52 @@
   export let port;
   let toastCoords = { y: "id-input-field", x: "user-settings" };
   let previousUser = "";
+  const basicEmailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  function normalizeUser(value) {
+    return typeof value === "string" ? value.trim() : "";
+  }
+
+  function isValidEmail(value) {
+    return basicEmailRegex.test(value);
+  }
 
   async function setup() {
-    user = await storage.uid.get();
+    user = normalizeUser(await storage.uid.get());
     userIsRegistered = user !== "" ? true : false;
     previousUser = user || "";
   }
 
   async function confirmUid() {
+    const normalizedUser = normalizeUser(user);
+    user = normalizedUser;
+    if (!normalizedUser) {
+      toast.push("Please enter your email before submitting.", {
+        theme: themes.warningTheme(toastCoords),
+      });
+      return;
+    }
+    if (!isValidEmail(normalizedUser)) {
+      toast.push("Please enter a valid email address.", {
+        theme: themes.warningTheme(toastCoords),
+      });
+      return;
+    }
+
     const confirmation = confirm(
       "Are you certain the provided email is correct?"
     );
     if (confirmation) {
       const oldValue = previousUser || "";
       await resetParticipantCache();
-      storage.uid.set(user);
-      previousUser = user;
+      await storage.uid.set(normalizedUser);
+      previousUser = normalizedUser;
       await logAuditEvent({
-        participantId: user,
+        participantId: normalizedUser,
         action: "register_participant",
         settingName: "participant_id",
         oldValue,
-        newValue: user,
+        newValue: normalizedUser,
         participantUpdates: { is_extension_active: true },
       });
       userIsRegistered = true;
@@ -65,7 +89,7 @@
         participantUpdates: { is_extension_active: false },
       });
       await resetParticipantCache();
-      storage.uid.set("");
+      await storage.uid.set("");
       userIsRegistered = false;
       user = "";
       previousUser = "";
@@ -116,7 +140,7 @@
     <div class="input-group mb-3">
       <input
         bind:value={user}
-        type="text"
+        type="email"
         class="form-control"
         placeholder="Enter your email here..."
         aria-label=""

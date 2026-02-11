@@ -60,9 +60,9 @@
     let newList = [...list];
     newList.splice(index, 1);
     list = newList;
-    storage.list.set(list);
-    syncPreferences();
-    port.postMessage(`Update: list`);
+    await storage.list.set(list);
+    await syncPreferences();
+    try { port?.postMessage(`Update: list`); } catch (_) {}
     toast.pop();
     toast.push("Website removed!", {
       theme: themes.successTheme(toastCoords),
@@ -86,9 +86,9 @@
       let newList = [...list];
       newList.push(site);
       list = newList;
-      storage.list.set(list);
-      syncPreferences();
-      port.postMessage(`Update: list`);
+      await storage.list.set(list);
+      await syncPreferences();
+      try { port?.postMessage(`Update: list`); } catch (_) {}
       addItemValue = "";
       toast.pop();
       toast.push("New Website Added!", {
@@ -199,12 +199,15 @@
               {item.host}
             </td>
             <td style="text-align: center">
-              <div
+              <button
+                type="button"
+                class="remove-site-button"
+                aria-label={`Remove ${item.host} from the list`}
                 data-tooltip="Remove this site from the list."
                 on:click={() => removeItem(index)}
               >
                 <Fa icon={faTimes} primaryColor="red" />
-              </div>
+              </button>
             </td>
           </tr>
         {/each}
@@ -263,5 +266,12 @@
     width: 1.2em;
     height: 1.2em;
     margin-right: 10px;
+  }
+
+  .remove-site-button {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
   }
 </style>

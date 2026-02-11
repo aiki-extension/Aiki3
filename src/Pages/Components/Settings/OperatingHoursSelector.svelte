@@ -6,7 +6,7 @@
   import storage from "../../../util/storage";
   import { saveUserPreferences } from "../../../util/logger";
 
-  let hourOptions = Array.from({ length: 25 }, (_, i) => i);
+  let hourOptions = Array.from({ length: 24 }, (_, i) => i);
   let minuteOptions = [0, 15, 30, 45];
 
   export let settings;
@@ -22,7 +22,7 @@
 
   async function setActiveTo() {
     const setting = { hrs: hrsTo, min: minTo };
-    storage.operatingHours.to.set(setting);
+    await storage.operatingHours.to.set(setting);
     try {
       const participantId = user || (await storage.uid.get());
       const startMinutes = hrsFrom * 60 + minFrom;
@@ -39,13 +39,8 @@
   }
 
   async function setActiveFrom() {
-    if (hrsTo < hrsFrom) {
-      hrsTo = hrsFrom === 24 ? hrsFrom : hrsFrom + 1;
-
-      storage.operatingHours.from.set({ hrs: hrsTo, min: minTo });
-    }
     const setting = { hrs: hrsFrom, min: minFrom };
-    storage.operatingHours.from.set(setting);
+    await storage.operatingHours.from.set(setting);
     try {
       const participantId = user || (await storage.uid.get());
       const startMinutes = hrsFrom * 60 + minFrom;
@@ -61,16 +56,6 @@
     update();
   }
 
-  function hrsToDisabled(value) {
-    const threshhold = hrsFrom * 60 + minFrom;
-    const target = value * 60 + minTo;
-    if (threshhold >= target) return true;
-  }
-  function minToDisabled(value) {
-    const threshhold = hrsFrom * 60 + minFrom;
-    const target = hrsTo * 60 + value;
-    if (threshhold >= target) return true;
-  }
 </script>
 
 <!-- ActiveFrom -->
@@ -109,11 +94,7 @@
         class="custom-select custom-select-sm inline"
       >
         {#each minuteOptions as value}
-          <option
-            disabled={hrsFrom === 0 && value === 0}
-            selected={value === minFrom}
-            {value}>{parseNumberToTime(value)}</option
-          >
+          <option selected={value === minFrom} {value}>{parseNumberToTime(value)}</option>
         {/each}
       </select>
       <p><small>{"Hrs/Min"}</small></p>
@@ -140,11 +121,7 @@
         class="custom-select custom-select-sm inline"
       >
         {#each hourOptions as value}
-          <option
-            disabled={hrsToDisabled(value)}
-            selected={value === hrsTo}
-            {value}>{parseNumberToTime(value)}</option
-          >
+          <option selected={value === hrsTo} {value}>{parseNumberToTime(value)}</option>
         {/each}
       </select>
       <p>:</p>
@@ -159,11 +136,7 @@
         class="custom-select custom-select-sm inline"
       >
         {#each minuteOptions as value}
-          <option
-            disabled={minToDisabled(value)}
-            selected={value === minTo}
-            {value}>{parseNumberToTime(value)}</option
-          >
+          <option selected={value === minTo} {value}>{parseNumberToTime(value)}</option>
         {/each}
       </select>
       <p><small>{"Hrs/Min"}</small></p>

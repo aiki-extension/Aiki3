@@ -6,16 +6,62 @@ import timer from "./services/TimerManager";
 import { setTheme } from "./util/themes";
 import badge from "./badge";
 import { logAuditEvent, saveUserPreferences } from "./util/logger";
-import controlledMode from "./controlledMode";
-import { isControlled } from "./util/variantConfig";
+import interventionEngine from "./interventionEngine";
 
 // Manifest V3: No DOM access, no stray variables
+let lastKnownRedirectionToggle = null;
+let redirectionToggleTransition = Promise.resolve();
 
 browser.runtime.onInstalled.addListener(({ reason }) => {
   if (reason === "install") {
     installationSetup();
   }
 });
+
+function buildTimerPayload(timeData) {
+  const controlledState = interventionEngine.getState();
+  if (controlledState.state === "idle") {
+    return { ...timeData, isControlledVariant: false };
+  }
+
+  return {
+    ...timeData,
+    isControlledVariant: true,
+    controlledState: controlledState.state,
+    controlledProcrastinationUrl: controlledState.procrastinationUrl || "",
+    controlledLearningRemaining:
+      controlledState.state === "learning" ? controlledState.remainingMs : 0,
+    controlledLearningGoal:
+      controlledState.state === "learning" ? controlledState.goalMs : 0,
+    controlledLearningElapsed:
+      controlledState.state === "learning" ? controlledState.elapsedMs : 0,
+    controlledLearningCompleted:
+      controlledState.state === "learning" ? controlledState.completed : false,
+    controlledRewardRemaining:
+      controlledState.state === "reward" ? controlledState.remainingMs : 0,
+    controlledRewardGoal:
+      controlledState.state === "reward" ? controlledState.goalMs : 0,
+  };
+}
+
+async function isWithinOperatingHours() {
+  const [fromTime, toTime] = await Promise.all([
+    storage.operatingHours.from.get(),
+    storage.operatingHours.to.get(),
+  ]);
+  const now = new Date();
+  const hours = now.getHours();
+  const minutes = now.getMinutes();
+  const currentMinutes = hours * 60 + minutes;
+  const startMinutes = (Number(fromTime?.hrs) || 0) * 60 + (Number(fromTime?.min) || 0);
+  const endMinutes = (Number(toTime?.hrs) || 0) * 60 + (Number(toTime?.min) || 0);
+
+  if (startMinutes === endMinutes) return true;
+  if (startMinutes < endMinutes) {
+    return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
+  }
+  return currentMinutes >= startMinutes || currentMinutes <= endMinutes;
+}
 
 browser.runtime.onMessage.addListener((message, sender) => {
   if (!message || typeof message !== "object") {
@@ -29,24 +75,7 @@ browser.runtime.onMessage.addListener((message, sender) => {
       } catch (_) { }
 
       const timeData = timer.getTime();
-      const controlledState = controlledMode.getState();
-
-     
-      if (controlledState.state !== "idle") {
-        return {
-          ...timeData,
-          isControlledVariant: true,
-          controlledState: controlledState.state,
-          controlledLearningRemaining: controlledState.state === "learning" ? controlledState.remainingMs : 0,
-          controlledLearningGoal: controlledState.state === "learning" ? controlledState.goalMs : 0,
-          controlledLearningElapsed: controlledState.state === "learning" ? controlledState.elapsedMs : 0,
-          controlledLearningCompleted: controlledState.state === "learning" ? controlledState.completed : false,
-          controlledRewardRemaining: controlledState.state === "reward" ? controlledState.remainingMs : 0,
-          controlledRewardGoal: controlledState.state === "reward" ? controlledState.goalMs : 0,
-        };
-      }
-
-      return { ...timeData, isControlledVariant: false };
+      return buildTimerPayload(timeData);
     })();
   }
 
@@ -54,9 +83,31 @@ browser.runtime.onMessage.addListener((message, sender) => {
   if (message.type === "learning:autoStart") {
 
     return (async () => {
+      const isEnabled = await storage.redirection.get();
+      const isInHours = await isWithinOperatingHours();
+      if (!isEnabled || !isInHours) {
+        if (timer.isLearningSessionActive()) {
+          timer.stopLearningSession();
+        }
+        return { allowed: false, started: false };
+      }
+
       try {
         if (!timer.isLearningSessionActive()) {
           await timer.startLearningSession();
+          return { allowed: true, started: true };
+        }
+      } catch (_) { }
+      return { allowed: true, started: false };
+    })();
+  }
+
+  if (message.type === "reward:expired") {
+    return (async () => {
+      try {
+        const isEnabled = await storage.redirection.get();
+        if (isEnabled) {
+          await redirection.checkActiveTab({ ignorePromptCooldown: true });
         }
       } catch (_) { }
       return true;
@@ -64,8 +115,16 @@ browser.runtime.onMessage.addListener((message, sender) => {
   }
 
   if (message.type === "blocker:release" && sender && sender.tab && sender.tab.id !== undefined) {
-    storage.blockedTabs.remove(sender.tab.id);
-    storage.blockedOrigins.remove(sender.tab.id);
+    return (async () => {
+      try {
+        await redirection.handleBlockerRelease(sender.tab.id, sender.tab.url || "");
+      } catch (_) {
+        // Fallback cleanup to preserve previous behavior if reward flow fails.
+        storage.blockedTabs.remove(sender.tab.id);
+        storage.blockedOrigins.remove(sender.tab.id);
+      }
+      return true;
+    })();
   }
 
 
@@ -73,7 +132,7 @@ browser.runtime.onMessage.addListener((message, sender) => {
   if (message.type === "controlled:claimReward" && sender && sender.tab) {
     return (async () => {
       try {
-        await controlledMode.claimReward(sender.tab.id);
+        await interventionEngine.claimReward(sender.tab.id);
       } catch (e) {
         console.log("[Background] Failed to claim reward:", e);
       }
@@ -84,7 +143,7 @@ browser.runtime.onMessage.addListener((message, sender) => {
   if (message.type === "controlled:snoozeReward") {
     return (async () => {
       try {
-        const success = controlledMode.snoozeReward();
+        const success = interventionEngine.snoozeReward();
         console.log("[Background] Snooze reward result:", success);
       } catch (e) {
         console.log("[Background] Failed to snooze reward:", e);
@@ -95,12 +154,12 @@ browser.runtime.onMessage.addListener((message, sender) => {
 });
 
 async function installationSetup() {
-  storage.clearStorage();
+  await storage.clearStorage();
   storage.stats.init();
   storage.operatingHours.init();
   setTheme("dark");
   storage.shouldRedirect.set(true);
-  storage.redirection.toggle();
+  await storage.redirection.set(true);
   storage.list.set([]);
   storage.uid.set("");
   // Leave learning URL empty by default; user sets this in settings
@@ -121,14 +180,18 @@ async function setup() {
   storage.shouldRedirect.set(true);
   await redirection.start();
 
-  // Initialize controlled mode if applicable
-  if (isControlled()) {
-    await controlledMode.init();
-    console.log("[Background] Controlled mode initialized");
+  await interventionEngine.init();
+  try {
+    lastKnownRedirectionToggle = await storage.redirection.get();
+  } catch (_) {
+    lastKnownRedirectionToggle = null;
   }
+  console.log("[Background] Intervention engine initialized");
 }
 
 async function killAiki() {
+  lastKnownRedirectionToggle = false;
+
   // FIRST: Finalize all active sessions before stopping anything
   // This ensures we capture the exact duration up to the disable moment
   try {
@@ -138,25 +201,20 @@ async function killAiki() {
     console.warn("[Background] Failed to finalize sessions on disable:", e);
   }
 
-  // For controlled variant, also cleanup controlledMode state
-  if (isControlled()) {
-    try {
-      await controlledMode.cleanup();
-      console.log("[Background] Controlled mode cleaned up on extension disable");
-    } catch (e) {
-      console.warn("[Background] Failed to cleanup controlled mode:", e);
-    }
+  try {
+    await interventionEngine.cleanup();
+    console.log("[Background] Intervention engine cleaned up on extension disable");
+  } catch (e) {
+    console.warn("[Background] Failed to cleanup intervention engine:", e);
   }
 
-  const tabs = await browser.tabs.query({
-    active: true,
-    currentWindow: true,
-  });
-  try {
-    await browser.tabs.sendMessage(tabs[0].id, { action: "kill aiki" });
-  } catch (_) {
-    // Tab may not have content script or context invalidated
-  }
+  const tabs = await browser.tabs.query({});
+  await Promise.all(
+    tabs.map((tab) => {
+      if (tab?.id === undefined) return Promise.resolve();
+      return browser.tabs.sendMessage(tab.id, { action: "kill aiki" }).catch(() => { });
+    })
+  );
   timer.stopLearningSession();
   timer.stopBonusTime();
   timer.killAiki();
@@ -176,6 +234,7 @@ async function killAiki() {
 }
 
 async function reviveAiki() {
+  lastKnownRedirectionToggle = true;
   redirection.checkActiveTab();
   const user = await storage.uid.get();
   await logAuditEvent({
@@ -198,6 +257,27 @@ async function gotoOriginTab() {
   } catch (_) { }
 }
 
+function parsePortMessage(msg) {
+  if (typeof msg !== "string") return null;
+  const raw = msg.trim();
+  if (!raw) return null;
+
+  const segments = raw
+    .split(":")
+    .map((segment) => segment.trim())
+    .filter((segment) => segment.length > 0);
+
+  if (segments.length === 0) return null;
+
+  return {
+    raw,
+    command: segments[0].toLowerCase(),
+    topic: (segments[1] || "").toLowerCase(),
+    detail: segments.slice(2).join(": ").trim().toLowerCase(),
+    segments,
+  };
+}
+
 // Manifest V3: Use runtime.onConnect for port messaging
 browser.runtime.onConnect.addListener(function (port) {
   let isDisconnected = false;
@@ -205,8 +285,16 @@ browser.runtime.onConnect.addListener(function (port) {
     isDisconnected = true;
   });
   port.onMessage.addListener(function (msg) {
-    console.log("[Aiki Debug] Port message received:", msg, "parsed as:", msg.split(": ")[1]);
-    switch (msg.split(": ")[1]) {
+    const parsed = parsePortMessage(msg);
+    if (!parsed) {
+      console.warn("[Aiki Debug] Ignoring malformed port message:", msg);
+      return;
+    }
+
+    const messageType = parsed.topic || parsed.command;
+    console.log("[Aiki Debug] Port message received:", msg, "parsed as:", messageType);
+
+    switch (messageType) {
       case "user":
         intervals.logger.restart();
         break;
@@ -216,9 +304,8 @@ browser.runtime.onConnect.addListener(function (port) {
         redirection.checkActiveTab();
         break;
       case "origin": {
-        const segments = msg.split(": ");
-        const action = segments[2];
-        console.log("[Aiki Debug] Background received origin message:", { msg, action, segments });
+        const action = parsed.detail;
+        console.log("[Aiki Debug] Background received origin message:", { msg, action, segments: parsed.segments });
         (async () => {
           let tabId = port.sender?.tab?.id;
           if (tabId === undefined) {
@@ -231,7 +318,7 @@ browser.runtime.onConnect.addListener(function (port) {
             } catch (_) { }
           }
           console.log("[Aiki Debug] Calling redirection.gotoOrigin with:", { action, tabId, type: "popup" });
-          redirection.gotoOrigin(action, {
+          await redirection.gotoOrigin(action, {
             type: "popup",
             tabId,
             restoreAll: action === "skip",
@@ -248,35 +335,19 @@ browser.runtime.onConnect.addListener(function (port) {
           if (isDisconnected) return;
           try {
             const timeData = timer.getTime();
-            const controlledState = controlledMode.getState();
-            // Return controlled state for both variants when session is active
-            if (controlledState.state !== "idle") {
-              port.postMessage({
-                ...timeData,
-                isControlledVariant: true,
-                controlledState: controlledState.state,
-                controlledLearningRemaining: controlledState.state === "learning" ? controlledState.remainingMs : 0,
-                controlledLearningGoal: controlledState.state === "learning" ? controlledState.goalMs : 0,
-                controlledLearningElapsed: controlledState.state === "learning" ? controlledState.elapsedMs : 0,
-                controlledLearningCompleted: controlledState.state === "learning" ? controlledState.completed : false,
-                controlledRewardRemaining: controlledState.state === "reward" ? controlledState.remainingMs : 0,
-                controlledRewardGoal: controlledState.state === "reward" ? controlledState.goalMs : 0,
-              });
-            } else {
-              port.postMessage({ ...timeData, isControlledVariant: false });
-            }
+            port.postMessage(buildTimerPayload(timeData));
           } catch (error) {
             // Port might have been disconnected between sync and post
           }
         })();
         break;
       case "off":
-        killAiki();
+        storage.redirection.set(false).catch(() => { });
         break;
       case "on":
-        reviveAiki();
+        storage.redirection.set(true).catch(() => { });
         break;
-      case "originTab":
+      case "origintab":
         gotoOriginTab();
         break;
     }
@@ -288,6 +359,34 @@ setup();
 
 browser.storage.onChanged.addListener(async (changes, areaName) => {
   if (areaName !== "local") return;
+
+  if (changes.toggled) {
+    const oldValue = changes.toggled.oldValue;
+    const newValue = changes.toggled.newValue;
+    if (typeof newValue === "boolean") {
+      if (typeof oldValue !== "boolean") {
+        lastKnownRedirectionToggle = newValue;
+      } else if (newValue !== oldValue && lastKnownRedirectionToggle !== newValue) {
+        lastKnownRedirectionToggle = newValue;
+        redirectionToggleTransition = redirectionToggleTransition
+          .then(() => (newValue ? reviveAiki() : killAiki()))
+          .catch((e) => {
+            console.warn("[Background] Failed to apply redirection toggle change:", e);
+          });
+        await redirectionToggleTransition;
+      }
+    }
+  }
+
+  if (changes.list) {
+    try {
+      intervals.counter.restart();
+      await redirection.navigationListener.restart();
+      await redirection.checkActiveTab();
+    } catch (e) {
+      console.warn("[Background] Failed to refresh listeners after list change:", e);
+    }
+  }
 
   if (changes.dailyGoal) {
     console.log("[Background] Daily goal changed:", changes.dailyGoal);
@@ -306,6 +405,9 @@ browser.storage.onChanged.addListener(async (changes, areaName) => {
       await storage.shouldRedirect.set(true);
 
       redirection.checkActiveTab();
+    } else if (newGoalMs > 0 && dailyProgress >= newGoalMs) {
+      console.log("[Background] Daily goal met - keeping interception disabled for today");
+      await storage.shouldRedirect.set(false);
     }
   }
 });

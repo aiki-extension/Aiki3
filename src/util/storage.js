@@ -7,17 +7,33 @@ const storage = browser.storage.local;
  * @param {string} storageKey - The key to use in browser.storage
   */
 function createKeyedStore(storageKey) {
+  let mutationQueue = Promise.resolve();
+  const enqueueMutation = (operation) => {
+    const next = mutationQueue.then(operation);
+    // Keep the queue alive even when an operation fails.
+    mutationQueue = next.catch(() => { });
+    return next;
+  };
+  const waitForPendingMutations = async () => {
+    try {
+      await mutationQueue;
+    } catch (_) { }
+  };
+
   return {
     async set(key, value) {
       if (key === null || key === undefined) return;
-      const data = await storage.get(storageKey);
-      const current = data[storageKey] && typeof data[storageKey] === "object"
-        ? { ...data[storageKey] } : {};
-      current[String(key)] = value;
-      return storage.set({ [storageKey]: current });
+      return enqueueMutation(async () => {
+        const data = await storage.get(storageKey);
+        const current = data[storageKey] && typeof data[storageKey] === "object"
+          ? { ...data[storageKey] } : {};
+        current[String(key)] = value;
+        return storage.set({ [storageKey]: current });
+      });
     },
     async get(key) {
       if (key === null || key === undefined) return null;
+      await waitForPendingMutations();
       const data = await storage.get(storageKey);
       if (data[storageKey] && typeof data[storageKey] === "object") {
         return data[storageKey][String(key)] || null;
@@ -26,20 +42,22 @@ function createKeyedStore(storageKey) {
     },
     async remove(key) {
       if (key === null || key === undefined) return;
-      const strKey = String(key);
-      const data = await storage.get(storageKey);
-      if (data[storageKey] && typeof data[storageKey] === "object" && strKey in data[storageKey]) {
-        const next = { ...data[storageKey] };
-        delete next[strKey];
-        if (Object.keys(next).length > 0) {
-          return storage.set({ [storageKey]: next });
-        } else {
-          return storage.remove(storageKey);
+      return enqueueMutation(async () => {
+        const strKey = String(key);
+        const data = await storage.get(storageKey);
+        if (data[storageKey] && typeof data[storageKey] === "object" && strKey in data[storageKey]) {
+          const next = { ...data[storageKey] };
+          delete next[strKey];
+          if (Object.keys(next).length > 0) {
+            return storage.set({ [storageKey]: next });
+          } else {
+            return storage.remove(storageKey);
+          }
         }
-      }
+      });
     },
     clear() {
-      return storage.remove(storageKey);
+      return enqueueMutation(() => storage.remove(storageKey));
     }
   };
 }
@@ -53,7 +71,7 @@ const activeSessionsStore = createKeyedStore("activeSessions");
  * @function
  * @description Clears all stored data in browser storage. */
 function clearStorage() {
-  storage.clear();
+  return storage.clear();
 }
 
 /**
@@ -63,9 +81,13 @@ function clearStorage() {
  * redirectionToggled is a settings parameter changed by the user. */
 
 function toggleRedirection() {
-  storage.get("toggled").then((data) => {
-    storage.set({ toggled: !data.toggled });
+  return storage.get("toggled").then((data) => {
+    return storage.set({ toggled: !data.toggled });
   });
+}
+
+function setRedirectionToggled(state) {
+  return storage.set({ toggled: Boolean(state) });
 }
 
 /**
@@ -79,7 +101,8 @@ function toggleRedirection() {
  * redirectionToggled is a settings parameter changed by the user. */
 async function getRedirectionToggled() {
   const result = await storage.get("toggled");
-  return result.toggled;
+  if (typeof result.toggled === "boolean") return result.toggled;
+  return true;
 }
 
 /**
@@ -89,7 +112,7 @@ async function getRedirectionToggled() {
  * @param {string} list[].id
  * @description Sets the list of procrastination websites in storage. */
 function setList(list) {
-  storage.set({ list: list });
+  return storage.set({ list: list });
 }
 
 /**
@@ -106,7 +129,7 @@ async function getList() {
  * @param {string} uid
  * @description sets the user ID in storage. */
 function setUid(uid) {
-  storage.set({ uid: uid });
+  return storage.set({ uid: uid });
 }
 
 /**
@@ -126,7 +149,7 @@ async function getUid() {
  * @description sets the origin tabID and url in storage for later reference.
  * The origin object is tied to the website from which the user was intercepted by Aiki3 */
 function setOrigin(origin) {
-  storage.set({ origin: origin });
+  return storage.set({ origin: origin });
 }
 
 /**
@@ -144,15 +167,15 @@ async function getOrigin() {
  * @description removes the origin variable from storage.
  *  The origin object is tied to the website from which the user was intercepted by Aiki3 */
 function removeOrigin() {
-  storage.remove("origin");
+  return storage.remove("origin");
 }
 
 function setLearningUri(uri) {
   if (uri && typeof uri === "string" && uri.trim() !== "") {
-    storage.set({ learningUri: uri.trim() });
+    return storage.set({ learningUri: uri.trim() });
   } else {
     // Default to empty when not provided
-    storage.remove("learningUri");
+    return storage.remove("learningUri");
   }
 }
 
@@ -185,7 +208,7 @@ async function getLearningTime() {
  * @description sets the amount of time before a user is allowed to
  * continue to the origin procrastination website. */
 function setLearningTime(time) {
-  storage.set({ learningTime: time });
+  return storage.set({ learningTime: time });
 }
 
 /**
@@ -208,7 +231,7 @@ async function getRewardTime() {
  * @description sets in storage the userdefined amount of miliseconds the user is allowed
  * to spend on procrastination websites before interception is turned back on. */
 function setRewardTime(time) {
-  storage.set({ rewardTime: time });
+  return storage.set({ rewardTime: time });
 }
 
 /**
@@ -229,7 +252,7 @@ async function getDailyGoal() {
  * @param {object} goal {min, sec}
  * @description sets the user's daily learning goal. */
 function setDailyGoal(goal) {
-  storage.set({ dailyGoal: goal });
+  return storage.set({ dailyGoal: goal });
 }
 
 /**
@@ -250,7 +273,7 @@ async function getSessionDuration() {
  * @param {object} duration {min, sec}
  * @description sets the per-session learning duration. */
 function setSessionDuration(duration) {
-  storage.set({ sessionDuration: duration });
+  return storage.set({ sessionDuration: duration });
 }
 
 async function getUserTimes() {
@@ -309,9 +332,11 @@ async function getRewardUnlock() {
 /**
  * @description Initializes the time settings in storage upon app installation. */
 function userTimeInit() {
-  setDailyGoal({ min: 30, sec: 0 });
-  setSessionDuration({ min: 5, sec: 0 });
-  setRewardTime({ min: 2, sec: 0 });
+  return Promise.all([
+    setDailyGoal({ min: 30, sec: 0 }),
+    setSessionDuration({ min: 5, sec: 0 }),
+    setRewardTime({ min: 2, sec: 0 }),
+  ]);
 }
 
 /**
@@ -320,8 +345,8 @@ function userTimeInit() {
  * @description sets in storage whether user should be redirected.
  * shouldRedirect is defined by the application when the user has earned
  * procrastination time, and again when this expires. */
-async function setShouldRedirect(state) {
-  storage.set({ shouldRedirect: state });
+function setShouldRedirect(state) {
+  return storage.set({ shouldRedirect: state });
 }
 
 /**
@@ -341,35 +366,29 @@ async function storeSession(data) {
   const { sessionData } = await storage.get("sessionData");
   const { learningUri } = await storage.get("learningUri");
   const learningName = learningUri ? parseUrl(learningUri).name : null;
+  const toFiniteNumber = (value) =>
+    typeof value === "number" && Number.isFinite(value) ? value : 0;
 
-  let newData = sessionData || {
-    procrastinationDuration: 0,
-    learningDuration: 0,
-  };
-  if (
-    !newData.hasOwnProperty("procrastinationDuration") ||
-    newData.procrastinationDuration === NaN
-  ) {
-    newData.procrastinationDuration = 0;
-  }
-  if (
-    !newData.hasOwnProperty("learningDuration") ||
-    newData.learningDuration === NaN
-  ) {
-    newData.learningDuration = 0;
-  }
+  let newData =
+    sessionData && typeof sessionData === "object"
+      ? { ...sessionData }
+      : {
+          procrastinationDuration: 0,
+          learningDuration: 0,
+        };
+  newData.procrastinationDuration = toFiniteNumber(newData.procrastinationDuration);
+  newData.learningDuration = toFiniteNumber(newData.learningDuration);
 
-  for (const key in data) {
+  for (const [key, value] of Object.entries(data || {})) {
+    const increment = toFiniteNumber(value);
     if (learningName && key === learningName) {
-      newData.learningDuration += data[key];
+      newData.learningDuration += increment;
     } else if (!["chromeInactive", "chromeActive"].includes(key)) {
-      newData[key] = newData.hasOwnProperty(key)
-        ? newData[key] + data[key]
-        : data[key];
-      newData.procrastinationDuration += data[key];
+      newData[key] = toFiniteNumber(newData[key]) + increment;
+      newData.procrastinationDuration += increment;
     }
   }
-  storage.set({ sessionData: newData });
+  await storage.set({ sessionData: newData });
 }
 
 async function checkDate(statsDate) {
@@ -413,19 +432,21 @@ async function getAllStats() {
 }
 
 function initializeStats() {
-  storage.set({
-    sessionData: { procrastinationDuration: 0, learningDuration: 0 },
-  });
-  storage.set({
-    history: {
+  return Promise.all([
+    storage.set({
       sessionData: { procrastinationDuration: 0, learningDuration: 0 },
-    },
-  });
-  storage.set({
-    yesterday: {
-      sessionData: { procrastinationDuration: 0, learningDuration: 0 },
-    },
-  });
+    }),
+    storage.set({
+      history: {
+        sessionData: { procrastinationDuration: 0, learningDuration: 0 },
+      },
+    }),
+    storage.set({
+      yesterday: {
+        sessionData: { procrastinationDuration: 0, learningDuration: 0 },
+      },
+    }),
+  ]);
 }
 
 async function overWriteYesterday() {
@@ -437,7 +458,7 @@ async function overWriteYesterday() {
       learningDuration: 0,
     },
   };
-  storage.set({ yesterday });
+  return storage.set({ yesterday });
 }
 
 async function addToHistory() {
@@ -463,18 +484,18 @@ async function addToHistory() {
     yesterday.sessionData.procrastinationDuration || 0;
   history.sessionData.learningDuration +=
     yesterday.sessionData.learningDuration || 0;
-  storage.set({ history });
+  return storage.set({ history });
 }
 
 function setActiveTimeFrom(value) {
-  storage.set({ activeFrom: value });
+  return storage.set({ activeFrom: value });
 }
 async function getActiveTimeFrom() {
   const { activeFrom } = await storage.get("activeFrom");
   return activeFrom ?? { hrs: 8, min: 0 };
 }
 function setActiveTimeTo(value) {
-  storage.set({ activeTo: value });
+  return storage.set({ activeTo: value });
 }
 async function getActiveTimeTo() {
   const { activeTo } = await storage.get("activeTo");
@@ -490,19 +511,19 @@ async function getAllActiveTimes() {
 }
 
 function operatingHoursInit() {
-  setActiveTimeFrom({ hrs: 8, min: 0 });
-  setActiveTimeTo({ hrs: 21, min: 30 });
+  return Promise.all([
+    setActiveTimeFrom({ hrs: 8, min: 0 }),
+    setActiveTimeTo({ hrs: 21, min: 30 }),
+  ]);
 }
 
 async function addBlockedTabs(tab) {
   const { blockedTabs } = await storage.get("blockedTabs");
-  if (blockedTabs) {
-    if (!blockedTabs.includes(tab)) {
-      storage.set({ blockedTabs: [...blockedTabs, tab] });
-    }
-  } else {
-    storage.set({ blockedTabs: [tab] });
+  if (Array.isArray(blockedTabs)) {
+    if (blockedTabs.includes(tab)) return;
+    return storage.set({ blockedTabs: [...blockedTabs, tab] });
   }
+  return storage.set({ blockedTabs: [tab] });
 }
 
 async function getBlockedTabs() {
@@ -516,12 +537,12 @@ async function removeBlockedTab(tab) {
   const { blockedTabs } = await storage.get("blockedTabs");
   if (Array.isArray(blockedTabs)) {
     const next = blockedTabs.filter((item) => item !== tab);
-    storage.set({ blockedTabs: next });
+    return storage.set({ blockedTabs: next });
   }
 }
 
 function clearBlockedTabs() {
-  storage.remove("blockedTabs");
+  return storage.remove("blockedTabs");
 }
 
 
@@ -530,9 +551,9 @@ function clearBlockedTabs() {
 
 async function setParticipantRecord(record) {
   if (record && typeof record === "object") {
-    storage.set({ participantRecord: record });
+    return storage.set({ participantRecord: record });
   } else {
-    storage.remove("participantRecord");
+    return storage.remove("participantRecord");
   }
 }
 
@@ -552,9 +573,9 @@ function normalizeSessionKey(tabId) {
 
 async function setUserPreferencesId(id) {
   if (id && typeof id === "string") {
-    storage.set({ userPreferencesId: id });
+    return storage.set({ userPreferencesId: id });
   } else {
-    storage.remove("userPreferencesId");
+    return storage.remove("userPreferencesId");
   }
 }
 
@@ -568,9 +589,9 @@ async function getUserPreferencesId() {
 // Controlled variant session state
 async function setControlledSession(session) {
   if (session && typeof session === "object") {
-    await storage.set({ controlledSession: session });
+    return storage.set({ controlledSession: session });
   } else {
-    await storage.remove("controlledSession");
+    return storage.remove("controlledSession");
   }
 }
 
@@ -592,7 +613,7 @@ async function getControlledLearningMinutes() {
 }
 
 async function setControlledLearningMinutes(minutes) {
-  await storage.set({ controlledLearningMinutes: minutes });
+  return storage.set({ controlledLearningMinutes: minutes });
 }
 
 async function getControlledRewardMinutes() {
@@ -603,7 +624,7 @@ async function getControlledRewardMinutes() {
 }
 
 async function setControlledRewardMinutes(minutes) {
-  await storage.set({ controlledRewardMinutes: minutes });
+  return storage.set({ controlledRewardMinutes: minutes });
 }
 
 async function getControlledLearningSeconds() {
@@ -614,7 +635,7 @@ async function getControlledLearningSeconds() {
 }
 
 async function setControlledLearningSeconds(seconds) {
-  await storage.set({ controlledLearningSeconds: seconds });
+  return storage.set({ controlledLearningSeconds: seconds });
 }
 
 async function getControlledRewardSeconds() {
@@ -625,7 +646,7 @@ async function getControlledRewardSeconds() {
 }
 
 async function setControlledRewardSeconds(seconds) {
-  await storage.set({ controlledRewardSeconds: seconds });
+  return storage.set({ controlledRewardSeconds: seconds });
 }
 
 export default {
@@ -653,7 +674,11 @@ export default {
   learningUri: { get: getLearningUri, set: setLearningUri },
   list: { set: setList, get: getList },
   uid: { set: setUid, get: getUid },
-  redirection: { toggle: toggleRedirection, get: getRedirectionToggled },
+  redirection: {
+    toggle: toggleRedirection,
+    set: setRedirectionToggled,
+    get: getRedirectionToggled,
+  },
   stats: {
     storeSession: storeSession,
     getAll: getAllStats,

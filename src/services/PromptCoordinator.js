@@ -1,5 +1,6 @@
 import browser from "webextension-polyfill";
 import storage from "../util/storage";
+import siteDetector from "./siteDetector";
 
 class PromptCoordinator {
   constructor({ applyPreemptiveHide, removePreemptiveHide, showImmediatePrompt, hideImmediatePrompt }) {
@@ -79,15 +80,13 @@ class PromptCoordinator {
         try {
           const originTab = await browser.tabs.get(origin.tabId);
           const learningUri = await storage.learningUri.get();
-          if (originTab && learningUri) {
-            
-            let learningName = "";
-            try {
-              learningName = new URL(learningUri).hostname.replace(/^www\./, "");
-            } catch (_) { }
-            if (learningName && originTab.url && originTab.url.includes(learningName)) {
-              isOriginValid = true;
-            }
+          if (
+            originTab &&
+            learningUri &&
+            typeof originTab.url === "string" &&
+            siteDetector.isLearningSite(originTab.url, learningUri)
+          ) {
+            isOriginValid = true;
           }
         } catch (_) {
           

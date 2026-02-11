@@ -4,18 +4,16 @@ import browser from "webextension-polyfill";
 import timer from "./services/TimerManager";
 import { parseUrl, makeDate, parseTime } from "./util/utilities";
 import { isControlled } from "./util/variantConfig";
-import controlledMode from "./controlledMode";
+import interventionEngine from "./interventionEngine";
 import SessionService from "./services/SessionService";
 import NavigationGuards from "./services/NavigationGuards";
-import ControlledStrategy from "./util/ControlledStrategy";
-import ExperimentalStrategy from "./util/ExperimentalStrategy";
 import PromptCoordinator from "./services/PromptCoordinator";
+import siteDetector from "./services/siteDetector";
 
 const l = console.log;
 
-const strategy = isControlled() ? new ControlledStrategy() : new ExperimentalStrategy();
-
-const navigationGuards = new NavigationGuards(strategy);
+// NavigationGuards now uses interventionEngine directly (no strategy needed)
+const navigationGuards = new NavigationGuards();
 const promptCoordinator = new PromptCoordinator({
   applyPreemptiveHide: (tabId) => navigationGuards.applyPreemptiveHide(tabId),
   removePreemptiveHide: (tabId) => navigationGuards.removePreemptiveHide(tabId),
@@ -38,6 +36,128 @@ function buildProcrastinationUrlFilters(list = []) {
       return { hostSuffix: host };
     })
     .filter(Boolean);
+}
+
+function extractProcrastinationHosts(list = []) {
+  return (list || [])
+    .map((item) => item?.host || item?.name || "")
+    .filter(Boolean);
+}
+
+async function getRewardDurationMs(defaultMs = 60 * 1000) {
+  const rewardMinutes = await storage.controlledTimerSettings.rewardMinutes.get();
+  const rewardSeconds = await storage.controlledTimerSettings.rewardSeconds.get();
+  const rewardMs = (rewardMinutes * 60 + rewardSeconds) * 1000;
+  return rewardMs > 0 ? rewardMs : defaultMs;
+}
+
+async function isDailyGoalCompleted() {
+  const goal = parseTime.toSystem(await storage.timeSettings.dailyGoal.get());
+  if (goal <= 0) return false;
+  const progress = await storage.dailyProgress.get();
+  return progress >= goal;
+}
+
+async function canInterceptNow() {
+  const goalCompleted = await isDailyGoalCompleted();
+  if (goalCompleted) {
+    const [shouldRedirect, unlockAt] = await Promise.all([
+      storage.shouldRedirect.get(),
+      storage.rewardUnlock.get(),
+    ]);
+    const updates = [];
+    if (shouldRedirect !== false) {
+      updates.push(storage.shouldRedirect.set(false));
+    }
+    if (typeof unlockAt === "number" && unlockAt > 0) {
+      updates.push(storage.rewardUnlock.set(0));
+    }
+    if (updates.length > 0) {
+      await Promise.allSettled(updates);
+    }
+    return false;
+  }
+
+  let shouldRedirect = await storage.shouldRedirect.get();
+  if (!shouldRedirect) {
+    const unlockAt = await storage.rewardUnlock.get();
+    if (unlockAt && unlockAt <= Date.now()) {
+      await storage.rewardUnlock.set(0);
+      await storage.shouldRedirect.set(true);
+      shouldRedirect = true;
+    }
+  }
+
+  return Boolean(shouldRedirect);
+}
+
+async function clearStaleOriginState() {
+  await storage.origin.remove();
+  removeOriginUpdatedListener();
+  await removeAllContentBlockers();
+  timer.stopBonusTime();
+  timer.stopLearningSession();
+}
+
+async function validateOriginSession(learningUri = "") {
+  const origin = await storage.origin.get();
+  if (!origin || origin.tabId === undefined) {
+    return { origin: null, isValid: false };
+  }
+
+  const configuredLearning = learningUri || (await storage.learningUri.get());
+  if (!configuredLearning) {
+    await clearStaleOriginState();
+    return { origin: null, isValid: false };
+  }
+
+  try {
+    const originTab = await browser.tabs.get(origin.tabId);
+    const isValid =
+      Boolean(originTab?.url) &&
+      siteDetector.isLearningSite(originTab.url, configuredLearning);
+    if (!isValid) {
+      await clearStaleOriginState();
+      return { origin: null, isValid: false };
+    }
+    return { origin, isValid: true };
+  } catch (_) {
+    await clearStaleOriginState();
+    return { origin: null, isValid: false };
+  }
+}
+
+async function shouldSkipPrompt(tabId, url) {
+  const hostName = parseUrl(url).name;
+  if (!hostName) return false;
+  const promptLock = await storage.promptLocks.get(tabId);
+  if (!promptLock) return false;
+  return (
+    promptLock.host === hostName &&
+    Date.now() - promptLock.timestamp < PROMPT_SUPPRESS_DURATION
+  );
+}
+
+async function handleUnifiedNavigation(tabId, url, procrastinationHosts, learningUrl) {
+  if (!tabId || !url || !learningUrl) return false;
+  if (!isControlled()) return false;
+
+  try {
+    return Boolean(
+      await interventionEngine.handleNavigation(
+        tabId,
+        url,
+        procrastinationHosts || [],
+        learningUrl
+      )
+    );
+  } catch (_) {
+    return false;
+  }
+}
+
+async function hideImmediatePrompt(tabId) {
+  return navigationGuards.hideImmediatePrompt(tabId);
 }
 
 const finalizeAllActiveSessions = (reason = "window_blur") =>
@@ -161,9 +281,12 @@ async function originUpdatedListener(details) {
       const tab = await browser.tabs.get(details);
       l(tab);
       const currentLearning = await storage.learningUri.get();
-      const learningName = parseUrl(currentLearning).name;
-      if (tab.url.includes(learningName)) {
-        storage.learningUri.set(tab.url);
+      if (
+        typeof tab?.url === "string" &&
+        currentLearning &&
+        siteDetector.isLearningSite(tab.url, currentLearning)
+      ) {
+        await storage.learningUri.set(tab.url);
       }
     }
   }
@@ -179,113 +302,63 @@ async function originUpdatedListener(details) {
  * @param {string} details.url
  * @param {number} details.tabId */
 async function redirect(details) {
-  if (await checkActiveTime()) {
-    if (details.frameId === 0 && !details.url.includes("auth")) {
-      const toggled = await storage.redirection.get();
-      if (!toggled) return;
+  if (!(await checkActiveTime())) return;
+  if (details.frameId !== 0 || details.url.includes("auth")) return;
 
-      const procList = await storage.list.get();
-      const procHosts = (procList || []).map(item => item?.host || item?.name || "").filter(Boolean);
-      const learningUrl = await storage.learningUri.get();
+  const toggled = await storage.redirection.get();
+  if (!toggled) return;
 
-      const handled = await strategy.handleNavigation(details, {
-        applyPreemptiveHide: (tabId) => navigationGuards.applyPreemptiveHide(tabId),
-        removePreemptiveHide: (tabId) => navigationGuards.removePreemptiveHide(tabId),
-        procrastinationHosts: procHosts,
-        learningUrl,
-      });
-      if (handled) return;
+  const procList = await storage.list.get();
+  const procHosts = extractProcrastinationHosts(procList);
+  // Always revalidate against latest storage list to avoid stale listener filters.
+  if (!siteDetector.isProcrastinationSite(details.url, procHosts)) return;
+  const learningUrl = await storage.learningUri.get();
 
-      let shouldRedirect = await storage.shouldRedirect.get();
-      if (!shouldRedirect) {
-        const unlockAt = await storage.rewardUnlock.get();
-        if (unlockAt && unlockAt <= Date.now()) {
-          await storage.rewardUnlock.set(0);
-          await storage.shouldRedirect.set(true);
-          shouldRedirect = true;
-        }
-      }
+  const handled = await handleUnifiedNavigation(
+    details.tabId,
+    details.url,
+    procHosts,
+    learningUrl
+  );
+  if (handled) return;
+  if (isControlled()) return;
 
-      const goal = parseTime.toSystem(await storage.timeSettings.dailyGoal.get());
-      const progress = await storage.dailyProgress.get();
-      const goalMet = goal > 0 && progress >= goal;
-
-      if (toggled && shouldRedirect && !goalMet) {
-        l("ShouldRedirect", shouldRedirect);
-        const origin = await storage.origin.get();
-        l("Checking against this: ", origin);
-
-        // Validate that the origin learning tab still exists before showing blocker
-        let isOriginValid = false;
-        if (origin && origin.tabId !== undefined) {
-          try {
-            const originTab = await browser.tabs.get(origin.tabId);
-            const learningUri = await storage.learningUri.get();
-            if (originTab && learningUri) {
-              const learningName = parseUrl(learningUri).name;
-              if (learningName && originTab.url && originTab.url.includes(learningName)) {
-                isOriginValid = true;
-              }
-            }
-          } catch (_) {
-            // Tab doesn't exist - origin is stale
-          }
-
-          // Clear stale origin if tab no longer exists or isn't on learning site
-          if (!isOriginValid) {
-            l("Origin tab no longer valid, clearing stale origin");
-            await storage.origin.remove();
-            removeOriginUpdatedListener();
-            removeAllContentBlockers();
-            timer.stopBonusTime();
-            timer.stopLearningSession();
-          }
-        }
-
-        if (isOriginValid) {
-          l(details);
-          // Only show blocker for experimental variant
-          // Controlled variant handles blocking via direct redirect in controlledMode
-          if (!isControlled()) {
-            addProcsiteLoadedListener();
-          }
-        } else {
-          const learningUri = await storage.learningUri.get();
-          if (!learningUri) return; // skip redirection if no learning URL configured
-          const hostName = parseUrl(details.url).name;
-          const promptLock = await storage.promptLocks.get(details.tabId);
-          const now = Date.now();
-
-          if (
-            promptLock &&
-            promptLock.host === hostName &&
-            now - promptLock.timestamp < PROMPT_SUPPRESS_DURATION
-          ) {
-            l("Skipping prompt due to recent eventData for tab", details.tabId);
-            return;
-          }
-          promptRedirect(details.tabId, learningUri, details.url);
-        }
-      }
-    }
+  if (!(await canInterceptNow())) {
+    return;
   }
+
+  const { isValid: isOriginValid } = await validateOriginSession(learningUrl);
+  if (isOriginValid) {
+    if (!isControlled()) {
+      await addProcsiteLoadedListener();
+    }
+    return;
+  }
+
+  if (!learningUrl) return;
+  if (await shouldSkipPrompt(details.tabId, details.url)) {
+    l("Skipping prompt due to recent eventData for tab", details.tabId);
+    return;
+  }
+
+  await promptRedirect(details.tabId, learningUrl, details.url);
 }
 
 async function checkActiveTime() {
   const fromTime = await storage.operatingHours.from.get();
   const toTime = await storage.operatingHours.to.get();
   const date = makeDate();
-  if (date.hours < fromTime.hrs) {
-    return false;
-  } else if (date.hours === fromTime.hrs && date.minutes < fromTime.min) {
-    return false;
+  const currentMinutes = date.hours * 60 + date.minutes;
+  const startMinutes = (Number(fromTime?.hrs) || 0) * 60 + (Number(fromTime?.min) || 0);
+  const endMinutes = (Number(toTime?.hrs) || 0) * 60 + (Number(toTime?.min) || 0);
+
+  // Equal start/end means interception should stay active all day.
+  if (startMinutes === endMinutes) return true;
+  if (startMinutes < endMinutes) {
+    return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
   }
-  if (date.hours > toTime.hrs) {
-    return false;
-  } else if (date.hours === toTime.hrs && date.minutes > toTime.min) {
-    return false;
-  }
-  return true;
+  // Window crosses midnight (e.g., 22:00 -> 06:00).
+  return currentMinutes >= startMinutes || currentMinutes <= endMinutes;
 }
 
 function addOriginTabCloseListener() {
@@ -303,33 +376,30 @@ async function onOriginRemoved(details) {
       const learningUri = await storage.learningUri.get();
       let migrated = false;
       if (learningUri) {
-        const learningName = parseUrl(learningUri).name;
-        if (learningName) {
-          try {
-            const tabs = await browser.tabs.query({});
-            const replacement = tabs.find(
-              (tab) =>
-                tab.id !== details &&
-                typeof tab.url === "string" &&
-                tab.url.includes(learningName)
-            );
-            if (replacement) {
-              storage.origin.set({ url: replacement.url, tabId: replacement.id });
-              addOriginUpdatedListener(replacement.id);
-              setTimeout(() => triggerLearningOverlay(replacement.id), 150);
-              await SessionService.transferActiveSession(details, replacement.id);
-              migrated = true;
-            }
-          } catch (error) {
-            l(error);
+        try {
+          const tabs = await browser.tabs.query({});
+          const replacement = tabs.find(
+            (tab) =>
+              tab.id !== details &&
+              typeof tab.url === "string" &&
+              siteDetector.isLearningSite(tab.url, learningUri)
+          );
+          if (replacement) {
+            storage.origin.set({ url: replacement.url, tabId: replacement.id });
+            addOriginUpdatedListener(replacement.id);
+            setTimeout(() => triggerLearningOverlay(replacement.id), 150);
+            await SessionService.transferActiveSession(details, replacement.id);
+            migrated = true;
           }
+        } catch (error) {
+          l(error);
         }
       }
 
       if (!migrated) {
         l("Origin killed");
         removeOriginUpdatedListener();
-        removeAllContentBlockers();
+        await removeAllContentBlockers();
         storage.origin.remove();
         await SessionService.finalizeSession(details, "learning", "tab_closed");
         timer.stopBonusTime();
@@ -343,10 +413,15 @@ async function onOriginRemoved(details) {
 async function addLearningSiteLoadedListener() {
   const currentLearning = await storage.learningUri.get();
   if (!currentLearning) return;
-  const learningName = parseUrl(currentLearning).name;
-  if (!learningName) return;
+  let learningHost = "";
+  try {
+    learningHost = new URL(currentLearning).hostname.replace(/^www\./, "").toLowerCase();
+  } catch (_) {
+    learningHost = (parseUrl(currentLearning).host || "").replace(/^www\./, "").toLowerCase();
+  }
+  if (!learningHost) return;
   browser.webNavigation.onCompleted.addListener(messageLearningResource, {
-    url: [{ hostContains: `.${learningName}.` }],
+    url: [{ hostSuffix: learningHost }],
   });
 }
 
@@ -364,8 +439,6 @@ function removeLearningSiteLoadedListener() {
 async function getActiveLearningTabs(excludedIds = new Set()) {
   const learningUri = await storage.learningUri.get();
   if (!learningUri) return [];
-  const learningName = parseUrl(learningUri).name;
-  if (!learningName) return [];
   try {
     const tabs = await browser.tabs.query({});
     return tabs.filter(
@@ -373,12 +446,43 @@ async function getActiveLearningTabs(excludedIds = new Set()) {
         tab &&
         typeof tab.id === "number" &&
         typeof tab.url === "string" &&
-        tab.url.includes(learningName) &&
+        siteDetector.isLearningSite(tab.url, learningUri) &&
         !excludedIds.has(tab.id)
     );
   } catch (_) {
     return [];
   }
+}
+
+async function shouldPreserveLearningStateOnStay(currentTabId) {
+  const state = interventionEngine.getState();
+  if (!state || state.state !== "learning") return false;
+  if (
+    typeof state.tabId === "number" &&
+    typeof currentTabId === "number" &&
+    state.tabId !== currentTabId
+  ) {
+    return true;
+  }
+  const excludedIds = new Set();
+  if (typeof currentTabId === "number") {
+    excludedIds.add(currentTabId);
+  }
+  const remainingLearningTabs = await getActiveLearningTabs(excludedIds);
+  return remainingLearningTabs.length > 0;
+}
+
+async function showRewardOverlayWithRetry(tabId, attempt = 0) {
+  if (tabId === undefined || tabId === null) return;
+  try {
+    await browser.tabs.sendMessage(tabId, { action: "display: rewardOverlay" });
+    return;
+  } catch (_) { }
+
+  if (attempt >= 6) return;
+  setTimeout(() => {
+    showRewardOverlayWithRetry(tabId, attempt + 1).catch(() => { });
+  }, 150);
 }
 
 async function setPromptCooldown(tabId, url) {
@@ -432,88 +536,30 @@ async function messageLearningResource(details) {
 @async
 @description Gets currently active tab and sends message to the content script if it
 is a procrastination website. */
-async function checkActiveTab() {
+async function checkActiveTab(options = {}) {
+  const { ignorePromptCooldown = false } = options || {};
   try {
-    const tabs = await browser.tabs.query({
+    const redirectionToggled = await storage.redirection.get();
+    if (!redirectionToggled) return;
+
+    const [tab] = await browser.tabs.query({
       active: true,
       currentWindow: true,
     });
-    if (tabs.length > 0) {
-      const tab = tabs[0];
-      const tabSiteName = parseUrl(tab.url).name;
-      const procList = await storage.list.get();
-      const procListNames = procList.map((site) => site.name);
-      if (procListNames.includes(tabSiteName)) {
-        const learningUri = await storage.learningUri.get();
-        if (!learningUri) return; // no learning site set; do nothing
-
-        const procHosts = procList.map(item => item?.host || item?.name || "").filter(Boolean);
-        const handled = await strategy.handleNavigation(
-          { tabId: tab.id, url: tab.url },
-          { procrastinationHosts: procHosts, learningUrl: learningUri }
-        );
-        if (handled) return;
-
-        // Check if there's a valid learning session (same logic as checkTab)
-        const origin = await storage.origin.get();
-        let isOriginValid = false;
-        if (origin && origin.tabId !== undefined) {
-          try {
-            const originTab = await browser.tabs.get(origin.tabId);
-            if (originTab && learningUri) {
-              const learningName = parseUrl(learningUri).name;
-              if (learningName && originTab.url && originTab.url.includes(learningName)) {
-                isOriginValid = true;
-              }
-            }
-          } catch (_) {
-            // Tab doesn't exist - origin is stale
-          }
-
-          // Clear stale origin if tab no longer exists or isn't on learning site
-          if (!isOriginValid) {
-            await storage.origin.remove();
-            removeOriginUpdatedListener();
-            removeAllContentBlockers();
-            timer.stopBonusTime();
-            timer.stopLearningSession();
-          }
-        }
-
-        if (isOriginValid) {
-          // Show "Keep learning" blocker (active learning session exists)
-          renderContentBlocker({ tabId: tab.id, frameId: 0, url: tab.url });
-        } else {
-          // Show "Redirect to learning?" prompt (no active session)
-          addRedirectionLog(
-            `Interception: initiating countdown`,
-            tabSiteName,
-            parseUrl(learningUri).name,
-            {
-              eventType: "redirection_prompt",
-              action: "prompt_shown",
-              procrastinationUrl: tab.url,
-              learningUrl: learningUri,
-            }
-          );
-          promptRedirect(tab.id, learningUri, tab.url);
-        }
-      }
-    }
-  } catch (error) {
-    // console.log(error.message);
-  }
+    if (!tab) return;
+    await handleInterceptionForTab(tab, {
+      addPromptLog: true,
+      ignorePromptCooldown,
+    });
+  } catch (_) { }
 }
 
 async function checkTabById({ tabId }) {
   try {
     const tab = await browser.tabs.get(tabId);
-    checkTab(tab);
-  } catch (error) {
-    // console.log(error.message);
-  }
+    await checkTab(tab);
+  } catch (_) { }
 }
-// TODO: Rewrite these two functions ^ & v to 1 single function that checks if tab has url (if not, get it)
 
 /** #CHECKTAB()#
  * @async
@@ -525,44 +571,51 @@ async function checkTabById({ tabId }) {
  * @param {string} tab.url
  * @param {number} tab.id */
 async function checkTab(tab) {
-  const tabSiteName = parseUrl(tab.url).name;
+  await handleInterceptionForTab(tab);
+}
+
+async function handleInterceptionForTab(tab, options = {}) {
+  const { addPromptLog = false, ignorePromptCooldown = false } = options;
+  if (!tab || typeof tab.url !== "string" || tab.id === undefined) return;
+  if (!(await storage.redirection.get())) return;
+
   const procList = await storage.list.get();
-  const procListNames = procList.map((site) => site.name);
-  if (procListNames.includes(tabSiteName)) {
-    const origin = await storage.origin.get();
+  const procHosts = extractProcrastinationHosts(procList);
+  if (!siteDetector.isProcrastinationSite(tab.url, procHosts)) return;
+  const siteName = parseUrl(tab.url).name;
 
-    // Validate that the origin learning tab still exists before showing blocker
-    let isOriginValid = false;
-    if (origin && origin.tabId !== undefined) {
-      try {
-        const originTab = await browser.tabs.get(origin.tabId);
-        const learningUri = await storage.learningUri.get();
-        if (originTab && learningUri) {
-          const learningName = parseUrl(learningUri).name;
-          if (learningName && originTab.url && originTab.url.includes(learningName)) {
-            isOriginValid = true;
-          }
-        }
-      } catch (_) {
-        // Tab doesn't exist - origin is stale
-      }
+  const learningUri = await storage.learningUri.get();
+  if (!learningUri) return;
 
-      // Clear stale origin if tab no longer exists or isn't on learning site
-      if (!isOriginValid) {
-        await storage.origin.remove();
-        removeOriginUpdatedListener();
-        removeAllContentBlockers();
-        timer.stopBonusTime();
-        timer.stopLearningSession();
-      }
-    }
+  const handled = await handleUnifiedNavigation(tab.id, tab.url, procHosts, learningUri);
+  if (handled) return;
+  if (isControlled()) return;
 
-    if (isOriginValid) {
-      renderContentBlocker({ tabId: tab.id, frameId: 0, url: tab.url });
-    } else {
-      redirect({ frameId: 0, url: tab.url, tabId: tab.id });
-    }
+  if (!(await canInterceptNow())) return;
+
+  const { isValid: isOriginValid } = await validateOriginSession(learningUri);
+  if (isOriginValid) {
+    await renderContentBlocker({ tabId: tab.id, frameId: 0, url: tab.url });
+    return;
   }
+
+  if (!ignorePromptCooldown && (await shouldSkipPrompt(tab.id, tab.url))) return;
+
+  if (addPromptLog) {
+    await addRedirectionLog(
+      "Interception: initiating countdown",
+      siteName,
+      parseUrl(learningUri).name,
+      {
+        eventType: "redirection_prompt",
+        action: "prompt_shown",
+        procrastinationUrl: tab.url,
+        learningUrl: learningUri,
+      }
+    );
+  }
+
+  await promptRedirect(tab.id, learningUri, tab.url);
 }
 
 /** #GOTOORIGIN()#
@@ -575,35 +628,57 @@ async function checkTab(tab) {
 async function gotoOrigin(event, sourceContext = {}) {
   const normalizedEvent = event === "injected" ? "continue" : event;
 
+  const context =
+    sourceContext && typeof sourceContext === "object"
+      ? sourceContext
+      : { type: sourceContext };
+  const { type: sourceType, tabId: providedTabId, restoreAll } = context;
+
   // Handle controlled variant continue bypass via controlledMode
   if (isControlled() && normalizedEvent === "continue") {
     const origin = await storage.origin.get();
-    const targetTabId = sourceContext?.tabId || origin?.tabId;
+    const engineState = interventionEngine.getState();
+    const targetTabId =
+      providedTabId !== undefined
+        ? providedTabId
+        : engineState?.tabId !== undefined
+          ? engineState.tabId
+          : origin?.tabId;
 
-    if (targetTabId) {
-      await controlledMode.handleContinue(targetTabId);
+    // If continue is triggered from a different tab while another tab is
+    // actively in LEARNING, preserve that learning session and let the common
+    // tab restore flow handle only the active tab.
+    const preserveLearningSession =
+      engineState?.state === "learning" &&
+      typeof engineState.tabId === "number" &&
+      typeof targetTabId === "number" &&
+      targetTabId !== engineState.tabId;
+
+    if (preserveLearningSession) {
+      console.log("[Controlled] Continue on non-learning tab: preserving active learning session", {
+        targetTabId,
+        learningTabId: engineState.tabId,
+      });
     } else {
-      // Fallback: just cleanup
-      controlledMode.cleanup();
+      if (targetTabId !== undefined && targetTabId !== null) {
+        await interventionEngine.handleContinue(targetTabId);
+      } else {
+        // Fallback: just cleanup
+        interventionEngine.cleanup();
+      }
+
+      // Clear origin after continue when we intentionally transition out of learning.
+      await storage.origin.remove();
+
+      l("[Controlled] Continue handled by interventionEngine");
+      return; // Don't execute shared flow
     }
-
-    // Clear origin after continue
-    await storage.origin.remove();
-
-    l("[Controlled] Continue handled by controlledMode");
-    return; // Don't execute experimental continue logic
   }
 
   const statsHandler = storage.stats[normalizedEvent];
   if (typeof statsHandler === "function") {
     await statsHandler();
   }
-
-  const context =
-    sourceContext && typeof sourceContext === "object"
-      ? sourceContext
-      : { type: sourceContext };
-  const { type: sourceType, tabId: providedTabId, restoreAll } = context;
 
   const origin = await storage.origin.get();
   const blockedTabs = await storage.blockedTabs.get();
@@ -622,6 +697,15 @@ async function gotoOrigin(event, sourceContext = {}) {
       targetTabId = activeTab?.id;
     } catch (_) { }
   }
+  const targetSession =
+    targetTabId !== undefined ? await storage.activeSessions.get(targetTabId) : null;
+  const targetSessionOriginUrl =
+    targetSession &&
+      targetSession.sessionType === "learning" &&
+      typeof targetSession.procrastinationUrl === "string" &&
+      targetSession.procrastinationUrl
+      ? targetSession.procrastinationUrl
+      : null;
 
   console.log("[Aiki Debug] gotoOrigin called:", {
     event,
@@ -644,9 +728,14 @@ async function gotoOrigin(event, sourceContext = {}) {
     console.log("[Aiki Debug] No session to finalize - sessionTabId is undefined");
   }
 
+  // Experimental continue should always end the current learning cycle.
+  // Reset intervention engine state so the next accepted redirect starts a fresh session.
+  if (!isControlled() && normalizedEvent === "continue") {
+    interventionEngine.cleanup();
+  }
+
   removeOriginUpdatedListener();
   removeProcsiteLoadedListener();
-  await removeAllContentBlockers();
 
   if (origin && origin.tabId !== undefined) {
     try {
@@ -664,7 +753,15 @@ async function gotoOrigin(event, sourceContext = {}) {
     }
   }
 
-  storage.origin.remove();
+  const shouldClearOrigin =
+    !origin ||
+    origin.tabId === undefined ||
+    targetTabId === undefined ||
+    origin.tabId === targetTabId ||
+    shouldRestoreAllTabs;
+  if (shouldClearOrigin) {
+    storage.origin.remove();
+  }
 
   let destinationUrl = null;
 
@@ -680,29 +777,55 @@ async function gotoOrigin(event, sourceContext = {}) {
   } else if (targetTabId !== undefined) {
     const blockedOrigin = await storage.blockedOrigins.get(targetTabId);
     if (blockedOrigin) {
-      await removeContentBlocker(targetTabId);
       try {
         await browser.tabs.update(targetTabId, { url: blockedOrigin });
         destinationUrl = blockedOrigin;
         await setPromptCooldown(targetTabId, blockedOrigin);
         restoredTabIds.add(targetTabId);
+        await removeContentBlocker(targetTabId);
       } catch (error) {
         l(error);
       }
-    } else if (origin && origin.url) {
-
+    } else if (targetSessionOriginUrl) {
       try {
-        await browser.tabs.update(targetTabId, { url: origin.url });
-        destinationUrl = origin.url;
-        await setPromptCooldown(targetTabId, origin.url);
+        await browser.tabs.update(targetTabId, { url: targetSessionOriginUrl });
+        destinationUrl = targetSessionOriginUrl;
+        await setPromptCooldown(targetTabId, targetSessionOriginUrl);
         restoredTabIds.add(targetTabId);
       } catch (error) {
         l(error);
       }
+    } else if (origin && origin.url) {
+      if (origin.tabId === undefined || origin.tabId === targetTabId) {
+        try {
+          await browser.tabs.update(targetTabId, { url: origin.url });
+          destinationUrl = origin.url;
+          await setPromptCooldown(targetTabId, origin.url);
+          restoredTabIds.add(targetTabId);
+        } catch (error) {
+          l(error);
+        }
+      }
     }
   }
 
-  if (!destinationUrl && origin && origin.tabId !== undefined) {
+  if (!destinationUrl && targetTabId !== undefined && targetSessionOriginUrl) {
+    try {
+      await browser.tabs.update(targetTabId, { url: targetSessionOriginUrl });
+      destinationUrl = targetSessionOriginUrl;
+      await setPromptCooldown(targetTabId, targetSessionOriginUrl);
+      restoredTabIds.add(targetTabId);
+    } catch (error) {
+      l(error);
+    }
+  }
+
+  if (
+    !destinationUrl &&
+    origin &&
+    origin.tabId !== undefined &&
+    (targetTabId === undefined || origin.tabId === targetTabId)
+  ) {
     try {
       await browser.tabs.update(origin.tabId, { url: origin.url });
       destinationUrl = origin.url;
@@ -729,6 +852,12 @@ async function gotoOrigin(event, sourceContext = {}) {
           restoredTabIds.add(tabId);
         })
     );
+  } else if (
+    targetTabId !== undefined &&
+    blockedTabIds.includes(targetTabId) &&
+    !restoredTabIds.has(targetTabId)
+  ) {
+    await removeContentBlocker(targetTabId);
   }
 
   const remainingLearningTabs = await getActiveLearningTabs(restoredTabIds);
@@ -762,19 +891,16 @@ async function gotoOrigin(event, sourceContext = {}) {
   }
 
   const redirectionToggled = await storage.redirection.get();
-  if (redirectionToggled && !hasRemainingLearningTabs) {
-    // Read reward time from controlledTimerSettings (unified for both variants)
-    const rewardMinutes = await storage.controlledTimerSettings.rewardMinutes.get();
-    const rewardSeconds = await storage.controlledTimerSettings.rewardSeconds.get();
-    let rewardTime = (rewardMinutes * 60 + rewardSeconds) * 1000;
-
-    if (rewardTime <= 0) {
-      // Provide a short grace period so the skip/continue action actually unlocks the site.
-      rewardTime = 60 * 1000;
-    }
-
+  const goalCompleted = await isDailyGoalCompleted();
+  if (redirectionToggled && !hasRemainingLearningTabs && !goalCompleted) {
+    const rewardTime = await getRewardDurationMs();
     await storage.shouldRedirect.set(false);
-    await timer.startProcrastinationSession(checkActiveTab, rewardTime);
+    await timer.startProcrastinationSession(
+      () => checkActiveTab({ ignorePromptCooldown: true }),
+      rewardTime
+    );
+  } else if (goalCompleted) {
+    await storage.shouldRedirect.set(false);
   } else if (hasRemainingLearningTabs) {
     await storage.shouldRedirect.set(true);
   }
@@ -783,6 +909,14 @@ async function gotoOrigin(event, sourceContext = {}) {
 async function promptRedirect(tabId, url, originUrl) {
   await promptCoordinator.promptRedirect(tabId, url, originUrl, {
     onContinue: async () => {
+      if (!isControlled()) {
+        // Preserve an existing learning session in other tabs so a decline in this tab
+        // can run reward time without tearing down the active learning context.
+        const preserveLearningState = await shouldPreserveLearningStateOnStay(tabId);
+        if (!preserveLearningState) {
+          interventionEngine.cleanup();
+        }
+      }
       // Set prompt lock now that user has explicitly clicked Stay
       // This prevents the prompt from appearing again for 2 minutes
       const hostName = parseUrl(originUrl).name;
@@ -794,26 +928,19 @@ async function promptRedirect(tabId, url, originUrl) {
       await SessionService.startSession(tabId, "procrastination", originUrl);
       await logDeclinedIntervention(originUrl, url);
 
-      // Start the reward timer (this sets rewardUnlockAt for the overlay to track)
-      // Read from controlledTimerSettings (unified for both variants)
-      const rewardMinutes = await storage.controlledTimerSettings.rewardMinutes.get();
-      const rewardSeconds = await storage.controlledTimerSettings.rewardSeconds.get();
-      let rewardTime = (rewardMinutes * 60 + rewardSeconds) * 1000;
-      if (rewardTime <= 0) {
-        rewardTime = 60 * 1000; // Default 1 minute if not set
-      }
+      const rewardTime = await getRewardDurationMs();
       await storage.shouldRedirect.set(false);
-      await timer.startProcrastinationSession(checkActiveTab, rewardTime);
+      await timer.startProcrastinationSession(
+        () => checkActiveTab({ ignorePromptCooldown: true }),
+        rewardTime
+      );
 
       // Show reward progress bar (same as controlled variant)
-      try {
-        await browser.tabs.sendMessage(tabId, { action: "display: rewardOverlay" });
-      } catch (_) { }
+      await showRewardOverlayWithRetry(tabId);
     },
     onAccept: async () => {
       addLearningSiteLoadedListener();
       navigationGuards.install();
-      await SessionService.startSession(tabId, "learning", url, originUrl);
       await logEvent({
         participantId: await storage.uid.get(),
         eventType: "experimental_redirection",
@@ -822,23 +949,54 @@ async function promptRedirect(tabId, url, originUrl) {
         eventData: "accept",
       });
 
-      // Use controlledMode to handle learning session (same as controlled variant)
-      // This provides: session countdown, claim reward button, redirect to procrastination
       const procList = await storage.list.get();
-      const procHosts = (procList || []).map(item => item?.host || item?.name || "").filter(Boolean);
-      await controlledMode.handleNavigation(tabId, originUrl, procHosts, url);
+      const procHosts = extractProcrastinationHosts(procList);
+      await interventionEngine.handleNavigation(tabId, originUrl, procHosts, url);
 
       await storage.promptLocks.remove(tabId);
       try {
         scheduleRevealOnLoad(tabId);
-        await browser.tabs.update(tabId, {
-          url: url,
-        });
       } catch (error) {
         l(error);
       }
     },
   });
+}
+
+async function handleBlockerRelease(tabId, tabUrl = "") {
+  if (isControlled()) {
+    await removeContentBlocker(tabId);
+    return;
+  }
+
+  await removeContentBlocker(tabId);
+
+  let currentUrl = typeof tabUrl === "string" ? tabUrl : "";
+  if (!currentUrl && typeof tabId === "number") {
+    try {
+      const tab = await browser.tabs.get(tabId);
+      currentUrl = typeof tab?.url === "string" ? tab.url : "";
+    } catch (_) { }
+  }
+  if (!currentUrl) return;
+
+  const rewardTime = await getRewardDurationMs();
+  await storage.shouldRedirect.set(false);
+  await SessionService.startSession(tabId, "procrastination", currentUrl);
+  await timer.startProcrastinationSession(
+    () => checkActiveTab({ ignorePromptCooldown: true }),
+    rewardTime
+  );
+  await setPromptCooldown(tabId, currentUrl);
+
+  try {
+    const learningUrl = await storage.learningUri.get();
+    if (learningUrl) {
+      await logDeclinedIntervention(currentUrl, learningUrl);
+    }
+  } catch (_) { }
+
+  await showRewardOverlayWithRetry(tabId);
 }
 
 async function addRedirectionLog(event, from, to, details = {}) {
@@ -929,6 +1087,7 @@ export default {
     restart: restartWindowChangeListener,
   },
   gotoOrigin,
+  handleBlockerRelease,
   addOriginTabCloseListener,
   removeLearningSiteLoadedListener,
   checkActiveTab,

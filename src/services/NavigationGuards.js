@@ -2,6 +2,7 @@ import browser from "webextension-polyfill";
 import SessionService from "./SessionService";
 import siteDetector from "./siteDetector";
 import storage from "../util/storage";
+import interventionEngine from "../interventionEngine";
 
 /**
  * NavigationGuards centralizes tab/window listeners and delegates session handling.
@@ -11,8 +12,8 @@ import storage from "../util/storage";
  * - onLearningSiteNavigation?(details): optional async hook
  */
 class NavigationGuards {
-  constructor(strategy) {
-    this.strategy = strategy;
+  constructor(strategy = null) {
+    this.strategy = strategy; // Optional for backward compatibility
     this.lastActiveTabByWindow = new Map();
     this.procrastinationGuardsRegistered = false;
     this.onActivatedHandler = null;
@@ -111,16 +112,16 @@ class NavigationGuards {
     }
   }
 
-  scheduleRevealOnLoad(tabId) {
-    // No-op: preemptive hide removed
+  scheduleRevealOnLoad() {
+    // No-op: this hook is retained for prompt rendering compatibility.
   }
 
-  async applyPreemptiveHide(tabId) {
-    // No-op: preemptive hide removed
+  async applyPreemptiveHide() {
+    // No-op: preemptive hiding is intentionally disabled.
   }
 
-  async removePreemptiveHide(tabId) {
-    // No-op: preemptive hide removed
+  async removePreemptiveHide() {
+    // No-op: preemptive hiding is intentionally disabled.
   }
 
   async hideImmediatePrompt(tabId) {
@@ -162,12 +163,10 @@ class NavigationGuards {
     browser.tabs.onActivated.addListener(this.onActivatedHandler);
 
     this.onRemovedHandler = async (tabId, removeInfo) => {
-      if (this.strategy?.handleTabClose) {
-        await this.strategy.handleTabClose(tabId);
-      } else {
-        await SessionService.finalizeSession(tabId, "procrastination", "tab_closed");
-        await SessionService.finalizeSession(tabId, "learning", "tab_closed");
-      }
+      // Use interventionEngine for unified tab close handling
+      await interventionEngine.handleTabClose(tabId);
+      await SessionService.finalizeSession(tabId, "procrastination", "tab_closed");
+      await SessionService.finalizeSession(tabId, "learning", "tab_closed");
 
       if (removeInfo?.windowId !== undefined) {
         const tracked = this.lastActiveTabByWindow.get(removeInfo.windowId);
@@ -191,8 +190,18 @@ class NavigationGuards {
     this.onCommittedHandler = async (details) => {
       if (details.frameId !== 0) return;
       await this.hideImmediatePrompt(details.tabId);
-      if (this.strategy?.onLearningSiteNavigation && details.url) {
-        await this.strategy.onLearningSiteNavigation(details);
+
+      // Handle learning site navigation via interventionEngine
+      if (details.url) {
+        const toggled = await storage.redirection.get();
+        if (toggled) {
+          const procList = await storage.list.get();
+          const procHosts = (procList || []).map((item) => item?.host || item?.name || "").filter(Boolean);
+          const learningUrl = await storage.learningUri.get();
+          if (learningUrl && siteDetector.isLearningSite(details.url, learningUrl)) {
+            await interventionEngine.handleNavigation(details.tabId, details.url, procHosts, learningUrl);
+          }
+        }
       }
     };
     browser.webNavigation.onCommitted.addListener(this.onCommittedHandler);

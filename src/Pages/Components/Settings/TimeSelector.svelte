@@ -68,7 +68,7 @@
       const participantId = user || (await storage.uid.get());
       await saveUserPreferences({
         participantId,
-        session_duration_minutes: totalMinutes,
+        learning_time_minutes: totalMinutes,
       });
       await logEvent({
         participantId,

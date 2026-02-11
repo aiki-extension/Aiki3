@@ -3,22 +3,8 @@
   Used in / Parent components: /src/Pages/Popup.svelte
  -->
 <script>
-  import { AIKI_VARIANT } from "../../../util/variant";
-
-  export let learningTimeRemaining = 0;
   export let dailyGoal = 0;
   export let dailyProgress = 0;
-  
-  // Controlled variant props
-  export let controlledState = "idle";
-  export let controlledLearningRemaining = 0;
-  export let controlledLearningGoal = 0;
-  export let controlledLearningElapsed = 0;
-  export let controlledLearningCompleted = false;
-  export let controlledRewardRemaining = 0;
-  export let controlledRewardGoal = 0;
-
-  const isControlled = AIKI_VARIANT === "controlled";
 
   function formatDuration(milliseconds) {
     if (!milliseconds || milliseconds <= 0) return "0m 0s";
@@ -28,30 +14,14 @@
     return `${minutes}m ${seconds}s`;
   }
 
-  // Experimental variant values
-  $: remainingLabel = formatDuration(learningTimeRemaining);
+  // Daily goal progress values
+  $: remainingDaily = Math.max(dailyGoal - dailyProgress, 0);
+  $: remainingLabel = formatDuration(remainingDaily);
   $: goalLabel = formatDuration(dailyGoal);
   $: progressLabel = formatDuration(dailyProgress);
   $: clampedGoal = dailyGoal > 0 ? dailyGoal : 0;
   $: percent = clampedGoal > 0
     ? Math.min(100, Math.round((dailyProgress / clampedGoal) * 100))
-    : 0;
-
-  // Controlled variant computed values
-  $: isLearning = isControlled && controlledState === "learning";
-  $: isReward = isControlled && controlledState === "reward";
-  $: isIdle = isControlled && controlledState === "idle";
-  
-  // Learning session values
-  $: learningProgress = controlledLearningGoal - controlledLearningRemaining;
-  $: learningPercent = controlledLearningGoal > 0 
-    ? Math.min(100, Math.round((learningProgress / controlledLearningGoal) * 100)) 
-    : 0;
-  
-  // Reward session values
-  $: rewardProgress = controlledRewardGoal - controlledRewardRemaining;
-  $: rewardPercent = controlledRewardGoal > 0 
-    ? Math.min(100, Math.round((rewardProgress / controlledRewardGoal) * 100)) 
     : 0;
 </script>
 
@@ -112,14 +82,6 @@
     color: #22c55e;
   }
 
-  p.reward {
-    color: var(--textColor);
-  }
-
-  p.idle {
-    color: var(--textColorSecondary, rgba(100, 100, 100, 0.7));
-  }
-
   .progress {
     width: 100%;
     height: 8px;
@@ -136,10 +98,6 @@
   }
 
   .progress-bar.learning-bar {
-    background: var(--progressBarFill, #22c55e);
-  }
-
-  .progress-bar.reward-bar {
     background: var(--progressBarFill, #22c55e);
   }
 

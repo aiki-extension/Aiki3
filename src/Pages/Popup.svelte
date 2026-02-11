@@ -1,15 +1,13 @@
 <!-- 
   This popup is displayed when the user clicks on the extension icon on the toolbar.
-  Used in / Parent components: /src/App.svelte
+  Used in / Entry: /src/main.js
  -->
 <script>
   /* Functional and module imports */
+  import { onDestroy } from "svelte";
   import { parseUrl } from "../util/utilities";
   import storage from "../util/storage";
   import browser from "webextension-polyfill";
-  import { AIKI_VARIANT } from "../util/variant";
-
-  const isControlled = AIKI_VARIANT === "controlled";
 
   /* Components import */
   import Header from "./Components/Popup/Header.svelte";
@@ -19,12 +17,12 @@
   import LearningTimeLeft from "./Components/Popup/LearningTimeLeft.svelte";
 
   const port = browser.runtime.connect({
-  name: "Popup Communication",
+    name: "Popup Communication",
   });
+  let timerPollInterval = null;
 
   let siteName = "";
   let origin = {};
-  let isOnLearningSite = false;
 
   let timeValues = new Promise((resolve) => {});
 
@@ -33,40 +31,37 @@
       resolve(res);
     });
   }
-  port.onMessage.addListener(function (msg) {
+  const onPortMessage = function (msg) {
     sync(msg);
-  });
-  try {
-    port.postMessage("get: timer");
-  } catch (error) {
-    console.error(error);
-  }
+  };
+  port.onMessage.addListener(onPortMessage);
 
-  setInterval(() => {
+  function requestTimerUpdate() {
     try {
       port.postMessage("get: timer");
     } catch (error) {
       console.error(error);
     }
-  }, 1000);
-
-  async function checkIfOnLearningSite() {
-    try {
-      const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
-      if (!activeTab?.url) return false;
-      const learningUri = await storage.learningUri.get();
-      if (!learningUri) return false;
-      const learningName = parseUrl(learningUri).name;
-      if (!learningName) return false;
-      return activeTab.url.includes(learningName);
-    } catch (_) {
-      return false;
-    }
   }
+
+  requestTimerUpdate();
+  timerPollInterval = setInterval(requestTimerUpdate, 1000);
+
+  onDestroy(() => {
+    if (timerPollInterval) {
+      clearInterval(timerPollInterval);
+      timerPollInterval = null;
+    }
+    try {
+      port.onMessage.removeListener(onPortMessage);
+    } catch (_) { }
+    try {
+      port.disconnect();
+    } catch (_) { }
+  });
 
   async function setup() {
     origin = await storage.origin.get();
-    isOnLearningSite = await checkIfOnLearningSite();
   }
 
   $: if (origin) {
@@ -99,25 +94,17 @@
   <Header />
   <SettingsButton />
   <hr />
-  <ToggleRedirection {port} />
+  <ToggleRedirection />
   <hr />
   {#await timeValues}
     LOADING
   {:then values}
     <LearningTimeLeft
-      learningTimeRemaining={values.learningTimeRemaining}
       dailyGoal={values.dailyGoal}
       dailyProgress={values.dailyProgress}
-      controlledState={values.controlledState || "idle"}
-      controlledLearningRemaining={values.controlledLearningRemaining || 0}
-      controlledLearningGoal={values.controlledLearningGoal || 0}
-      controlledLearningElapsed={values.controlledLearningElapsed || 0}
-      controlledLearningCompleted={values.controlledLearningCompleted || false}
-      controlledRewardRemaining={values.controlledRewardRemaining || 0}
-      controlledRewardGoal={values.controlledRewardGoal || 0}
     />
     <hr />
-    {#if siteName !== "" || isOnLearningSite || (isControlled && values.controlledState === "learning")}
+    {#if siteName !== "" || (values.controlledState === "learning" && values.controlledProcrastinationUrl)}
       <div class="container">
         <ContinueButton {gotoOrigin} />
       </div>
