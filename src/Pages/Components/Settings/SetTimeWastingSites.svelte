@@ -147,18 +147,14 @@
   }
 </script>
 
+<!-- Header element for describing the set time wasting sites-->
 <Container id="site-input-container" headline="Set Time Wasting Sites">
   <h5>Add your Time Wasting Sites here:</h5>
   <hr />
-  <p>
-    Type in pages you feel like you spend a little too much time on here (e.g:
-    www.facebook.com, www.reddit.com, 9gag.com).
-  </p>
-  <p>
-    <strong>NB:</strong> You can still visit these websites, Aiki will just be logging
-    the amount of time you spend on them.
-  </p>
+  <p>Type in pages you feel like you spend a little too much time on here (e.g: www.facebook.com, www.reddit.com, 9gag.com).</p>
+  <p><strong>NB:</strong> You can still visit these websites, Aiki will just be logging the amount of time you spend on them.</p>
 
+  <!-- This is the button element for addding procrastination Sites-->
   <form on:submit|preventDefault={addItem}>
     <div data-tooltip="Add to your list of procrastination sites">
       <div class="input-group mb-3">
@@ -170,11 +166,19 @@
           placeholder="Enter a time wasting site here..."
           aria-label=""
           aria-describedby="basic-addon2"
+          list="common-sites"
         />
+
+      <datalist id="common-sites">
+        {#each commonSites as site}
+          <option value={site}></option>
+        {/each}
+      </datalist>
+        
         <div class="input-group-append">
-          <button id="add-button" class="btn btn-primary" type="submit"
-            ><Fa icon={faPlusCircle} /> Add Site</button
-          >
+          <button id="add-button" class="btn btn-primary" type="submit">
+            <Fa icon={faPlusCircle} /> Add Site
+          </button>
         </div>
       </div>
     </div>
@@ -209,8 +213,7 @@
             <td style="text-align: center">
               <div
                 data-tooltip="Remove this site from the list."
-                on:click={() => removeItem(index)}
-              >
+                on:click={() => removeItem(index)}>
                 <Fa icon={faTimes} primaryColor="red" />
               </div>
             </td>
