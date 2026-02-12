@@ -15,9 +15,11 @@
   export let user;
 </script>
 
-<h5>Learning Settings:</h5>
+<h5>Redirection Settings:</h5>
 <p>
-  Configure your daily goal, session duration, and reward time.
+	•	Daily goal (total time you aim to spend on the redirected site each day)<br>
+	•	Session duration (time per learning session)<br>
+	•	Reward time (time allowed on the procrastination site)<br>
 </p>
 {#await timeSettings}
   LOADING...

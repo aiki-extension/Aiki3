@@ -135,22 +135,57 @@ class TimerManager {
    */
   extendTimer(type, durationMs) {
     const timer = this.timers[type];
-    if (!timer || type !== "reward") return false;
-
-    timer.remaining += durationMs;
-    timer.goal += durationMs;
-    console.log(`[Timer] Extended ${type} timer by ${durationMs / 1000}s`);
-
-    // Restart interval if it was stopped
-    if (!timer.intervalRef && timer.remaining > 0) {
-      console.log(`[Timer] Restarting ${type} timer interval`);
-      timer.intervalRef = setInterval(() => {
-        this._decrementReward().catch(() => { });
-      }, 1000);
+    if (!timer || type !== "reward" || !Number.isFinite(durationMs) || durationMs <= 0) {
+      return false;
     }
 
-    this._persistState();
-    return true;
+    const now = Date.now();
+    const hasUnifiedReward =
+      timer.remaining > 0 ||
+      (timer.goal > 0 && Boolean(timer.intervalRef));
+
+    // Experimental reward windows are driven by rewardUnlockAt/shouldRedirect.
+    // Keep those in sync so prompt gating does not reopen while snoozed.
+    const legacyRemaining = Math.max(
+      0,
+      typeof this.rewardUnlockAt === "number" ? this.rewardUnlockAt - now : 0,
+      typeof this.rewardTimeRemaining === "number" ? this.rewardTimeRemaining : 0
+    );
+    const hasLegacyReward = legacyRemaining > 0;
+
+    if (hasUnifiedReward) {
+      timer.remaining += durationMs;
+      timer.goal += durationMs;
+      this.rewardTimeRemaining = timer.remaining;
+      this.rewardUnlockAt = now + timer.remaining;
+      storage.rewardUnlock.set(this.rewardUnlockAt).catch(() => { });
+      console.log(`[Timer] Extended ${type} timer by ${durationMs / 1000}s (unified)`);
+
+      // Restart interval if it was stopped
+      if (!timer.intervalRef && timer.remaining > 0) {
+        console.log(`[Timer] Restarting ${type} timer interval`);
+        timer.intervalRef = setInterval(() => {
+          this._decrementReward().catch(() => { });
+        }, 1000);
+      }
+
+      this._persistState();
+      return true;
+    }
+
+    if (hasLegacyReward) {
+      const nextRemaining = legacyRemaining + durationMs;
+      this.rewardTimeRemaining = nextRemaining;
+      this.rewardUnlockAt = now + nextRemaining;
+      this.lastRewardExpirySignal = 0;
+      storage.rewardUnlock.set(this.rewardUnlockAt).catch(() => { });
+      storage.shouldRedirect.set(false).catch(() => { });
+      console.log(`[Timer] Extended ${type} timer by ${durationMs / 1000}s (legacy)`);
+      this._persistState();
+      return true;
+    }
+
+    return false;
   }
 
   // ============================================

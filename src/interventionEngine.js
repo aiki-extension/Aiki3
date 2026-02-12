@@ -430,26 +430,26 @@ export function cleanup() {
 
 /**
  * Snooze the reward timer by adding 1 minute.
- * Works when in REWARD state, or in IDLE state for experimental variant
- * (when prompt was shown but user wants to dismiss and continue procrastinating).
+ * Controlled variant: only valid while in REWARD state.
+ * Experimental variant: extends the active reward window if one exists.
  */
 export function snoozeReward() {
   console.log("[ControlledMode] snoozeReward called", { state: currentState });
 
-  if (currentState === State.IDLE && !isControlled()) {
-    console.log("[ControlledMode] Experimental: restoring REWARD state from IDLE");
-    currentState = State.REWARD;
-    persistState().catch(() => { });
-  }
+  const inControlled = isControlled();
 
-  if (currentState !== State.REWARD) {
+  if (inControlled && currentState !== State.REWARD) {
     console.log("[ControlledMode] Not in REWARD state, cannot snooze");
     return false;
   }
 
   // Add 1 minute (60000ms) to the reward timer
   const SNOOZE_DURATION = 60 * 1000; // 1 minute
-  timer.extendTimer("reward", SNOOZE_DURATION);
+  const success = timer.extendTimer("reward", SNOOZE_DURATION);
+  if (!success) {
+    console.log("[ControlledMode] No active reward timer found, cannot snooze");
+    return false;
+  }
 
   // Log the snooze
   SessionService.logEventAsync("reward_snoozed", {
