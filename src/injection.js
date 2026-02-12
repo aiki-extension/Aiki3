@@ -55,11 +55,71 @@ const makeDraggable = (element) => {
     startY: 0,
     currentX: 0,
     currentY: 0,
-    intendedX: 0,  // Track where user actually dragged to
+    intendedX: 0,
     intendedY: 0
   };
 
-  // Initialize position based on current location
+  // Determine which corner to snap to based on position
+  const getNearestCorner = () => {
+    const rect = element.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    
+    return {
+      horizontal: centerX > window.innerWidth / 2 ? 'right' : 'left',
+      vertical: centerY > window.innerHeight / 2 ? 'bottom' : 'top'
+    };
+  };
+
+  // Snap position to nearest corner
+  const snapToCorner = () => {
+    const corner = getNearestCorner();
+    const rect = element.getBoundingClientRect();
+    const margin = 24; // Corner margin
+    
+    let x, y;
+    
+    if (corner.horizontal === 'right') {
+      x = window.innerWidth - rect.width - margin;
+    } else {
+      x = margin;
+    }
+    
+    if (corner.vertical === 'bottom') {
+      y = window.innerHeight - rect.height - margin;
+    } else {
+      y = margin;
+    }
+    
+    return { x, y, corner };
+  };
+
+  // Apply position using corner anchors
+  const applyPosition = (x, y, corner) => {
+    const rect = element.getBoundingClientRect();
+    
+    // Clear all position properties first
+    element.style.left = '';
+    element.style.right = '';
+    element.style.top = '';
+    element.style.bottom = '';
+    
+    // Apply appropriate corner anchors
+    if (corner.horizontal === 'right') {
+      const rightOffset = window.innerWidth - x - rect.width;
+      element.style.right = `${rightOffset}px`;
+    } else {
+      element.style.left = `${x}px`;
+    }
+    
+    if (corner.vertical === 'bottom') {
+      const bottomOffset = window.innerHeight - y - rect.height;
+      element.style.bottom = `${bottomOffset}px`;
+    } else {
+      element.style.top = `${y}px`;
+    }
+  };
+
   const initializePosition = () => {
     const rect = element.getBoundingClientRect();
     dragState.currentX = rect.left;
@@ -67,56 +127,61 @@ const makeDraggable = (element) => {
     dragState.intendedX = rect.left;
     dragState.intendedY = rect.top;
     
-    // Set initial positioning
     element.style.position = 'fixed';
-    element.style.left = `${dragState.currentX}px`;
-    element.style.top = `${dragState.currentY}px`;
-    element.style.transform = 'none'; // Clear any transform
+    element.style.transform = 'none';
+    
+    // Snap to nearest corner on init
+    const { x, y, corner } = snapToCorner();
+    dragState.currentX = x;
+    dragState.currentY = y;
+    dragState.intendedX = x;
+    dragState.intendedY = y;
+    applyPosition(x, y, corner);
   };
 
-  const constrainToBounds = (x, y) => {
+  const updatePosition = (intendedX, intendedY) => {
+    // During drag, allow free movement but constrain to bounds
     const rect = element.getBoundingClientRect();
-    const margin = 0;
+    const margin = 24;
     
     const minX = margin;
     const minY = margin;
     const maxX = window.innerWidth - rect.width - margin;
     const maxY = window.innerHeight - rect.height - margin;
     
-    return {
-      x: Math.max(minX, Math.min(maxX, x)),
-      y: Math.max(minY, Math.min(maxY, y))
-    };
+    const x = Math.max(minX, Math.min(maxX, intendedX));
+    const y = Math.max(minY, Math.min(maxY, intendedY));
+    
+    dragState.currentX = x;
+    dragState.currentY = y;
+    
+    const corner = getNearestCorner();
+    applyPosition(x, y, corner);
   };
 
-  const updatePosition = (intendedX, intendedY) => {
-    // Always constrain based on intended position
-    const constrained = constrainToBounds(intendedX, intendedY);
-    dragState.currentX = constrained.x;
-    dragState.currentY = constrained.y;
-    element.style.left = `${dragState.currentX}px`;
-    element.style.top = `${dragState.currentY}px`;
-    console.log("Position: ", { intendedX, intendedY, constrained });
-  };
-
-  // Method to sync intended position with current actual position
   const syncIntendedPosition = () => {
-    const rect = element.getBoundingClientRect();
-    dragState.intendedX = rect.left;
-    dragState.intendedY = rect.top;
-    dragState.currentX = rect.left;
-    dragState.currentY = rect.top;
+    // Snap to nearest corner when size changes
+    const { x, y, corner } = snapToCorner();
+    dragState.intendedX = x;
+    dragState.intendedY = y;
+    dragState.currentX = x;
+    dragState.currentY = y;
+    applyPosition(x, y, corner);
   };
 
   const onResize = () => {
-    // Re-constrain based on intended position, not current position
-    updatePosition(dragState.intendedX, dragState.intendedY);
+    // Snap to corner on resize
+    const { x, y, corner } = snapToCorner();
+    dragState.intendedX = x;
+    dragState.intendedY = y;
+    dragState.currentX = x;
+    dragState.currentY = y;
+    applyPosition(x, y, corner);
   };
 
   const onPointerDown = (event) => {
     if (event.button !== undefined && event.button !== 0) return;
     
-    // Don't start draggin if clicking on a button or interactive element inside the panel
     if (event.target.tagName === 'BUTTON' || event.target.closest('button')) {
       return;
     }
@@ -137,7 +202,6 @@ const makeDraggable = (element) => {
     const dx = event.clientX - dragState.startX;
     const dy = event.clientY - dragState.startY;
     
-    // Update intended position (where user is dragging to)
     dragState.intendedX += dx;
     dragState.intendedY += dy;
     dragState.startX = event.clientX;
@@ -155,12 +219,19 @@ const makeDraggable = (element) => {
     dragState.dragging = false;
     element.style.cursor = "grab";
     
+    // Snap to nearest corner when drag ends
+    const { x, y, corner } = snapToCorner();
+    dragState.intendedX = x;
+    dragState.intendedY = y;
+    dragState.currentX = x;
+    dragState.currentY = y;
+    applyPosition(x, y, corner);
+    
     if (event.pointerId !== undefined) {
       element.releasePointerCapture(event.pointerId);
     }
   };
 
-  // Initialize position
   initializePosition();
   
   element.style.cursor = "grab";
@@ -181,6 +252,7 @@ const makeDraggable = (element) => {
     syncIntendedPosition
   };
 };
+
 /**
  * Create a timer communication port with polling.
  * @param {(msg: any) => void} updateCallback - Function to call on each timer update
