@@ -8,23 +8,13 @@
   import { faPowerOff } from "@fortawesome/free-solid-svg-icons";
   import storage from "../../../util/storage";
 
-  export let port;
   let toggled = storage.redirection.get();
 
-  function toggleRedirection() {
-    storage.redirection.toggle();
-    toggled = !toggled;
-    try {
-      if (!toggled) {
-        port.postMessage("goto: off");
-        location.reload();
-      } else {
-        port.postMessage("goto: on");
-        location.reload();
-      }
-    } catch (error) {
-      console.error(error);
-    }
+  async function toggleRedirection() {
+    const wasOn = await storage.redirection.get();
+    const isNowOn = !wasOn;
+    await storage.redirection.set(isNowOn);
+    toggled = Promise.resolve(isNowOn);
   }
 </script>
 

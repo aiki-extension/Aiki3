@@ -1,41 +1,54 @@
 import browser from "webextension-polyfill";
 import storage from "./util/storage";
-import firebase from "./util/firebase";
-import { parseUrl, makeDate } from "./util/utilities";
-import { learningSites } from "./util/constants";
+import { parseUrl } from "./util/utilities";
 
-let list;
-let user;
+let list = [];
+let user = null;
+let learningName = null;
 let data = {
   chromeActive: 0,
   chromeInactive: 0,
 };
-let counterId;
-let loggerId;
+let counterId = null;
+let loggerId = null;
 
-function intervalSetup() {
-  syncUser();
-  syncList();
+async function intervalSetup() {
+  await Promise.all([syncUser(), syncList(), syncLearningSite()]);
   startCounter();
   startLogger();
   addOnWindowsCloseListener();
 }
 
+async function syncLearningSite() {
+  const learningUri = await storage.learningUri.get();
+  learningName = learningUri ? parseUrl(learningUri).name : null;
+}
+
 async function counter() {
-  const window = await browser.windows.getCurrent();
-  const views = chrome.extension.getViews({ type: "popup" });
-  if (window.focused || views.length > 0) {
+  const currentWindow = await browser.windows.getCurrent();
+
+  const views =
+    typeof chrome !== "undefined" && chrome.runtime?.getViews
+      ? chrome.runtime.getViews({ type: "popup" })
+      : [];
+
+  if (currentWindow.focused || views.length > 0) {
     data.chromeActive++;
-    const result = await browser.tabs.query({
+
+    const [activeTab] = await browser.tabs.query({
       active: true,
       currentWindow: true,
     });
-    const name = parseUrl(result[0].url).name;
-    if (
-      list.includes(name) ||
-      learningSites.find((site) => site.name === name) !== undefined
-    ) {
-      data[name] = data[name] ? data[name] + 1 : 1;
+
+    if (!activeTab || !activeTab.url) return;
+
+    const { name } = parseUrl(activeTab.url);
+
+    const isProcrastinationSite = list.includes(name);
+    const isLearningSite = learningName && name === learningName;
+
+    if (isProcrastinationSite || isLearningSite) {
+      data[name] = (data[name] ?? 0) + 1;
     }
   } else {
     data.chromeInactive++;
@@ -43,7 +56,8 @@ async function counter() {
 }
 
 function logger() {
-  storeData(data);
+  const snapshot = { ...data };
+  storeData(snapshot);
   resetData();
 }
 
@@ -71,7 +85,8 @@ async function restartCounter() {
 
 async function restartLogger() {
   stopLogger();
-  storeData(data);
+  const snapshot = { ...data };
+  storeData(snapshot);
   resetData();
   await syncUser();
   startLogger();
@@ -87,12 +102,12 @@ async function syncList() {
   list = result ? result.map((item) => item.name) : [];
 }
 
-function storeData(data) {
-  if (user) {
-    storage.stats.storeSession(data);
-    const entry = { data: data, user: user, date: makeDate() };
-    firebase.addLog(entry, "session");
-  }
+function storeData(snapshot) {
+  if (!user) return;
+
+  // Store locally for stats/badge display only
+  // Session logging is handled by redirection.js on tab switch/close
+  storage.stats.storeSession(snapshot);
 }
 
 function resetData() {
@@ -103,8 +118,9 @@ function resetData() {
 }
 
 function addOnWindowsCloseListener() {
-  browser.windows.onRemoved.addListener((details) => {
-    storeData(data);
+  browser.windows.onRemoved.addListener(() => {
+    const snapshot = { ...data };
+    storeData(snapshot);
     resetData();
   });
 }

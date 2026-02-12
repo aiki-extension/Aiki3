@@ -4,10 +4,9 @@
  -->
 <script>
   import storage from "../../../util/storage";
-  import firebase from "../../../util/firebase";
-  import { makeDate } from "../../../util/utilities";
+  import { saveUserPreferences } from "../../../util/logger";
 
-  let hourOptions = Array.from({ length: 25 }, (_, i) => i);
+  let hourOptions = Array.from({ length: 24 }, (_, i) => i);
   let minuteOptions = [0, 15, 30, 45];
 
   export let settings;
@@ -21,51 +20,42 @@
     return number < 10 ? `0${number}` : number;
   }
 
-  function setActiveTo() {
+  async function setActiveTo() {
     const setting = { hrs: hrsTo, min: minTo };
-    storage.operatingHours.to.set(setting);
-    firebase.addLog(
-      {
-        user: user,
-        event: "User changed operating hours in settings",
-        operatingHoursTo: setting,
-        date: makeDate(),
-      },
-      "config"
-    );
-    update();
-  }
-
-  function setActiveFrom() {
-    if (hrsTo < hrsFrom) {
-      hrsTo = hrsFrom === 24 ? hrsFrom : hrsFrom + 1;
-
-      storage.operatingHours.from.set({ hrs: hrsTo, min: minTo });
+    await storage.operatingHours.to.set(setting);
+    try {
+      const participantId = user || (await storage.uid.get());
+      const startMinutes = hrsFrom * 60 + minFrom;
+      const endMinutes = hrsTo * 60 + minTo;
+      await saveUserPreferences({
+        participantId,
+        operating_hours_start: startMinutes,
+        operating_hours_end: endMinutes,
+      });
+    } catch (e) {
+      console.warn("Failed to sync operating hours preference", e);
     }
-    const setting = { hrs: hrsFrom, min: minFrom };
-    storage.operatingHours.from.set(setting);
-    firebase.addLog(
-      {
-        user: user,
-        event: "User changed operating hours in settings",
-        operatingHoursFrom: setting,
-        date: makeDate(),
-      },
-      "config"
-    );
     update();
   }
 
-  function hrsToDisabled(value) {
-    const threshhold = hrsFrom * 60 + minFrom;
-    const target = value * 60 + minTo;
-    if (threshhold >= target) return true;
+  async function setActiveFrom() {
+    const setting = { hrs: hrsFrom, min: minFrom };
+    await storage.operatingHours.from.set(setting);
+    try {
+      const participantId = user || (await storage.uid.get());
+      const startMinutes = hrsFrom * 60 + minFrom;
+      const endMinutes = hrsTo * 60 + minTo;
+      await saveUserPreferences({
+        participantId,
+        operating_hours_start: startMinutes,
+        operating_hours_end: endMinutes,
+      });
+    } catch (e) {
+      console.warn("Failed to sync operating hours preference", e);
+    }
+    update();
   }
-  function minToDisabled(value) {
-    const threshhold = hrsFrom * 60 + minFrom;
-    const target = hrsTo * 60 + value;
-    if (threshhold >= target) return true;
-  }
+
 </script>
 
 <!-- ActiveFrom -->
@@ -104,11 +94,7 @@
         class="custom-select custom-select-sm inline"
       >
         {#each minuteOptions as value}
-          <option
-            disabled={hrsFrom === 0 && value === 0}
-            selected={value === minFrom}
-            {value}>{parseNumberToTime(value)}</option
-          >
+          <option selected={value === minFrom} {value}>{parseNumberToTime(value)}</option>
         {/each}
       </select>
       <p><small>{"Hrs/Min"}</small></p>
@@ -135,11 +121,7 @@
         class="custom-select custom-select-sm inline"
       >
         {#each hourOptions as value}
-          <option
-            disabled={hrsToDisabled(value)}
-            selected={value === hrsTo}
-            {value}>{parseNumberToTime(value)}</option
-          >
+          <option selected={value === hrsTo} {value}>{parseNumberToTime(value)}</option>
         {/each}
       </select>
       <p>:</p>
@@ -154,11 +136,7 @@
         class="custom-select custom-select-sm inline"
       >
         {#each minuteOptions as value}
-          <option
-            disabled={minToDisabled(value)}
-            selected={value === minTo}
-            {value}>{parseNumberToTime(value)}</option
-          >
+          <option selected={value === minTo} {value}>{parseNumberToTime(value)}</option>
         {/each}
       </select>
       <p><small>{"Hrs/Min"}</small></p>

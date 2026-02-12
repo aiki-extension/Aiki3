@@ -5,8 +5,8 @@
 <script>
   import Container from "./Container.svelte";
   import storage from "../../../util/storage";
-  import firebase from "../../../util/firebase";
-  import { parseUrl, makeDate } from "../../../util/utilities";
+  import { saveUserPreferences } from "../../../util/logger";
+  import { parseUrl } from "../../../util/utilities";
   import Fa from "svelte-fa";
   import {
     faTrashAlt,
@@ -23,28 +23,46 @@
   $: list = [];
 
   let toastCoords = { y: "add-button", x: "site-input-container" };
+  let syncingPrefs = false;
 
   async function setup() {
-    list = await storage.list.get();
+    const storedList = (await storage.list.get()) || [];
+    let hasUpdates = false;
+    const normalizedList = storedList.map((item) => {
+      if (!item || !item.host) {
+        return item;
+      }
+
+      const parsed = parseUrl(item.host);
+      const updatedItem = {
+        ...item,
+        host: parsed.host || item.host,
+        name: parsed.name || item.name,
+      };
+
+      if (updatedItem.host !== item.host || updatedItem.name !== item.name) {
+        hasUpdates = true;
+      }
+
+      return updatedItem;
+    });
+
+    list = normalizedList;
+
+    if (hasUpdates) {
+      storage.list.set(normalizedList);
+    }
   }
   setup();
   let addItemValue = "";
 
-  function removeItem(index) {
-    firebase.addLog(
-      {
-        user: user,
-        event: "User removed procrastination site",
-        site: list[index],
-        date: makeDate(),
-      },
-      "config"
-    );
+  async function removeItem(index) {
     let newList = [...list];
     newList.splice(index, 1);
     list = newList;
-    storage.list.set(list);
-    port.postMessage(`Update: list`);
+    await storage.list.set(list);
+    await syncPreferences();
+    try { port?.postMessage(`Update: list`); } catch (_) {}
     toast.pop();
     toast.push("Website removed!", {
       theme: themes.successTheme(toastCoords),
@@ -68,43 +86,52 @@
       let newList = [...list];
       newList.push(site);
       list = newList;
-      storage.list.set(list);
-      firebase.addLog(
-        {
-          user: user,
-          event: "User added procrastination site",
-          site: site,
-          date: makeDate(),
-        },
-        "config"
-      );
-      port.postMessage(`Update: list`);
+      await storage.list.set(list);
+      await syncPreferences();
+      try { port?.postMessage(`Update: list`); } catch (_) {}
       addItemValue = "";
       toast.pop();
       toast.push("New Website Added!", {
         theme: themes.successTheme(toastCoords),
       });
-    } else {
     }
   }
 
-  function pingSite(site) {
-    return new Promise(function (resolve, reject) {
-      let link = document.createElement("img");
-      link.src = `https://${site}/favicon.ico`;
-      link.style = "display: none;";
-      link.onload = function () {
-        resolve(true);
-      };
-      link.onerror = function () {
-        const confirmation = confirm(`
-          We could not get the icon from https://${site}/. This either means the website does not exist, or it may not be an issue at all.\n
-          Be sure to check the spelling or copy-paste the website address into the input field. \n
-          If you are certain it is correct, click "yes"`);
-        confirmation ? resolve(true) : resolve(false);
-      };
-      document.body.appendChild(link);
-    });
+  async function pingSite(site) {
+    try {
+      
+      await fetch(`https://${site}/`, { 
+        mode: 'no-cors',
+        method: 'HEAD'
+      });
+      return true;
+    } catch (error) {
+
+      const confirmation = confirm(
+        `We could not reach https://${site}/. This may mean the website does not exist.\n\n` +
+        `Please check the spelling or copy-paste the website address.\n\n` +
+        `If you are certain it is correct, click "OK" to add it anyway.`
+      );
+      return confirmation;
+    }
+  }
+
+  async function syncPreferences() {
+    if (syncingPrefs) return;
+    syncingPrefs = true;
+    try {
+      const participantId = user || (await storage.uid.get());
+      const procrastinationSites = Array.isArray(list)
+        ? list.map((item) => item?.host).filter(Boolean)
+        : [];
+      await saveUserPreferences({
+        participantId,
+        procrastination_sites: procrastinationSites,
+      });
+    } catch (_) {
+    } finally {
+      syncingPrefs = false;
+    }
   }
 
   function firstLetterUppercase(string) {
@@ -119,10 +146,7 @@
     Type in pages you feel like you spend a little too much time on here (e.g:
     www.facebook.com, www.reddit.com, 9gag.com).
   </p>
-  <p>
-    <strong>NB:</strong> You can still visit these websites, Aiki will just be logging
-    the amount of time you spend on them.
-  </p>
+ 
 
   <form on:submit|preventDefault={addItem}>
     <div data-tooltip="Add to your list of procrastination sites">
@@ -172,12 +196,15 @@
               {item.host}
             </td>
             <td style="text-align: center">
-              <div
+              <button
+                type="button"
+                class="remove-site-button"
+                aria-label={`Remove ${item.host} from the list`}
                 data-tooltip="Remove this site from the list."
                 on:click={() => removeItem(index)}
               >
                 <Fa icon={faTimes} primaryColor="red" />
-              </div>
+              </button>
             </td>
           </tr>
         {/each}
@@ -236,5 +263,12 @@
     width: 1.2em;
     height: 1.2em;
     margin-right: 10px;
+  }
+
+  .remove-site-button {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
   }
 </style>

@@ -1,7 +1,10 @@
 /node_modules/
 /public/build/
+/.vscode/
 
 .secret
+back4app.secret
 
 .DS_Store
 /src/API/secret.js
+/src/util/back4appConfig.local.js

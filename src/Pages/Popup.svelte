@@ -1,9 +1,10 @@
 <!-- 
   This popup is displayed when the user clicks on the extension icon on the toolbar.
-  Used in / Parent components: /src/App.svelte
+  Used in / Entry: /src/main.js
  -->
 <script>
   /* Functional and module imports */
+  import { onDestroy } from "svelte";
   import { parseUrl } from "../util/utilities";
   import storage from "../util/storage";
   import browser from "webextension-polyfill";
@@ -13,14 +14,12 @@
   import SettingsButton from "./Components/Popup/SettingsButton.svelte";
   import ToggleRedirection from "./Components/Popup/ToggleRedirection.svelte";
   import ContinueButton from "./Components/Popup/ContinueButton.svelte";
-  import SkipButton from "./Components/Popup/SkipButton.svelte";
   import LearningTimeLeft from "./Components/Popup/LearningTimeLeft.svelte";
-  import ProcTimeLeft from "./Components/Popup/ProcTimeLeft.svelte";
-  import ExtraLearningTime from "./Components/Popup/ExtraLearningTime.svelte";
 
   const port = browser.runtime.connect({
-  name: "Popup Communication",
+    name: "Popup Communication",
   });
+  let timerPollInterval = null;
 
   let siteName = "";
   let origin = {};
@@ -32,22 +31,34 @@
       resolve(res);
     });
   }
-  port.onMessage.addListener(function (msg) {
+  const onPortMessage = function (msg) {
     sync(msg);
-  });
-  try {
-    port.postMessage("get: timer");
-  } catch (error) {
-    console.error(error);
-  }
+  };
+  port.onMessage.addListener(onPortMessage);
 
-  let updateIntervalRef = setInterval(() => {
+  function requestTimerUpdate() {
     try {
       port.postMessage("get: timer");
     } catch (error) {
       console.error(error);
     }
-  }, 1000);
+  }
+
+  requestTimerUpdate();
+  timerPollInterval = setInterval(requestTimerUpdate, 1000);
+
+  onDestroy(() => {
+    if (timerPollInterval) {
+      clearInterval(timerPollInterval);
+      timerPollInterval = null;
+    }
+    try {
+      port.onMessage.removeListener(onPortMessage);
+    } catch (_) { }
+    try {
+      port.disconnect();
+    } catch (_) { }
+  });
 
   async function setup() {
     origin = await storage.origin.get();
@@ -83,31 +94,20 @@
   <Header />
   <SettingsButton />
   <hr />
-  <ToggleRedirection {port} />
+  <ToggleRedirection />
   <hr />
   {#await timeValues}
     LOADING
   {:then values}
-    {#if siteName !== ""}
-      {#if values.learningTimeRemaining > 0}
-        <LearningTimeLeft
-          learningTimeRemaining={values.learningTimeRemaining}
-        />
-        <hr />
-        <div class="container">
-          <SkipButton {gotoOrigin} />
-        </div>
-        <hr />
-      {:else}
-        <ExtraLearningTime bonusTime={values.bonusTime} />
-        <hr />
-        <div class="container">
-          <ContinueButton {gotoOrigin} />
-        </div>
-        <hr />
-      {/if}
-    {:else}
-      <ProcTimeLeft rewardTimeRemaining={values.rewardTimeRemaining} />
+    <LearningTimeLeft
+      dailyGoal={values.dailyGoal}
+      dailyProgress={values.dailyProgress}
+    />
+    <hr />
+    {#if siteName !== "" || (values.controlledState === "learning" && values.controlledProcrastinationUrl)}
+      <div class="container">
+        <ContinueButton {gotoOrigin} />
+      </div>
       <hr />
     {/if}
   {/await}

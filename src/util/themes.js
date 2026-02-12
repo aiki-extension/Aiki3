@@ -5,9 +5,15 @@
 import browser from "webextension-polyfill";
 const storage = browser.storage.local;
 
-// Variable that selects the root CSS file.
-const r = document.querySelector(":root");
-const root = r.style;
+// Lazily resolve the document root style; no-op in service worker.
+let root;
+function getRoot() {
+  if (root) return root;
+  if (typeof document === "undefined") return null;
+  const el = document.querySelector(":root");
+  root = el ? el.style : null;
+  return root;
+}
 
 /**
  * @function
@@ -55,15 +61,20 @@ export async function drawTheme() {
  * @description  Switches out the global css variables stored in global.css
  * to change the theme of the application to 'Dark'*/
 export function drawDarkMode() {
-  root.setProperty("--textColor", "#FFFFFF");
-  root.setProperty("--backgroundColorPrimary", "#1F2933");
-  root.setProperty("--backgroundColorSecondary", "#323F4B");
-  root.setProperty("--borderColor", "#12171D");
-  root.setProperty("--bannerTextColor", "#FFFFFF");
-  root.setProperty("--bannerBackgroundColor", "#3E4C59");
-  root.setProperty("--hrColor", "#616E7C");
-  root.setProperty("--footerBackgroundColor", "#3E4C59");
-  root.setProperty("--theadBackgroundColor", "#3E4C59");
+  const r = getRoot();
+  if (!r) return;
+  r.setProperty("--textColor", "#FFFFFF");
+  r.setProperty("--textColorSecondary", "rgba(255, 255, 255, 0.7)");
+  r.setProperty("--progressBarBackground", "#D1D5DB");
+  r.setProperty("--progressBarFill", "#22c55e");
+  r.setProperty("--backgroundColorPrimary", "#1F2933");
+  r.setProperty("--backgroundColorSecondary", "#323F4B");
+  r.setProperty("--borderColor", "#12171D");
+  r.setProperty("--bannerTextColor", "#FFFFFF");
+  r.setProperty("--bannerBackgroundColor", "#3E4C59");
+  r.setProperty("--hrColor", "#616E7C");
+  r.setProperty("--footerBackgroundColor", "#3E4C59");
+  r.setProperty("--theadBackgroundColor", "#3E4C59");
 }
 
 /**
@@ -71,15 +82,20 @@ export function drawDarkMode() {
  * @description  Switches out the global css variables stored in global.css
  * to change the theme of the application to 'Light'*/
 export function drawLightMode() {
-  root.setProperty("--textColor", "#444444");
-  root.setProperty("--backgroundColorPrimary", "#f0f2f5");
-  root.setProperty("--backgroundColorSecondary", "#FFFFFF");
-  root.setProperty("--borderColor", "#AAAAAA");
-  root.setProperty("--bannerTextColor", "#FFFFFF");
-  root.setProperty("--bannerBackgroundColor", "#282C34");
-  root.setProperty("--hrColor", "#D3D3D3");
-  root.setProperty("--footerBackgroundColor", "#E8ECF3");
-  root.setProperty("--theadBackgroundColor", "#D3D3D3");
+  const r = getRoot();
+  if (!r) return;
+  r.setProperty("--textColor", "#222222");
+  r.setProperty("--textColorSecondary", "rgba(34, 34, 34, 0.7)");
+  r.setProperty("--progressBarBackground", "#D1D5DB");
+  r.setProperty("--progressBarFill", "#22c55e");
+  r.setProperty("--backgroundColorPrimary", "#f0f2f5");
+  r.setProperty("--backgroundColorSecondary", "#FFFFFF");
+  r.setProperty("--borderColor", "#AAAAAA");
+  r.setProperty("--bannerTextColor", "#FFFFFF");
+  r.setProperty("--bannerBackgroundColor", "#282C34");
+  r.setProperty("--hrColor", "#D3D3D3");
+  r.setProperty("--footerBackgroundColor", "#E8ECF3");
+  r.setProperty("--theadBackgroundColor", "#D3D3D3");
 }
 
 /**
@@ -87,15 +103,20 @@ export function drawLightMode() {
  * @description  Switches out the global css variables stored in global.css
  * to change the theme of the application to 'Blue'*/
 export function drawBlueMode() {
-  root.setProperty("--textColor", "#212121");
-  root.setProperty("--backgroundColorPrimary", "#F5F6FB");
-  root.setProperty("--backgroundColorSecondary", "#FFFFFF");
-  root.setProperty("--borderColor", "#EDEDED");
-  root.setProperty("--bannerTextColor", "#FFFFFF");
-  root.setProperty("--bannerBackgroundColor", "#3366FF");
-  root.setProperty("--hrColor", "#EAEAEA");
-  root.setProperty("--footerBackgroundColor", "#99B2FF");
-  root.setProperty("--theadBackgroundColor", "#EAEAEA");
+  const r = getRoot();
+  if (!r) return;
+  r.setProperty("--textColor", "#212121");
+  r.setProperty("--textColorSecondary", "rgba(33, 33, 33, 0.7)");
+  r.setProperty("--progressBarBackground", "#D1D5DB");
+  r.setProperty("--progressBarFill", "#22c55e");
+  r.setProperty("--backgroundColorPrimary", "#F5F6FB");
+  r.setProperty("--backgroundColorSecondary", "#FFFFFF");
+  r.setProperty("--borderColor", "#EDEDED");
+  r.setProperty("--bannerTextColor", "#FFFFFF");
+  r.setProperty("--bannerBackgroundColor", "#3366FF");
+  r.setProperty("--hrColor", "#EAEAEA");
+  r.setProperty("--footerBackgroundColor", "#99B2FF");
+  r.setProperty("--theadBackgroundColor", "#EAEAEA");
 }
 
 /**
@@ -103,13 +124,18 @@ export function drawBlueMode() {
  * @description  Switches out the global css variables stored in global.css
  * to change the theme of the application to 'Zeeguu'*/
 export function drawZeeguuMode() {
-  root.setProperty("--textColor", "#263238");
-  root.setProperty("--backgroundColorPrimary", "#F7F7F7");
-  root.setProperty("--backgroundColorSecondary", "#FFFFFF");
-  root.setProperty("--borderColor", "#EFEFEF");
-  root.setProperty("--bannerTextColor", "#FFFFFF");
-  root.setProperty("--bannerBackgroundColor", "#FEBF00");
-  root.setProperty("--hrColor", "#EFEFEF");
-  root.setProperty("--footerBackgroundColor", "#F2C76B");
-  root.setProperty("--theadBackgroundColor", "#F7F7F7");
+  const r = getRoot();
+  if (!r) return;
+  r.setProperty("--textColor", "#263238");
+  r.setProperty("--textColorSecondary", "rgba(38, 50, 56, 0.7)");
+  r.setProperty("--progressBarBackground", "#D1D5DB");
+  r.setProperty("--progressBarFill", "#22c55e");
+  r.setProperty("--backgroundColorPrimary", "#F7F7F7");
+  r.setProperty("--backgroundColorSecondary", "#FFFFFF");
+  r.setProperty("--borderColor", "#EFEFEF");
+  r.setProperty("--bannerTextColor", "#FFFFFF");
+  r.setProperty("--bannerBackgroundColor", "#FEBF00");
+  r.setProperty("--hrColor", "#EFEFEF");
+  r.setProperty("--footerBackgroundColor", "#F2C76B");
+  r.setProperty("--theadBackgroundColor", "#F7F7F7");
 }

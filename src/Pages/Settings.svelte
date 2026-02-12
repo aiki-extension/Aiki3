@@ -2,7 +2,7 @@
   It is also opened by a button in extension popup component.
   This gathers all the settings components and displays them for the user to change the behaviour
   of the application.
-  Used in / Parent components: /src/App.svelte
+  Used in / Entry: /src/main.js
 -->
 <script>
   /*Functional and module imports*/
@@ -17,6 +17,7 @@
   import SetWebsites from "./Components/Settings/SetTimeWastingSites.svelte";
   import Statistics from "./Components/Settings/Statistics.svelte";
   import SetRedirection from "./Components/Settings/SetRedirection.svelte";
+  import AikiDescription from "./Components/Settings/AikiDescription.svelte";
 
   $: user = "";
   $: userIsRegistered = false;
@@ -38,6 +39,11 @@
       <SetUser bind:user bind:userIsRegistered {port} />
     </div>
     {#if userIsRegistered}
+      <div class="container">
+      <AikiDescription/>
+
+      </div>
+    
       <div class="container">
         <SetWebsites {user} {port} />
       </div>

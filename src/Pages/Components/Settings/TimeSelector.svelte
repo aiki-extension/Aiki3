@@ -1,98 +1,136 @@
 <!-- 
-  TODO: Description goes here
+  Session duration and reward time settings.
+  Both variants show session duration and reward time settings.
+  Daily goal is now in DailyGoal.svelte
+  Session duration is capped to daily goal.
   Used in / Parent components: /src/Pages/Settings.svelte
  -->
 <script>
+  import { onMount } from "svelte";
   import storage from "../../../util/storage";
-  import firebase from "../../../util/firebase";
-  import { makeDate } from "../../../util/utilities";
+  import { saveUserPreferences, logEvent } from "../../../util/logger";
 
-  let minuteOptions = Array.from({ length: 60 }, (_, i) => i); //Generates an array with values from 1->59
-  let secondsOptions = [0, 15, 30, 45];
-  export let settings;
+  let minuteOptions = Array.from({ length: 61 }, (_, i) => i); // 0 - 60 minutes
+  let secondsOptions = [0, 15, 30, 45]; // 15-second intervals
+
   export let update;
   export let user;
 
-  let { min: learnMin, sec: learnSec } = settings.learningTime;
-  let { min: rewardMin, sec: rewardSec } = settings.rewardTime;
+  // Daily goal (loaded for validation)
+  let dailyGoalMin = 30;
+  let dailyGoalSec = 0;
+
+  // Session duration (per learning session) - must be <= daily goal
+  let sessionMin = 5;
+  let sessionSec = 0;
+  
+  // Reward time (procrastination time after session)
+  let rewardMin = 2;
+  let rewardSec = 0;
+
+  // Computed: max session in seconds
+  $: dailyGoalTotalSec = dailyGoalMin * 60 + dailyGoalSec;
+  
+  // Filter minute options to not exceed daily goal
+  $: allowedSessionMinutes = minuteOptions.filter(m => m * 60 <= dailyGoalTotalSec);
+  
+  // Filter seconds options based on current minute selection
+  $: allowedSessionSeconds = secondsOptions.filter(s => sessionMin * 60 + s <= dailyGoalTotalSec);
+
+  onMount(async () => {
+    // Load daily goal for validation
+    const dailyGoal = await storage.timeSettings.dailyGoal.get();
+    dailyGoalMin = dailyGoal.min;
+    dailyGoalSec = dailyGoal.sec;
+    
+    // Load session duration
+    const sessionDuration = await storage.timeSettings.sessionDuration.get();
+    sessionMin = sessionDuration.min;
+    sessionSec = sessionDuration.sec;
+
+    
+    // Load reward time from controlledTimerSettings (unified for both variants)
+    rewardMin = await storage.controlledTimerSettings.rewardMinutes.get();
+    rewardSec = await storage.controlledTimerSettings.rewardSeconds.get();
+  });
 
   function parseNumberToTime(number) {
     return number < 10 ? `0${number}` : number;
   }
+  
 
-  function setLearningTime() {
-    const learningTime = { min: learnMin, sec: learnSec };
-    storage.timeSettings.learningTime.set(learningTime);
-    firebase.addLog(
-      {
-        user: user,
-        event: "User changed learning time in settings",
-        value: learningTime,
-        date: makeDate(),
-      },
-      "config"
-    );
+  async function setSessionDuration() {
+    const duration = { min: sessionMin, sec: sessionSec };
+    await storage.timeSettings.sessionDuration.set(duration);
+    
+    const totalMinutes = sessionMin + sessionSec / 60;
+    try {
+      const participantId = user || (await storage.uid.get());
+      await saveUserPreferences({
+        participantId,
+        learning_time_minutes: totalMinutes,
+      });
+      await logEvent({
+        participantId,
+        eventType: "audit:setting_change:session_duration",
+        eventData: JSON.stringify({ min: sessionMin, sec: sessionSec }),
+      });
+    } catch (e) {
+      console.warn("Failed to sync session duration preference", e);
+    }
     update();
   }
 
-  function setRewardTime() {
-    const rewardTime = { min: rewardMin, sec: rewardSec };
-    storage.timeSettings.rewardTime.set(rewardTime);
-    firebase.addLog(
-      {
-        user: user,
-        event: "User changed reward time in settings",
-        value: rewardTime,
-        date: makeDate(),
-      },
-      "config"
-    );
+  async function setRewardTime() {
+    await storage.controlledTimerSettings.rewardMinutes.set(rewardMin);
+    await storage.controlledTimerSettings.rewardSeconds.set(rewardSec);
+    
+    const totalMinutes = rewardMin + rewardSec / 60;
+    try {
+      const participantId = user || (await storage.uid.get());
+      await saveUserPreferences({
+        participantId,
+        procrastination_reward_minutes: totalMinutes,
+      });
+      await logEvent({
+        participantId,
+        eventType: "audit:setting_change:reward_time",
+        eventData: JSON.stringify({ min: rewardMin, sec: rewardSec }),
+      });
+    } catch (e) {
+      console.warn("Failed to sync reward time preference", e);
+    }
     update();
   }
 </script>
 
-<!-- ActiveFrom -->
+<!-- Session Duration -->
 <div class="row">
   <div class="col-sm">
-    <p>Time spent learning:</p>
+    <p>Session duration:</p>
   </div>
   <div class="col-sm" />
   <div class="col-sm">
     <div class="wrapper">
       <!-- svelte-ignore a11y-no-onchange -->
       <select
-        selected={learnMin}
-        id="hrs"
-        on:change={(e) => {
-          learnMin = parseInt(e.target.value);
-          if (learnMin === 0 && learnSec < 30) learnSec = 30;
-          setLearningTime();
-        }}
+        bind:value={sessionMin}
+        on:change={setSessionDuration}
         class="custom-select custom-select-sm inline"
       >
-        {#each minuteOptions as value}
-          <option selected={value === learnMin} {value}
-            >{parseNumberToTime(value)}</option
-          >
+        {#each allowedSessionMinutes.slice(1) as value}
+          <option {value}>{parseNumberToTime(value)}</option>
         {/each}
       </select>
       <p>:</p>
       <!-- svelte-ignore a11y-no-onchange -->
       <select
-        selected={learnSec}
-        id="min"
-        on:change={(e) => {
-          learnMin === 0 && parseInt(e.target.value) < 30
-            ? (learnSec = 30)
-            : (learnSec = parseInt(e.target.value));
-          setLearningTime();
-        }}
+        bind:value={sessionSec}
+        on:change={setSessionDuration}
         class="custom-select custom-select-sm inline"
       >
-        {#each secondsOptions as value}
-          <option selected={value === learnSec} {value}
-            >{parseNumberToTime(value)}</option
-          >
+        {#each allowedSessionSeconds as value}
+          <option {value}>{parseNumberToTime(value)}</option>
         {/each}
       </select>
       <p><small>{"Min/Sec"}</small></p>
@@ -100,48 +138,33 @@
   </div>
 </div>
 
-<!-- ActiveTo -->
-<div class="row">
+<!-- Reward Time -->
+<div class="row" style="margin-top: 1rem;">
   <div class="col-sm">
-    <p>Time you get on your procrastination sites in exchange:</p>
+    <p>Reward time:</p>
   </div>
   <div class="col-sm" />
   <div class="col-sm">
-    <!-- svelte-ignore a11y-no-onchange -->
     <div class="wrapper">
+      <!-- svelte-ignore a11y-no-onchange -->
       <select
-        selected={rewardMin}
-        id="hrs"
-        on:change={(e) => {
-          rewardMin = parseInt(e.target.value);
-          if (rewardMin === 0 && rewardSec < 30) rewardSec = 30;
-          setRewardTime();
-        }}
+        bind:value={rewardMin}
+        on:change={setRewardTime}
         class="custom-select custom-select-sm inline"
       >
-        {#each minuteOptions as value}
-          <option selected={value === rewardMin} {value}
-            >{parseNumberToTime(value)}</option
-          >
+        {#each minuteOptions.slice(1) as value}
+          <option {value}>{parseNumberToTime(value)}</option>
         {/each}
       </select>
       <p>:</p>
       <!-- svelte-ignore a11y-no-onchange -->
       <select
-        selected={rewardSec}
-        id="min"
-        on:change={(e) => {
-          rewardMin === 0 && parseInt(e.target.value) < 30
-            ? (rewardSec = 30)
-            : (rewardSec = parseInt(e.target.value));
-          setRewardTime();
-        }}
+        bind:value={rewardSec}
+        on:change={setRewardTime}
         class="custom-select custom-select-sm inline"
       >
         {#each secondsOptions as value}
-          <option selected={value === rewardSec} {value}
-            >{parseNumberToTime(value)}</option
-          >
+          <option {value}>{parseNumberToTime(value)}</option>
         {/each}
       </select>
       <p><small>{"Min/Sec"}</small></p>

@@ -1,23 +1,70 @@
 /**
  * @function
- * @param {object} site
- * @param {string} site.name
- * @param {string} site.host
+ * @param {string} site
  * @returns {object}
  * @description returns an object containing the host and name of the given site.
  * Example: https://example.com/fragment returns {name: "example", host: "www.example.com"} */
 export function parseUrl(site) {
-  let host = site.includes("http") ? site.split("/")[2] : site.split("/")[0];
-  let name = host.includes("www") ? host.split(".")[1] : host.split(".")[0];
-  return { host: host, name: name };
+  if (!site) {
+    return { host: "", name: "" };
+  }
+
+  const trimmedSite = String(site).trim();
+
+  if (!trimmedSite) {
+    return { host: "", name: "" };
+  }
+
+  const ensureProtocol = (value) =>
+    /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(value) ? value : `https://${value}`;
+
+  const tryBuildUrl = (value) => {
+    try {
+      return new URL(ensureProtocol(value));
+    } catch (_) {
+      return null;
+    }
+  };
+
+  const isLikelyLocalHost = (hostname) =>
+    hostname === "localhost" ||
+    hostname.endsWith(".local") ||
+    /^[0-9.]+$/.test(hostname);
+
+  let url = tryBuildUrl(trimmedSite);
+
+  if (url && !isLikelyLocalHost(url.hostname) && !url.hostname.includes(".")) {
+    const appended = tryBuildUrl(`${url.hostname}.com`);
+    if (appended) {
+      url = appended;
+    }
+  }
+
+  if (!url) {
+    if (!trimmedSite.includes(".")) {
+      url = tryBuildUrl(`${trimmedSite}.com`);
+    }
+
+    if (!url) {
+      const host = trimmedSite.includes("http")
+        ? trimmedSite.split("/")[2]
+        : trimmedSite.split("/")[0];
+      const cleanHost = host || trimmedSite;
+      const name = cleanHost.includes("www")
+        ? cleanHost.split(".")[1]
+        : cleanHost.split(".")[0];
+      return { host: cleanHost, name };
+    }
+  }
+
+  const host = url.host;
+  const hostname = url.hostname;
+  const nameSource = hostname.startsWith("www.") ? hostname.slice(4) : hostname;
+  const name = nameSource.split(".")[0];
+
+  return { host, name };
 }
 
-/**
- * @function
- * @returns {object} date
- * @description returns a new object containing a string with the date at time of function call,
- * as well as numbers for hours, minutes, seconds and milliseconds, as well as a timestamp for use in
- * Firestore document creation. */
 export function makeDate() {
   const options = {
     weekday: "long",
@@ -37,96 +84,40 @@ export function makeDate() {
 }
 
 /**
- * @function
+ * Format milliseconds into a human-readable duration.
  * @param {number} milliseconds
- * @returns {string} time
- * @description Parses a given value of milliseconds into a short human-readable string.
- * This function should be used only when counting up.
- * For values greater than or equal to 60 seconds, the string value will be floored
- * to the nearest minute. (eg: 1m). For values lesser than 60 seconds,
- * the string value will be in seconds.
- * For a long string version, use parseTimerUpLong. */
-export function parseTimerUp(milliseconds) {
-  let seconds = milliseconds / 1000;
-  if (seconds < 60) {
-    return `${seconds}s`;
-  } else if (seconds >= 60) {
-    let minutes = seconds / 60;
-    minutes = Math.floor(minutes);
-    return `${minutes}m`;
-  }
-}
+ * @param {{direction?: "up"|"down", longForm?: boolean}} options
+ * direction: "up" for elapsed time (floors minutes), "down" for remaining (rounds up minutes)
+ * longForm: false => short labels (e.g. "1m"), true => long labels (e.g. "1 minutes")
+ */
+export function formatDuration(milliseconds, options = {}) {
+  const { direction = "up", longForm = false } = options;
+  const seconds = Math.max(0, Math.floor(milliseconds / 1000));
 
-/**
- * @function
- * @param {number} milliseconds
- * @returns {string} time
- * @description Parses a given value of milliseconds into a long human-readable string.
- * @ This function should be used only when counting up.
- * For values greater than or equal to 60 seconds, the string value will be rounded down
- * to the nearest minute. (eg: 1m). For values lesser than 60 seconds, the string value will be in seconds.
- * For a short string version, use parseTimerUp. */
-export function parseTimerUpLong(milliseconds) {
-  let seconds = milliseconds / 1000;
-  if (seconds < 60) {
-    return `${seconds} seconds`;
-  } else if (seconds >= 60) {
-    let minutes = seconds / 60;
-    minutes = Math.floor(minutes);
-    return `${minutes} minutes`;
-  }
-}
+  const toSecondsLabel = () => (longForm ? `${seconds} seconds` : `${seconds}s`);
 
-/**
- * @param {number} milliseconds
- * @returns {string} time
- * @description Parses a given value of milliseconds into a short human-readable string.
- * This function should be used only when counting up.
- * For values greater than 60 seconds, the string value will be rounded up
- * to the nearest minute. (eg: 1m). For values lesser than or equal to 60 seconds,
- * the string value will be in seconds.
- * For a long string version, use parseTimerDownLong. */
-export function parseTimerDown(milliseconds) {
-  let seconds = milliseconds / 1000;
-  if (seconds <= 30) {
-    return `${seconds}s`;
-  } else if (seconds >= 31 && seconds <= 59) {
-    return "1m";
-  } else if (seconds >= 60) {
-    let minutes = seconds / 60;
-    minutes = Math.ceil(minutes);
-    return `${minutes}m`;
+  if (direction === "down") {
+    if (seconds === 0) return longForm ? "None" : "0s";
+    if (seconds <= 30) return toSecondsLabel();
+    if (seconds <= 59) return longForm ? "1 minutes" : "1m";
+    const minutes = Math.ceil(seconds / 60);
+    return longForm ? `${minutes} minutes` : `${minutes}m`;
   }
-}
 
-/**
- * @param {number} milliseconds
- * @returns {string} time
- * @description Parses a given value of milliseconds into a short human-readable string.
- * This function should be used only when counting up.
- * For values greater than 60 seconds, the string value will be rounded up
- * to the nearest minute. (eg: 1m). For values lesser than or equal to 60 seconds,
- * the string value will be in seconds.
- * For a short string version, use parseTimerDown. */
-export function parseTimerDownLong(milliseconds) {
-  let seconds = milliseconds / 1000;
-  if (seconds === 0) {
-    return "None";
-  } else if (seconds <= 60) {
-    return `${seconds} seconds`;
-  } else if (seconds >= 60) {
-    let minutes = seconds / 60;
-    minutes = Math.ceil(minutes);
-    return `${minutes} minutes`;
-  }
+  // direction === "up"
+  if (seconds < 60) return toSecondsLabel();
+  const minutes = Math.floor(seconds / 60);
+  return longForm ? `${minutes} minutes` : `${minutes}m`;
 }
 
 export const parseTime = {
   toHumanReadableArray: (time) => {
-    return [ Math.floor(time / 60 / 1000), (time / 1000) % 60 ];
+    return [Math.floor(time / 60 / 1000), (time / 1000) % 60];
   },
 
   toSystem: (time) => {
-    return 1000 * (time.min * 60 + time.sec);
+    const min = Number(time?.min) || 0;
+    const sec = Number(time?.sec) || 0;
+    return Math.max(0, 1000 * (min * 60 + sec));
   },
 };

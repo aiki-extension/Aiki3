@@ -1,163 +1,172 @@
 import browser from "webextension-polyfill";
-import { ProcrastinationWarning } from "./content/ProcrastinationWarning";
-import { LearningContent } from "./content/LearningContent";
-import { ContentBlocker } from "./content/ContentBlocker";
 
-const l = console.log;
+import { createOverlayPersistence } from "./injection/modules/persistence";
+import {
+  STYLES,
+  createTimerPort,
+  formatDuration,
+  makeDraggable,
+  matchesHost,
+  matchesProcrastinationHost,
+  removeOverlay,
+  removeRewardOverlay,
+} from "./injection/modules/uiUtils";
+import { createRedirectPromptOverlay } from "./injection/overlays/redirectPromptOverlay";
+import { createLearningOverlay } from "./injection/overlays/learningOverlay";
+import { createBlockerOverlay } from "./injection/overlays/blockerOverlay";
+import { createRewardOverlay } from "./injection/overlays/rewardOverlay";
+
+const { registerPersistenceCallback } = createOverlayPersistence();
+
+let renderLearningContent = () => Promise.resolve({ action: "end injection" });
+let renderProcrastinationRewardOverlay = () => { };
+
+let learningEnsureTimeout = null;
+const requestLearningOverlayAllowance = async () => {
+  try {
+    const response = await browser.runtime.sendMessage({ type: "learning:autoStart" });
+    if (response && typeof response === "object") {
+      return response.allowed === true;
+    }
+    return response === true;
+  } catch (_) {
+    return false;
+  }
+};
+
+const scheduleLearningEnsure = () => {
+  if (learningEnsureTimeout) return;
+  learningEnsureTimeout = setTimeout(async () => {
+    learningEnsureTimeout = null;
+    if (document.getElementById("aiki-overlay")) return;
+    const result = await browser.storage.local.get("learningUri");
+    const learningUri = result?.learningUri?.trim?.() || "";
+    if (!learningUri || !matchesHost(learningUri)) return;
+    const shouldShow = await requestLearningOverlayAllowance();
+    if (!shouldShow) return;
+    renderLearningContent().catch(() => { });
+  }, 120);
+};
+
+let bootstrapAttemptPending = false;
+
+async function bootstrapLearningOverlayIfNeeded() {
+  if (bootstrapAttemptPending) return;
+  bootstrapAttemptPending = true;
+  try {
+    const result = await browser.storage.local.get("learningUri");
+    const learningUri = result?.learningUri?.trim?.() || "";
+    if (!learningUri || !matchesHost(learningUri)) {
+      return;
+    }
+    const shouldShow = await requestLearningOverlayAllowance();
+    if (!shouldShow) return;
+    await renderLearningContent();
+  } catch (_) {
+  } finally {
+    bootstrapAttemptPending = false;
+  }
+}
+
+// Reward overlay persistence
+let rewardEnsureTimeout = null;
+const scheduleRewardEnsure = async () => {
+  if (rewardEnsureTimeout) return;
+  rewardEnsureTimeout = setTimeout(async () => {
+    rewardEnsureTimeout = null;
+    try {
+      const data = await browser.runtime.sendMessage({ type: "timer:get" });
+      if (data?.controlledRewardGoal > 0 && !document.getElementById("aiki-reward-overlay")) {
+        const result = await browser.storage.local.get("list");
+        const procHosts = (result?.list || []).map(item => item?.host || item?.name || "").filter(Boolean);
+        if (matchesProcrastinationHost(procHosts)) {
+          renderProcrastinationRewardOverlay();
+        }
+      }
+    } catch (_) { }
+  }, 120);
+};
+
+async function bootstrapRewardOverlayIfNeeded() {
+  try {
+    const timerData = await browser.runtime.sendMessage({ type: "timer:get" });
+    // Check for both controlled variant reward AND experimental variant reward
+    const hasControlledReward = timerData?.controlledRewardGoal > 0;
+    const hasExperimentalReward = timerData?.rewardUnlockAt > Date.now();
+
+    if (hasControlledReward || hasExperimentalReward) {
+      const result = await browser.storage.local.get("list");
+      const procHosts = (result?.list || []).map(item => item?.host || item?.name || "").filter(Boolean);
+      if (matchesProcrastinationHost(procHosts)) {
+        setTimeout(() => {
+          if (!document.getElementById("aiki-reward-overlay")) {
+            renderProcrastinationRewardOverlay();
+          }
+        }, 50);
+      }
+    }
+  } catch (_) { }
+}
+
+renderProcrastinationRewardOverlay = createRewardOverlay({
+  registerPersistenceCallback,
+  scheduleRewardEnsure,
+  makeDraggable,
+  createTimerPort,
+  formatDuration,
+});
+
+const renderRedirectPrompt = createRedirectPromptOverlay({
+  STYLES,
+  removeOverlay,
+  renderProcrastinationRewardOverlay,
+});
+
+renderLearningContent = createLearningOverlay({
+  registerPersistenceCallback,
+  scheduleLearningEnsure,
+  removeOverlay,
+  makeDraggable,
+  createTimerPort,
+  formatDuration,
+});
+
+const renderContentBlocker = createBlockerOverlay({
+  removeOverlay,
+  createTimerPort,
+  formatDuration,
+});
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", bootstrapLearningOverlayIfNeeded, { once: true });
+} else {
+  bootstrapLearningOverlayIfNeeded();
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", bootstrapRewardOverlayIfNeeded, { once: true });
+} else {
+  bootstrapRewardOverlayIfNeeded();
+}
 
 /* Listener for messages from background script. */
 browser.runtime.onMessage.addListener((request) => {
-  if (request.action === "display: snooze") {
-    return renderProcrastinationContent(request.url);
+  if (request.action === "display: redirectPrompt") {
+    return renderRedirectPrompt(request.originUrl);
   } else if (request.action === "display: encouragement") {
     return renderLearningContent(request.shouldShowWelcome);
+  } else if (request.action === "display: rewardOverlay") {
+    renderProcrastinationRewardOverlay();
+    return Promise.resolve({ action: "reward overlay shown" });
   } else if (request.action === "kill aiki") {
     removeOverlay();
-    return new Promise((resolve) => {
-      timer.stop();
-      resolve({ action: "end injection" });
-    });
+    removeRewardOverlay();
+    return Promise.resolve({ action: "end injection" });
   } else if (request.action === "inject blocker") {
-    console.log("Request: ", request);
-    l("Render blocking function should fire now");
     renderContentBlocker();
+    return Promise.resolve({ action: "blocker injected" });
   } else if (request.action === "remove blocker") {
     removeOverlay();
+    return Promise.resolve({ action: "blocker removed" });
   }
 });
-
-/* This object contains countdown functionality including 
-  functions to hasten and slow the countdown progress.
-  If it reaches zero, it will initial redirection and change window
-  location to a learning site URL as recieved from background script 
-  It is passed to the svelte content function app */
-let timer = {
-  time: 5000,
-  interval: undefined,
-  slowed: false,
-  start: function (resolve, url) {
-    timer.interval = setInterval(() => {
-      if (timer.slowed) {
-        timer.time -= 20;
-      } else {
-        timer.time -= 100;
-      }
-      if (timer.time <= 0) {
-        timer.stop();
-        resolve({ msg: "Auto resolve", snooze: false });
-        location.href = url;
-      }
-    }, 100);
-  },
-  stop: function () {
-    if (timer.interval) clearInterval(timer.interval);
-    timer.interval = undefined;
-    timer.time = 5000;
-    removeOverlay();
-  },
-};
-
-/**
- * @function
- * @description Removes the aiki interception overlay
- * by searching for DOM elements with the name "aiki-overlay" and calling remove() on it/them.  */
-function removeOverlay() {
-  l("Removing aiki-overlay");
-  try {
-    const element = document.getElementById("aiki-overlay");
-    l("Element: ", element);
-    if (element) {
-      element.remove();
-    }
-    const elements = document.getElementsByClassName("aiki-overlay");
-    l("Elements: ", elements);
-    if (elements.length > 0) {
-      for (let i = 0; elements.length; i++) {
-        elements[i].remove();
-      }
-    }
-  } catch (error) {
-    // console.log(error);
-  }
-}
-
-function renderProcrastinationContent(url) {
-  return new Promise((resolve) => {
-    /**
-     * @function
-     * @description removes the interception pre-redirection step entirely.
-     * Timers are stopped, and a message is returned to background script with "removeWarning = true".
-     * This function is called by the injected svelte content, and therefore passed to the app function.
-     * Lastly the location of this window will be changed to the learning resource URL as recieved from the background script.*/
-    function snooze() {
-      timer.stop();
-      timer.time = 5000;
-      resolve({ action: "snooze" });
-      removeOverlay();
-    }
-
-    ProcrastinationWarning(snooze, timer, browser, resolve, url);
-  });
-}
-
-function renderLearningContent(shouldShowWelcome) {
-  return new Promise((resolve) => {
-    // addCloseListener();
-    function gotoOrigin(source) {
-      // removeCloseListener();
-      clearInterval(intervalRef);
-      resolve({
-        action: "continue",
-        source: source,
-        uri: location.href,
-      });
-    }
-
-    function endInjection() {
-      clearInterval(intervalRef);
-      resolve({ action: "end injection" });
-    }
-
-    let port = browser.extension.connect({
-      name: "Content Communication",
-    });
-    port.onMessage.addListener(function (msg) {
-      sync(msg);
-    });
-
-    async function sync(msg) {
-      if (msg.learningTimeRemaining <= 0) {
-        isReady = true;
-      }
-    }
-    let isReady = false;
-
-    let intervalRef = setInterval(() => {
-      port.postMessage("get: timer");
-    }, 1000);
-
-    function getReady() {
-      return isReady;
-    }
-
-    LearningContent(
-      shouldShowWelcome,
-      gotoOrigin,
-      endInjection,
-      browser,
-      getReady
-    );
-  });
-}
-
-function renderContentBlocker() {
-  removeOverlay();
-    let port = browser.extension.connect({
-      name: "Content Communication",
-    });
-    l("Injecting blocker");
-    function gotoOriginTab() {
-      port.postMessage("goto: originTab");
-    }
-    ContentBlocker(gotoOriginTab, browser);
-}

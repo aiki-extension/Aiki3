@@ -22,7 +22,7 @@ Used in / Parent components: /src/Pages/Settings.svelte
     background-color: var(--backgroundColorSecondary);
     color: var(--textColor);
     border: var(--borderColor);
-    border-radius: 2px;
+    border-radius: 10px;
     box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.1);
     margin: 0 0 1em 0;
     padding: 1.5em;
