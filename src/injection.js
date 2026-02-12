@@ -85,6 +85,19 @@ const makeDraggable = (element) => {
     };
   };
 
+  const updatePosition = (x, y) => {
+    const constrained = constrainToBounds(x, y);
+    dragState.currentX = constrained.x;
+    dragState.currentY = constrained.y;
+    element.style.left = `${dragState.currentX}px`;
+    element.style.top = `${dragState.currentY}px`;
+  };
+
+  const onResize = () => {
+    // Re-constrain position when window is resized
+    updatePosition(dragState.currentX, dragState.currentY);
+  };
+
   const onPointerDown = (event) => {
     if (event.button !== undefined && event.button !== 0) return;
     
@@ -106,17 +119,10 @@ const makeDraggable = (element) => {
     
     dragState.currentX += dx;
     dragState.currentY += dy;
-    
-    const constrained = constrainToBounds(dragState.currentX, dragState.currentY);
-    
-    dragState.currentX = constrained.x;
-    dragState.currentY = constrained.y;
     dragState.startX = event.clientX;
     dragState.startY = event.clientY;
     
-    // Use left/top instead of transform
-    element.style.left = `${dragState.currentX}px`;
-    element.style.top = `${dragState.currentY}px`;
+    updatePosition(dragState.currentX, dragState.currentY);
     
     event.preventDefault();
     event.stopPropagation();
@@ -141,6 +147,7 @@ const makeDraggable = (element) => {
   element.addEventListener("pointermove", onPointerMove);
   element.addEventListener("pointerup", endDrag);
   element.addEventListener("pointercancel", endDrag);
+  window.addEventListener("resize", onResize);
   
   return {
     cleanup: () => {
@@ -148,6 +155,7 @@ const makeDraggable = (element) => {
       element.removeEventListener("pointermove", onPointerMove);
       element.removeEventListener("pointerup", endDrag);
       element.removeEventListener("pointercancel", endDrag);
+      window.removeEventListener("resize", onResize);
     }
   };
 };
