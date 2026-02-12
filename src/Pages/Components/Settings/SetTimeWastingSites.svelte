@@ -55,6 +55,14 @@
   }
   setup();
   let addItemValue = "";
+  let selectedSite = "";
+  const commonSites = [ // common sites that are used as examples and hardcode so wont have to find
+    "www.facebook.com",
+    "www.youtube.com",
+    "www.instagram.com",
+    "www.tiktok.com",
+    "netflix.com",
+  ];
 
   async function removeItem(index) {
     let newList = [...list];
