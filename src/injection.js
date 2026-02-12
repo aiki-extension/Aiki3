@@ -54,7 +54,9 @@ const makeDraggable = (element) => {
     startX: 0, 
     startY: 0,
     currentX: 0,
-    currentY: 0
+    currentY: 0,
+    intendedX: 0,  // Track where user actually dragged to
+    intendedY: 0
   };
 
   // Initialize position based on current location
@@ -62,6 +64,8 @@ const makeDraggable = (element) => {
     const rect = element.getBoundingClientRect();
     dragState.currentX = rect.left;
     dragState.currentY = rect.top;
+    dragState.intendedX = rect.left;
+    dragState.intendedY = rect.top;
     
     // Set initial positioning
     element.style.position = 'fixed';
@@ -72,7 +76,7 @@ const makeDraggable = (element) => {
 
   const constrainToBounds = (x, y) => {
     const rect = element.getBoundingClientRect();
-    const margin = 24;
+    const margin = 0;
     
     const minX = margin;
     const minY = margin;
@@ -85,8 +89,9 @@ const makeDraggable = (element) => {
     };
   };
 
-  const updatePosition = (x, y) => {
-    const constrained = constrainToBounds(x, y);
+  const updatePosition = (intendedX, intendedY) => {
+    // Always constrain based on intended position
+    const constrained = constrainToBounds(intendedX, intendedY);
     dragState.currentX = constrained.x;
     dragState.currentY = constrained.y;
     element.style.left = `${dragState.currentX}px`;
@@ -94,12 +99,17 @@ const makeDraggable = (element) => {
   };
 
   const onResize = () => {
-    // Re-constrain position when window is resized
-    updatePosition(dragState.currentX, dragState.currentY);
+    // Re-constrain based on intended position, not current position
+    updatePosition(dragState.intendedX, dragState.intendedY);
   };
 
   const onPointerDown = (event) => {
     if (event.button !== undefined && event.button !== 0) return;
+    
+    // Don't start draggin if clicking on a button or interactive element inside the panel
+    if (event.target.tagName === 'BUTTON' || event.target.closest('button')) {
+      return;
+    }
     
     dragState.dragging = true;
     dragState.startX = event.clientX;
@@ -117,12 +127,13 @@ const makeDraggable = (element) => {
     const dx = event.clientX - dragState.startX;
     const dy = event.clientY - dragState.startY;
     
-    dragState.currentX += dx;
-    dragState.currentY += dy;
+    // Update intended position (where user is dragging to)
+    dragState.intendedX += dx;
+    dragState.intendedY += dy;
     dragState.startX = event.clientX;
     dragState.startY = event.clientY;
     
-    updatePosition(dragState.currentX, dragState.currentY);
+    updatePosition(dragState.intendedX, dragState.intendedY);
     
     event.preventDefault();
     event.stopPropagation();
@@ -159,7 +170,6 @@ const makeDraggable = (element) => {
     }
   };
 };
-
 /**
  * Create a timer communication port with polling.
  * @param {(msg: any) => void} updateCallback - Function to call on each timer update
@@ -552,7 +562,7 @@ function renderLearningContent() {
     const isCollapsedKey = "aiki-learning-collapsed";
     let isCollapsed = localStorage.getItem(isCollapsedKey) === "true";
 
-    const getPanelStyle = (collapsed) => `pointer-events: auto; margin: 24px; padding: ${collapsed ? "10px 14px" : "clamp(16px, 3vw, 22px)"}; min-width: ${collapsed ? "140px" : "260px"}; max-width: ${collapsed ? "180px" : "320px"}; background: rgba(15, 23, 42, 0.96); color: #f8fafc; border-radius: ${collapsed ? "12px" : "18px"}; box-shadow: 0 24px 45px rgba(15, 23, 42, 0.45); font-family: 'Inter', 'Segoe UI', sans-serif; display: flex; flex-direction: column; gap: ${collapsed ? "6px" : "12px"}; cursor: grab; position: relative; font-size: 14px; transition: all 0.3s ease;`;
+    const getPanelStyle = (collapsed) => `pointer-events: auto; padding: ${collapsed ? "10px 14px" : "clamp(16px, 3vw, 22px)"}; min-width: ${collapsed ? "140px" : "260px"}; max-width: ${collapsed ? "180px" : "320px"}; background: rgba(15, 23, 42, 0.96); color: #f8fafc; border-radius: ${collapsed ? "12px" : "18px"}; box-shadow: 0 24px 45px rgba(15, 23, 42, 0.45); font-family: 'Inter', 'Segoe UI', sans-serif; display: flex; flex-direction: column; gap: ${collapsed ? "6px" : "12px"}; cursor: grab; position: relative; font-size: 14px; transition: all 0.3s ease;`;
 
     panel.setAttribute("style", getPanelStyle(isCollapsed));
 
@@ -622,6 +632,7 @@ function renderLearningContent() {
 
     // Collapse/expand toggle handler
     const toggleCollapse = () => {
+      console.log("TOGGLE COLLAPSE IS PRESSED");
       isCollapsed = !isCollapsed;
       localStorage.setItem(isCollapsedKey, isCollapsed.toString());
       collapseBtn.textContent = isCollapsed ? "▼" : "▲";
