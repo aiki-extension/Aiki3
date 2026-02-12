@@ -146,10 +146,7 @@
     Type in pages you feel like you spend a little too much time on here (e.g:
     www.facebook.com, www.reddit.com, 9gag.com).
   </p>
-  <p>
-    <strong>NB:</strong> You can still visit these websites, Aiki will just be logging
-    the amount of time you spend on them.
-  </p>
+ 
 
   <form on:submit|preventDefault={addItem}>
     <div data-tooltip="Add to your list of procrastination sites">
