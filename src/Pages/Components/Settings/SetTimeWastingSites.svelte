@@ -24,6 +24,7 @@
 
   let toastCoords = { y: "add-button", x: "site-input-container" };
   let syncingPrefs = false;
+  let learningUri = ""; 
 
   async function setup() {
     const storedList = (await storage.list.get()) || [];
@@ -70,10 +71,17 @@
   }
 
   async function addItem() {
-    if (addItemValue === "") {
+    learningUri = parseUrl(await storage.learningUri.get())
+    let site = parseUrl(addItemValue);
+
+    if (addItemValue === "" ||  learningUri.name === site.name) {
+      toast.pop();
+      toast.push("This site is set in your redirection!", {
+        theme: themes.infoTheme(toastCoords),
+      });
       return;
     }
-    let site = parseUrl(addItemValue);
+
     if (list.find((item) => item.name == site.name)) {
       toast.pop();
       toast.push("Website already in list.", {
@@ -81,6 +89,7 @@
       });
       return;
     }
+
     let status = await pingSite(site.host);
     if (status) {
       let newList = [...list];
