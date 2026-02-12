@@ -251,10 +251,6 @@ async function redirect(details) {
             return; // We are in global cooldown period - Don't show prompt
           }
 
-          // Note: We don't set promptLock here - it's set in promptRedirect callbacks
-          // Setting it before the prompt succeeds would block retries in Firefox
-          // where navigation events fire before content script is ready
-
           // Experimental variant: show consent prompt
           promptRedirect(details.tabId, learningUri, details.url);
         }
