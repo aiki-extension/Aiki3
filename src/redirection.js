@@ -24,7 +24,7 @@ const promptCoordinator = new PromptCoordinator({
 });
 
 let shouldShowWelcome = true;
-const PROMPT_SUPPRESS_DURATION = 2 * 60 * 1000; // 2 minutes
+const PROMPT_SUPPRESS_DURATION = 10 * 60 * 1000; // 10 minutes - global cooldown across all tabs
 const PREPROMPT_ID = "__aiki-preprompt";
 
 function buildProcrastinationUrlFilters(list = []) {
@@ -238,17 +238,17 @@ async function redirect(details) {
         } else {
           const learningUri = await storage.learningUri.get();
           if (!learningUri) return; // skip redirection if no learning URL configured
-          const hostName = parseUrl(details.url).name;
-          const promptLock = await storage.promptLocks.get(details.tabId);
+          
+          // Check global prompt lock (applies to all tabs)
+          const globalPromptLock = await storage.globalPromptLock.get();  // ← GLOBAL CHECK
           const now = Date.now();
 
           if (
-            promptLock &&
-            promptLock.host === hostName &&
-            now - promptLock.timestamp < PROMPT_SUPPRESS_DURATION
+            globalPromptLock &&                                           // Does global lock exists
+            now - globalPromptLock.timestamp < PROMPT_SUPPRESS_DURATION   // And still within time limit set (10 min)
           ) {
-            l("Skipping prompt due to recent eventData for tab", details.tabId);
-            return;
+            l("Skipping prompt due to global cooldown (10 minutes)");
+            return; // We are in global cooldown period - Don't show prompt
           }
 
           // Note: We don't set promptLock here - it's set in promptRedirect callbacks
@@ -394,13 +394,11 @@ async function getActiveLearningTabs(excludedIds = new Set()) {
 }
 
 async function setPromptCooldown(tabId, url) {
-  if (!tabId || !url) return;
+  if (!url) return;
   try {
-    const hostName = parseUrl(url).name;
-    if (!hostName) return;
-    await storage.promptLocks.set(tabId, {
-      host: hostName,
-      timestamp: Date.now(),
+    // Set global prompt lock (applies to all tabs for 10 minutes)
+    await storage.globalPromptLock.set({  
+      timestamp: Date.now(),  // Time stored for cooldown
     });
   } catch (_) { }
 }
@@ -725,13 +723,13 @@ async function gotoOrigin(event, sourceContext = {}) {
 async function promptRedirect(tabId, url, originUrl) {
   await promptCoordinator.promptRedirect(tabId, url, originUrl, {
     onContinue: async () => {
-      // Set prompt lock now that user has explicitly clicked Stay
-      // This prevents the prompt from appearing again for 2 minutes
-      const hostName = parseUrl(originUrl).name;
-      await storage.promptLocks.set(tabId, {
-        host: hostName,
+      // Set global prompt lock now that user has explicitly clicked Stay
+      // This prevents the prompt from appearing again for 10 minutes (across all tabs)
+      await storage.globalPromptLock.set({  
         timestamp: Date.now(),
       });
+
+      // Start tracking procastination session
       navigationGuards.install();
       await SessionService.startSession(tabId, "procrastination", originUrl);
       await logDeclinedIntervention(originUrl, url);
@@ -750,7 +748,9 @@ async function promptRedirect(tabId, url, originUrl) {
       await timer.startLearningSession();
       storage.origin.set({ url: originUrl, tabId: tabId });
       addOriginUpdatedListener(tabId);
-      await storage.promptLocks.remove(tabId);
+
+      // Clears the global prompt lock when user accepts
+      await storage.promptLocks.remove();
       try {
         scheduleRevealOnLoad(tabId);
         await browser.tabs.update(tabId, {
