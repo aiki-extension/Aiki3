@@ -211,6 +211,7 @@
               {item.host}
             </td>
             <td style="text-align: center">
+              <!-- svelte-ignore a11y-click-events-have-key-events -->
               <div
                 data-tooltip="Remove this site from the list."
                 on:click={() => removeItem(index)}>
