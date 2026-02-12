@@ -294,8 +294,12 @@ browser.runtime.onMessage.addListener((request) => {
 
 /**
  * @function
- * @description Removes the aiki interception overlay
- * by searching for DOM elements with the name "aiki-overlay" and calling remove() on it/them.  */
+ * @description Removes the aiki interception overlay by searching for DOM elements 
+ * with the name "aiki-overlay". Also calls any cleanup functions attached to the 
+ * overlay elements to properly dispose of event listeners and intervals. 
+ * This ensures a clean slate before showing new overlays and prevents 
+ * duplicate overlays from stacking.
+ */
 function removeOverlay() {
   l("Removing aiki-overlay");
   try {
