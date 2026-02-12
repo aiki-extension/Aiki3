@@ -149,7 +149,7 @@ function createLearningOverlay({
 
             barFill.style.width = `${percent}%`;
             barFill.style.background = "linear-gradient(135deg, #22c55e, #14b8a6)";
-            heading.textContent = "📚 Learning Session";
+            heading.textContent = "📚 Redirection Session";
             panel.style.background = defaultBg;
             claimRewardBtn.style.display = "none";
 
@@ -202,7 +202,7 @@ function createLearningOverlay({
           barFill.style.width = `${percent}%`;
           barFill.style.background = "linear-gradient(135deg, #22c55e, #14b8a6)";
           progressLabel.textContent = goal > 0 ? `${formatDuration(progress)} / ${formatDuration(goal)}` : "Starting...";
-          heading.textContent = "📚 Learning Session";
+          heading.textContent = "📚 Redirection Session";
           claimRewardBtn.style.display = "none";
           panel.style.background = defaultBg;
 
