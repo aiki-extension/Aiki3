@@ -1,6 +1,9 @@
 function getCoords(id) {
-  const rect = document.getElementById(id).getBoundingClientRect();
-  return rect;
+  const element = document.getElementById(id);
+  if (!element) {
+    return { right: 0, top: 0 };
+  }
+  return element.getBoundingClientRect();
 }
 
 export const successTheme = ({ x, y }) => {

@@ -16,6 +16,8 @@
   export let port;
   let toastCoords = { y: "id-input-field", x: "user-settings" };
   let previousUser = "";
+  let emailTouched = false;
+  let emailError = "";
   const basicEmailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
   function normalizeUser(value) {
@@ -26,6 +28,29 @@
     return basicEmailRegex.test(value);
   }
 
+  function validateEmail({ requireValue = true } = {}) {
+    const normalizedUser = normalizeUser(user);
+    if (!normalizedUser) {
+      emailError = requireValue ? "Please enter your email before submitting." : "";
+      return false;
+    }
+
+    if (!isValidEmail(normalizedUser)) {
+      emailError =
+        "Please enter a valid email address (for example: name@mail.com).";
+      return false;
+    }
+
+    emailError = "";
+    return true;
+  }
+
+  function handleEmailInput() {
+    if (!emailTouched) return;
+    emailTouched = false;
+    emailError = "";
+  }
+
   async function setup() {
     user = normalizeUser(await storage.uid.get());
     userIsRegistered = user !== "" ? true : false;
@@ -33,16 +58,15 @@
   }
 
   async function confirmUid() {
+    emailTouched = false;
+    emailError = "";
+
     const normalizedUser = normalizeUser(user);
     user = normalizedUser;
-    if (!normalizedUser) {
-      toast.push("Please enter your email before submitting.", {
-        theme: themes.warningTheme(toastCoords),
-      });
-      return;
-    }
-    if (!isValidEmail(normalizedUser)) {
-      toast.push("Please enter a valid email address.", {
+
+    if (!validateEmail()) {
+      emailTouched = true;
+      toast.push(emailError || "Please enter a valid email address.", {
         theme: themes.warningTheme(toastCoords),
       });
       return;
@@ -65,6 +89,7 @@
         participantUpdates: { is_extension_active: true },
       });
       userIsRegistered = true;
+      emailError = "";
       port.postMessage(`Update: user`);
       setTimeout(() => {
         toast.push("User registered!", {
@@ -93,6 +118,8 @@
       userIsRegistered = false;
       user = "";
       previousUser = "";
+      emailTouched = false;
+      emailError = "";
       port.postMessage(`Update: user`);
     }
   }
@@ -139,12 +166,18 @@
     <!-- https://getbootstrap.com/docs/4.0/components/input-group/ -->
     <div class="input-group mb-3">
       <input
+        id="id-input-field"
         bind:value={user}
         type="email"
         class="form-control"
+        class:is-invalid={emailTouched && !!emailError}
         placeholder="Enter your email here..."
+        autocomplete="email"
+        required
         aria-label=""
         aria-describedby="basic-addon2"
+        aria-invalid={emailTouched && !!emailError}
+        on:input={handleEmailInput}
       />
       <div class="input-group-append">
         <button on:click={confirmUid} class="btn btn-primary" type="button"
@@ -152,6 +185,9 @@
         >
       </div>
     </div>
+    {#if emailTouched && emailError}
+      <div class="invalid-feedback d-block">{emailError}</div>
+    {/if}
   {/if}
 </Container>
 
