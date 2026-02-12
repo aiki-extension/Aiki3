@@ -49,44 +49,105 @@ const formatDuration = (value) => {
  * @returns {{ cleanup: () => void }}
  */
 const makeDraggable = (element) => {
-  let dragState = { dragging: false, startX: 0, startY: 0, offsetX: 0, offsetY: 0 };
+  let dragState = { 
+    dragging: false, 
+    startX: 0, 
+    startY: 0,
+    currentX: 0,
+    currentY: 0
+  };
+
+  // Initialize position based on current location
+  const initializePosition = () => {
+    const rect = element.getBoundingClientRect();
+    dragState.currentX = rect.left;
+    dragState.currentY = rect.top;
+    
+    // Set initial positioning
+    element.style.position = 'fixed';
+    element.style.left = `${dragState.currentX}px`;
+    element.style.top = `${dragState.currentY}px`;
+    element.style.transform = 'none'; // Clear any transform
+  };
+
+  const constrainToBounds = (x, y) => {
+    const rect = element.getBoundingClientRect();
+    const margin = 24;
+    
+    const minX = margin;
+    const minY = margin;
+    const maxX = window.innerWidth - rect.width - margin;
+    const maxY = window.innerHeight - rect.height - margin;
+    
+    return {
+      x: Math.max(minX, Math.min(maxX, x)),
+      y: Math.max(minY, Math.min(maxY, y))
+    };
+  };
 
   const onPointerDown = (event) => {
+    if (event.button !== undefined && event.button !== 0) return;
+    
     dragState.dragging = true;
     dragState.startX = event.clientX;
     dragState.startY = event.clientY;
+    
     element.style.cursor = "grabbing";
+    element.setPointerCapture(event.pointerId);
     event.preventDefault();
+    event.stopPropagation();
   };
 
   const onPointerMove = (event) => {
     if (!dragState.dragging) return;
+    
     const dx = event.clientX - dragState.startX;
     const dy = event.clientY - dragState.startY;
-    dragState.offsetX += dx;
-    dragState.offsetY += dy;
+    
+    dragState.currentX += dx;
+    dragState.currentY += dy;
+    
+    const constrained = constrainToBounds(dragState.currentX, dragState.currentY);
+    
+    dragState.currentX = constrained.x;
+    dragState.currentY = constrained.y;
     dragState.startX = event.clientX;
     dragState.startY = event.clientY;
-    element.style.transform = `translate(${dragState.offsetX}px, ${dragState.offsetY}px)`;
+    
+    // Use left/top instead of transform
+    element.style.left = `${dragState.currentX}px`;
+    element.style.top = `${dragState.currentY}px`;
+    
     event.preventDefault();
+    event.stopPropagation();
   };
 
-  const endDrag = () => {
+  const endDrag = (event) => {
+    if (!dragState.dragging) return;
+    
     dragState.dragging = false;
     element.style.cursor = "grab";
+    
+    if (event.pointerId !== undefined) {
+      element.releasePointerCapture(event.pointerId);
+    }
   };
 
+  // Initialize position
+  initializePosition();
+  
+  element.style.cursor = "grab";
   element.addEventListener("pointerdown", onPointerDown);
-  window.addEventListener("pointermove", onPointerMove);
-  window.addEventListener("pointerup", endDrag);
-  window.addEventListener("pointerleave", endDrag);
-
+  element.addEventListener("pointermove", onPointerMove);
+  element.addEventListener("pointerup", endDrag);
+  element.addEventListener("pointercancel", endDrag);
+  
   return {
     cleanup: () => {
       element.removeEventListener("pointerdown", onPointerDown);
-      window.removeEventListener("pointermove", onPointerMove);
-      window.removeEventListener("pointerup", endDrag);
-      window.removeEventListener("pointerleave", endDrag);
+      element.removeEventListener("pointermove", onPointerMove);
+      element.removeEventListener("pointerup", endDrag);
+      element.removeEventListener("pointercancel", endDrag);
     }
   };
 };
