@@ -96,6 +96,16 @@ const makeDraggable = (element) => {
     dragState.currentY = constrained.y;
     element.style.left = `${dragState.currentX}px`;
     element.style.top = `${dragState.currentY}px`;
+    console.log("Position: ", { intendedX, intendedY, constrained });
+  };
+
+  // Method to sync intended position with current actual position
+  const syncIntendedPosition = () => {
+    const rect = element.getBoundingClientRect();
+    dragState.intendedX = rect.left;
+    dragState.intendedY = rect.top;
+    dragState.currentX = rect.left;
+    dragState.currentY = rect.top;
   };
 
   const onResize = () => {
@@ -110,7 +120,7 @@ const makeDraggable = (element) => {
     if (event.target.tagName === 'BUTTON' || event.target.closest('button')) {
       return;
     }
-    
+
     dragState.dragging = true;
     dragState.startX = event.clientX;
     dragState.startY = event.clientY;
@@ -167,7 +177,8 @@ const makeDraggable = (element) => {
       element.removeEventListener("pointerup", endDrag);
       element.removeEventListener("pointercancel", endDrag);
       window.removeEventListener("resize", onResize);
-    }
+    },
+    syncIntendedPosition
   };
 };
 /**
@@ -636,18 +647,41 @@ function renderLearningContent() {
       isCollapsed = !isCollapsed;
       localStorage.setItem(isCollapsedKey, isCollapsed.toString());
       collapseBtn.textContent = isCollapsed ? "▼" : "▲";
+      
+      // Store current position before changing styles
+      const currentLeft = panel.style.left;
+      const currentTop = panel.style.top;
+      const currentPosition = panel.style.position;
+      const currentTransform = panel.style.transform;
+      
+      // Update the style
       panel.setAttribute("style", getPanelStyle(isCollapsed));
+      
+      // Restore positioning properties
+      if (currentPosition) panel.style.position = currentPosition;
+      if (currentLeft) panel.style.left = currentLeft;
+      if (currentTop) panel.style.top = currentTop;
+      if (currentTransform) panel.style.transform = currentTransform;
+      
       heading.style.display = isCollapsed ? "none" : "block";
       status.style.display = isCollapsed ? "none" : "block";
       barShell.style.height = isCollapsed ? "6px" : "10px";
       progressLabel.style.fontSize = isCollapsed ? "0.95em" : "0.9em";
       progressLabel.style.fontWeight = isCollapsed ? "600" : "400";
+      
       if (isCollapsed && claimRewardBtn.style.display !== "none") {
         claimRewardBtn.dataset.wasVisible = "true";
         claimRewardBtn.style.display = "none";
       } else if (!isCollapsed && claimRewardBtn.dataset.wasVisible === "true") {
         claimRewardBtn.style.display = "block";
       }
+      
+      // Sync the intended position after size change
+      setTimeout(() => {
+        if (dragHandle && dragHandle.syncIntendedPosition) {
+          dragHandle.syncIntendedPosition();
+        }
+      }, 300);
     };
     collapseBtn.addEventListener("click", (e) => {
       e.stopPropagation();
