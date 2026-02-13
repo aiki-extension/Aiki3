@@ -8,18 +8,16 @@
   import { saveUserPreferences, logEvent } from "../../../util/logger";
 
   let minuteOptions = Array.from({ length: 121 }, (_, i) => i); // 0 - 120 minutes
-  let secondsOptions = [0, 15, 30, 45]; // 15-second intervals
 
   export let update;
   export let user;
 
   let goalMin = 30;
-  let goalSec = 0;
+  const goalSec = 0;
 
   onMount(async () => {
     const dailyGoal = await storage.timeSettings.dailyGoal.get();
     goalMin = dailyGoal.min;
-    goalSec = dailyGoal.sec;
   });
 
   function parseNumberToTime(number) {
@@ -54,13 +52,13 @@
     } catch (e) {
       console.warn("Failed to sync daily goal preference", e);
     }
-    update();
+    update?.();
   }
 </script>
 
 <div class="row">
   <div class="col-sm">
-    <p>Daily learning goal:</p>
+    <p>Daily Productive Goal:</p>
   </div>
   <div class="col-sm" />
   <div class="col-sm">
@@ -75,18 +73,7 @@
           <option {value}>{parseNumberToTime(value)}</option>
         {/each}
       </select>
-      <p>:</p>
-      <!-- svelte-ignore a11y-no-onchange -->
-      <select
-        bind:value={goalSec}
-        on:change={setDailyGoal}
-        class="custom-select custom-select-sm inline"
-      >
-        {#each secondsOptions as value}
-          <option {value}>{parseNumberToTime(value)}</option>
-        {/each}
-      </select>
-      <p><small>{"Min/Sec"}</small></p>
+      <p><small>{"Min"}</small></p>
     </div>
   </div>
 </div>

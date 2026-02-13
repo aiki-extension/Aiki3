@@ -13,7 +13,6 @@
   export let user;
 </script>
 
-<h5>Set Operating Hours:</h5>
 
 {#await operatingHours}
   LOADING...

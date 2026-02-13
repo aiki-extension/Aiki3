@@ -17,6 +17,7 @@
   } from "@fortawesome/free-solid-svg-icons";
   import { toast } from "@zerodevx/svelte-toast";
   import * as themes from "./util/toastThemes";
+  
 
   export let user = "";
   export let port;
@@ -140,7 +141,6 @@
 </script>
 
 <Container id="site-input-container" headline="Set Time Wasting Sites">
-  <h5>Add your Time Wasting Sites here:</h5>
   <hr />
   <p>
     Type in pages you feel like you spend a little too much time on here (e.g:

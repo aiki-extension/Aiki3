@@ -176,7 +176,7 @@ function createLearningOverlay({
             progressLabel.textContent = goal > 0 ? `${formatDuration(progress)} / ${formatDuration(goal)}` : "Enjoy!";
             heading.textContent = "🎉 Reward Time";
             status.textContent = goal > 0 ? `Enjoy! ${formatDuration(remaining)} remaining.` : "Your reward time!";
-            panel.style.background = "linear-gradient(135deg, #ffffff, #32CD32)";
+            panel.style.background = "linear-gradient(135deg, #32CD32, #ffffff)";
             claimRewardBtn.style.display = "none";
           } else {
             heading.textContent = "📚 Aiki Learning";

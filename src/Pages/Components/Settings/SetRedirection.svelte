@@ -15,6 +15,7 @@
   import ThemeSelector from "./ThemeSelector.svelte";
   import OperatingHoursSettings from "./OperatingHoursSettings.svelte";
   import TimeSettings from "./TimeSettings.svelte";
+  import DailyGoal from "./DailyGoal.svelte";
 
   export let user = "";
 
@@ -105,8 +106,10 @@
 
 </script>
 
-<Container headline="Redirection Settings">
-  <h5>Your Redirection Platform:</h5>
+<Container headline="Configure Productivity Activity">
+  <hr />
+  <p>Provide the URL for the redirection platform</p>
+  
   <div class="container">
     <div class="full" id="learning-url-container">
       <input
@@ -143,8 +146,7 @@
             type="button"
             class="btn btn-theme-primary"
             on:click={enableEditing}
-            data-tooltip="Change your learning platform"
-          >
+            data-tooltip="Change your learning platform">
             Change
           </button>
         {/if}
@@ -154,25 +156,34 @@
           <span class="status-badge saved">Saved for redirection</span>
         {/if}
       </div>
+      <hr />
     </div>
   </div>
+  <div>
+    <DailyGoal {user} />
+  </div>
+  </Container>
+  <br>
+  <Container headline="Configure Interception Session">
   <hr />
   <TimeSettings {user} />
-  <hr />
+  </Container>
+  <br>
+  <Container headline="Set Operating Hours:">
+    <hr>
   <OperatingHoursSettings {user} />
-
+  </Container>
+  <br>
+  <Container headline="Pick a Theme">
   <hr />
-  <h5>Other Settings:</h5>
   <div>
     <div class="row">
-      <div class="col-sm">Pick a theme:</div>
-      <div class="col-sm" />
       <div class="col-sm center">
         <ThemeSelector />
       </div>
     </div>
-  </div>
-</Container>
+
+  </Container>
 
 <style>
   .container {

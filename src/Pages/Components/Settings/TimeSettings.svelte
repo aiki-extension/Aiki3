@@ -1,10 +1,9 @@
 <!-- 
-  Time settings container showing DailyGoal, SessionDuration, and RewardTime.
+  Time settings container showing SessionDuration and RewardTime.
   Used in / Parent components: /src/Pages/Settings.svelte
  -->
 <script>
   import storage from "../../../util/storage";
-  import DailyGoal from "./DailyGoal.svelte";
   import TimeSelector from "./TimeSelector.svelte";
   
   let timeSettings = storage.timeSettings.getAll();
@@ -15,16 +14,12 @@
   export let user;
 </script>
 
-<h5>Redirection Settings:</h5>
 <p>
-	•	Daily goal (total time you aim to spend on the redirected site each day)<br>
-	•	Session duration (time per learning session)<br>
-	•	Reward time (time allowed on the procrastination site)<br>
+	Each time you’re intercepted, you’re redirected to a productive site for a minimum study period. Once completed, this unlocks a reward period on your time-wasting site.
 </p>
 {#await timeSettings}
   LOADING...
 {:then settings}
-  <DailyGoal {update} {user} />
   <TimeSelector {update} {user} />
 {/await}
 
