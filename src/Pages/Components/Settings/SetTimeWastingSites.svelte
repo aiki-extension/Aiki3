@@ -211,6 +211,7 @@
               {item.host}
             </td>
             <td style="text-align: center">
+              <!-- This is to suppress the on:click event warning -->
               <!-- svelte-ignore a11y-click-events-have-key-events -->
               <div
                 data-tooltip="Remove this site from the list."
