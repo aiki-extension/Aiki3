@@ -61,7 +61,7 @@
     "www.youtube.com",
     "www.instagram.com",
     "www.tiktok.com",
-    "netflix.com",
+    "www.netflix.com",
   ];
 
   async function removeItem(index) {
