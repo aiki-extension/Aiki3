@@ -49,45 +49,207 @@ const formatDuration = (value) => {
  * @returns {{ cleanup: () => void }}
  */
 const makeDraggable = (element) => {
-  let dragState = { dragging: false, startX: 0, startY: 0, offsetX: 0, offsetY: 0 };
+  let dragState = { 
+    dragging: false, 
+    startX: 0, 
+    startY: 0,
+    currentX: 0,
+    currentY: 0,
+    intendedX: 0,
+    intendedY: 0
+  };
+
+  // Determine which corner to snap to based on position
+  const getNearestCorner = () => {
+    const rect = element.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    
+    return {
+      horizontal: centerX > window.innerWidth / 2 ? 'right' : 'left',
+      vertical: centerY > window.innerHeight / 2 ? 'bottom' : 'top'
+    };
+  };
+
+  // Snap position to nearest corner
+  const snapToCorner = () => {
+    const corner = getNearestCorner();
+    const rect = element.getBoundingClientRect();
+    const margin = 24; // Corner margin
+    
+    let x, y;
+    
+    if (corner.horizontal === 'right') {
+      x = window.innerWidth - rect.width - margin;
+    } else {
+      x = margin;
+    }
+    
+    if (corner.vertical === 'bottom') {
+      y = window.innerHeight - rect.height - margin;
+    } else {
+      y = margin;
+    }
+    
+    return { x, y, corner };
+  };
+
+  // Apply position using corner anchors
+  const applyPosition = (x, y, corner) => {
+    const rect = element.getBoundingClientRect();
+    
+    // Clear all position properties first
+    element.style.left = '';
+    element.style.right = '';
+    element.style.top = '';
+    element.style.bottom = '';
+    
+    // Apply appropriate corner anchors
+    if (corner.horizontal === 'right') {
+      const rightOffset = window.innerWidth - x - rect.width;
+      element.style.right = `${rightOffset}px`;
+    } else {
+      element.style.left = `${x}px`;
+    }
+    
+    if (corner.vertical === 'bottom') {
+      const bottomOffset = window.innerHeight - y - rect.height;
+      element.style.bottom = `${bottomOffset}px`;
+    } else {
+      element.style.top = `${y}px`;
+    }
+  };
+
+  const initializePosition = () => {
+    const rect = element.getBoundingClientRect();
+    dragState.currentX = rect.left;
+    dragState.currentY = rect.top;
+    dragState.intendedX = rect.left;
+    dragState.intendedY = rect.top;
+    
+    element.style.position = 'fixed';
+    element.style.transform = 'none';
+    
+    // Snap to nearest corner on init
+    const { x, y, corner } = snapToCorner();
+    dragState.currentX = x;
+    dragState.currentY = y;
+    dragState.intendedX = x;
+    dragState.intendedY = y;
+    applyPosition(x, y, corner);
+  };
+
+  const updatePosition = (intendedX, intendedY) => {
+    // During drag, allow free movement but constrain to bounds
+    const rect = element.getBoundingClientRect();
+    const margin = 24;
+    
+    const minX = margin;
+    const minY = margin;
+    const maxX = window.innerWidth - rect.width - margin;
+    const maxY = window.innerHeight - rect.height - margin;
+    
+    const x = Math.max(minX, Math.min(maxX, intendedX));
+    const y = Math.max(minY, Math.min(maxY, intendedY));
+    
+    dragState.currentX = x;
+    dragState.currentY = y;
+    
+    const corner = getNearestCorner();
+    applyPosition(x, y, corner);
+  };
+
+  const syncIntendedPosition = () => {
+    // Snap to nearest corner when size changes
+    const { x, y, corner } = snapToCorner();
+    dragState.intendedX = x;
+    dragState.intendedY = y;
+    dragState.currentX = x;
+    dragState.currentY = y;
+    applyPosition(x, y, corner);
+  };
+
+  const onResize = () => {
+    // Snap to corner on resize
+    const { x, y, corner } = snapToCorner();
+    dragState.intendedX = x;
+    dragState.intendedY = y;
+    dragState.currentX = x;
+    dragState.currentY = y;
+    applyPosition(x, y, corner);
+  };
 
   const onPointerDown = (event) => {
+    if (event.button !== undefined && event.button !== 0) return;
+    
+    if (event.target.tagName === 'BUTTON' || event.target.closest('button')) {
+      return;
+    }
+
     dragState.dragging = true;
     dragState.startX = event.clientX;
     dragState.startY = event.clientY;
+    
     element.style.cursor = "grabbing";
+    element.setPointerCapture(event.pointerId);
     event.preventDefault();
+    event.stopPropagation();
   };
 
   const onPointerMove = (event) => {
     if (!dragState.dragging) return;
+    
     const dx = event.clientX - dragState.startX;
     const dy = event.clientY - dragState.startY;
-    dragState.offsetX += dx;
-    dragState.offsetY += dy;
+    
+    dragState.intendedX += dx;
+    dragState.intendedY += dy;
     dragState.startX = event.clientX;
     dragState.startY = event.clientY;
-    element.style.transform = `translate(${dragState.offsetX}px, ${dragState.offsetY}px)`;
+    
+    updatePosition(dragState.intendedX, dragState.intendedY);
+    
     event.preventDefault();
+    event.stopPropagation();
   };
 
-  const endDrag = () => {
+  const endDrag = (event) => {
+    if (!dragState.dragging) return;
+    
     dragState.dragging = false;
     element.style.cursor = "grab";
+    
+    // Snap to nearest corner when drag ends
+    const { x, y, corner } = snapToCorner();
+    dragState.intendedX = x;
+    dragState.intendedY = y;
+    dragState.currentX = x;
+    dragState.currentY = y;
+    applyPosition(x, y, corner);
+    
+    if (event.pointerId !== undefined) {
+      element.releasePointerCapture(event.pointerId);
+    }
   };
 
+  initializePosition();
+  
+  element.style.cursor = "grab";
   element.addEventListener("pointerdown", onPointerDown);
-  window.addEventListener("pointermove", onPointerMove);
-  window.addEventListener("pointerup", endDrag);
-  window.addEventListener("pointerleave", endDrag);
-
+  element.addEventListener("pointermove", onPointerMove);
+  element.addEventListener("pointerup", endDrag);
+  element.addEventListener("pointercancel", endDrag);
+  window.addEventListener("resize", onResize);
+  
   return {
     cleanup: () => {
       element.removeEventListener("pointerdown", onPointerDown);
-      window.removeEventListener("pointermove", onPointerMove);
-      window.removeEventListener("pointerup", endDrag);
-      window.removeEventListener("pointerleave", endDrag);
-    }
+      element.removeEventListener("pointermove", onPointerMove);
+      element.removeEventListener("pointerup", endDrag);
+      element.removeEventListener("pointercancel", endDrag);
+      window.removeEventListener("resize", onResize);
+    },
+    syncIntendedPosition
   };
 };
 
@@ -483,7 +645,7 @@ function renderLearningContent() {
     const isCollapsedKey = "aiki-learning-collapsed";
     let isCollapsed = localStorage.getItem(isCollapsedKey) === "true";
 
-    const getPanelStyle = (collapsed) => `pointer-events: auto; margin: 24px; padding: ${collapsed ? "10px 14px" : "clamp(16px, 3vw, 22px)"}; min-width: ${collapsed ? "140px" : "260px"}; max-width: ${collapsed ? "180px" : "320px"}; background: rgba(15, 23, 42, 0.96); color: #f8fafc; border-radius: ${collapsed ? "12px" : "18px"}; box-shadow: 0 24px 45px rgba(15, 23, 42, 0.45); font-family: 'Inter', 'Segoe UI', sans-serif; display: flex; flex-direction: column; gap: ${collapsed ? "6px" : "12px"}; cursor: grab; position: relative; font-size: 14px; transition: all 0.3s ease;`;
+    const getPanelStyle = (collapsed) => `pointer-events: auto; padding: ${collapsed ? "10px 14px" : "clamp(16px, 3vw, 22px)"}; min-width: ${collapsed ? "140px" : "260px"}; max-width: ${collapsed ? "180px" : "320px"}; background: rgba(15, 23, 42, 0.96); color: #f8fafc; border-radius: ${collapsed ? "12px" : "18px"}; box-shadow: 0 24px 45px rgba(15, 23, 42, 0.45); font-family: 'Inter', 'Segoe UI', sans-serif; display: flex; flex-direction: column; gap: ${collapsed ? "6px" : "12px"}; cursor: grab; position: relative; font-size: 14px; transition: all 0.3s ease;`;
 
     panel.setAttribute("style", getPanelStyle(isCollapsed));
 
@@ -553,21 +715,45 @@ function renderLearningContent() {
 
     // Collapse/expand toggle handler
     const toggleCollapse = () => {
+      console.log("TOGGLE COLLAPSE IS PRESSED");
       isCollapsed = !isCollapsed;
       localStorage.setItem(isCollapsedKey, isCollapsed.toString());
       collapseBtn.textContent = isCollapsed ? "▼" : "▲";
+      
+      // Store current position before changing styles
+      const currentLeft = panel.style.left;
+      const currentTop = panel.style.top;
+      const currentPosition = panel.style.position;
+      const currentTransform = panel.style.transform;
+      
+      // Update the style
       panel.setAttribute("style", getPanelStyle(isCollapsed));
+      
+      // Restore positioning properties
+      if (currentPosition) panel.style.position = currentPosition;
+      if (currentLeft) panel.style.left = currentLeft;
+      if (currentTop) panel.style.top = currentTop;
+      if (currentTransform) panel.style.transform = currentTransform;
+      
       heading.style.display = isCollapsed ? "none" : "block";
       status.style.display = isCollapsed ? "none" : "block";
       barShell.style.height = isCollapsed ? "6px" : "10px";
       progressLabel.style.fontSize = isCollapsed ? "0.95em" : "0.9em";
       progressLabel.style.fontWeight = isCollapsed ? "600" : "400";
+      
       if (isCollapsed && claimRewardBtn.style.display !== "none") {
         claimRewardBtn.dataset.wasVisible = "true";
         claimRewardBtn.style.display = "none";
       } else if (!isCollapsed && claimRewardBtn.dataset.wasVisible === "true") {
         claimRewardBtn.style.display = "block";
       }
+      
+      // Sync the intended position after size change
+      setTimeout(() => {
+        if (dragHandle && dragHandle.syncIntendedPosition) {
+          dragHandle.syncIntendedPosition();
+        }
+      }, 300);
     };
     collapseBtn.addEventListener("click", (e) => {
       e.stopPropagation();
