@@ -589,6 +589,35 @@ async function setControlledRewardSeconds(seconds) {
   await storage.set({ controlledRewardSeconds: seconds });
 }
 
+// Global prompt lock (replaces per-tab promptLocks for 10-minute global cooldown)
+
+
+async function getGlobalPromptLock() {
+  // Retrieves the global lock from browser storage
+  const result = await storage.get("globalPromptLock");
+
+  // Checks if we get valid data back from the function
+  return result && result.globalPromptLock ? result.globalPromptLock : null;
+}
+
+async function setGlobalPromptLock(value) {
+  // Saves the global lock to browser storage
+
+  // Validates the input - It must be an object with a timestamp number
+  if (value && typeof value === "object" && typeof value.timestamp === "number") {
+    await storage.set({ globalPromptLock: value });
+  } else {
+    // If there is invalid data passed in, then remove any existing lock
+    await storage.remove("globalPromptLock");
+  }
+}
+
+async function removeGlobalPromptLock() {
+  // Removes the global lock from browser storage
+  return storage.remove("globalPromptLock");
+}
+
+
 export default {
   timeSettings: {
     getAll: getUserTimes,
@@ -636,10 +665,15 @@ export default {
     clear: blockedOriginsStore.clear,
   },
   promptLocks: {
-    set: promptLocksStore.set,
+    set: promptLocksStore.set, 
     get: promptLocksStore.get,
     remove: promptLocksStore.remove,
     clear: promptLocksStore.clear,
+  },
+  globalPromptLock: {  // Global prompts
+    get: getGlobalPromptLock, // Gets global lock
+    set: setGlobalPromptLock, // Sets global lock
+    remove: removeGlobalPromptLock, // Removes the global lock
   },
   participantRecord: {
     get: getParticipantRecord,
