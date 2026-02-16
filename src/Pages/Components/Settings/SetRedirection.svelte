@@ -59,7 +59,7 @@
     if (timeWasteList.some(item => item.host === hostToCompare)) {
       console.log("Already exists in time wasting list");
       toast.pop();
-      toast.push("This site is already in your Time Wasting list!", {
+      toast.push("Your learning site cant be the same as a time wasting site", {
         theme: themes.infoTheme(toastCoords),
       });
       return;    }
