@@ -290,6 +290,15 @@ const createTimerPort = (updateCallback) => {
   return { port, intervalRef, cleanup };
 };
 
+function isFullScreen() {
+  return (
+    document.fullscreenElement ||
+    document.webkitFullscreenElement ||
+    document.mozFullScreenElement ||
+    document.msFullscreenElement
+  );
+}
+
 // ============================================
 // OVERLAY PERSISTENCE GUARDS
 // ============================================
@@ -651,6 +660,19 @@ function renderLearningContent() {
 
     const getPanelStyle = (collapsed) => `pointer-events: auto; padding: ${collapsed ? "10px 14px" : "clamp(16px, 3vw, 22px)"}; min-width: ${collapsed ? "140px" : "260px"}; max-width: ${collapsed ? "180px" : "320px"}; background: rgba(15, 23, 42, 0.96); color: #f8fafc; border-radius: ${collapsed ? "12px" : "18px"}; box-shadow: 0 24px 45px rgba(15, 23, 42, 0.45); font-family: 'Inter', 'Segoe UI', sans-serif; display: flex; flex-direction: column; gap: ${collapsed ? "6px" : "12px"}; cursor: grab; position: relative; font-size: 14px; transition: all 0.3s ease;`;
 
+    function updateOverlayVisibility() {
+      overlay.style.display = isFullScreen() ? "none" : "flex";
+    }
+
+    // Listeners for fullscreen
+    document.addEventListener("fullscreenchange", updateOverlayVisibility);
+    document.addEventListener("webkitfullscreenchange", updateOverlayVisibility);
+    document.addEventListener("mozfullscreenchange", updateOverlayVisibility);
+    document.addEventListener("MSFullscreenChange", updateOverlayVisibility);
+
+    // Initial check for fullscreen
+    updateOverlayVisibility();
+
     panel.setAttribute("style", getPanelStyle(isCollapsed));
 
     // Collapse toggle button
@@ -867,6 +889,11 @@ function renderLearningContent() {
       dragHandle.cleanup();
       timerPort.cleanup();
       try { removeOverlay(); } catch (_) { }
+      // Remove fullscreen listeners when cleaning up to prevent memory leaks
+      document.removeEventListener("fullscreenchange", updateOverlayVisibility);
+      document.removeEventListener("webkitfullscreenchange", updateOverlayVisibility);
+      document.removeEventListener("mozfullscreenchange", updateOverlayVisibility);
+      document.removeEventListener("MSFullscreenChange", updateOverlayVisibility);
     };
 
     overlay.cleanup = cleanup;
