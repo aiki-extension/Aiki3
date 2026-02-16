@@ -9,6 +9,7 @@
   import { saveUserPreferences } from "../../../util/logger";
   import { toast } from "@zerodevx/svelte-toast";
   import * as themes from "./util/toastThemes";
+  import { parseUrl } from "../../../util/utilities";
 
   // Component imports
   import Container from "./Container.svelte";
@@ -51,6 +52,18 @@
     if (!isEditing) return;
 
     const uri = normalize(learningUri);
+
+    const hostToCompare = parseUrl(uri).host; // Get just the domain (e.g., "example.com")
+
+    const timeWasteList = (await storage.list.get()) || [];
+    if (timeWasteList.some(item => item.host === hostToCompare)) {
+      console.log("Already exists in time wasting list");
+      toast.pop();
+      toast.push("Your learning site cant be the same as a time wasting site", {
+        theme: themes.infoTheme(toastCoords),
+      });
+      return;    }
+
     if (!uri) {
       learningUri = "";
       await storage.learningUri.set("");
