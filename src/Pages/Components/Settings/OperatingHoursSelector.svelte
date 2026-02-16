@@ -13,11 +13,20 @@
   let { hrs: hrsFrom, min: minFrom } = settings.activeFrom;
   let { hrs: hrsTo, min: minTo } = settings.activeTo;
 
-  function parseNumberToTime(number) {
-    return number < 10 ? `0${number}` : number;
+  // reactive normalization
+  $: {
+    const fromTotal = hrsFrom * 60 + minFrom;
+    let toTotal = hrsTo * 60 + minTo;
+
+    if (toTotal <= fromTotal) {
+      toTotal = fromTotal + 1; 
+      hrsTo = Math.floor(toTotal / 60) % 24;
+      minTo = toTotal % 60;
+    }
   }
 
   async function setActiveTo() {
+    normalizeToTime();
     const setting = { hrs: hrsTo, min: minTo };
     storage.operatingHours.to.set(setting);
     try {
@@ -36,6 +45,7 @@
   }
 
   async function setActiveFrom() {
+    normalizeToTime();
     if (hrsTo < hrsFrom) {
       hrsTo = hrsFrom === 24 ? hrsFrom : hrsFrom + 1;
 
@@ -58,47 +68,7 @@
     update();
   }
 
-  function hrsToDisabled(value) {
-    const threshhold = hrsFrom * 60 + minFrom;
-    const target = value * 60 + minTo;
-    if (threshhold >= target) return true;
-  }
-  function minToDisabled(value) {
-    const threshhold = hrsFrom * 60 + minFrom;
-    const target = hrsTo * 60 + value;
-    if (threshhold >= target) return true;
-  }
 
-  function normalizeMinTo(value) {
-  value = Math.max(0, Math.min(59, value));
-
-  const threshold = hrsFrom * 60 + minFrom;
-  const target = hrsTo * 60 + value;
-
-  if (threshold >= target) {
-    return minFrom;
-  }
-
-  return value;
-}
-
-  function normalizeHrsTo(value) {
-    value = Math.max(0, Math.min(23, value));
-
-    const threshold = hrsFrom * 60 + minFrom;
-    const target = value * 60 + minTo;
-
-    if (threshold >= target) {
-      return hrsFrom;
-    }
-
-    return value;
-  }
-
-  
-
-
-  
 </script>
 
 <!-- ActiveFrom -->
@@ -117,6 +87,7 @@
           bind:value={hrsFrom}
           on:change={() => {
             hrsFrom = Math.max(0, Math.min(23, parseInt(hrsFrom) || 0));
+            normalizeToTime();
             setActiveFrom();
           }}
           class="form-control form-control-sm inline"
@@ -130,6 +101,7 @@
           bind:value={minFrom}
           on:change={() => {
             minFrom = Math.max(0, Math.min(59, parseInt(minFrom) || 0));
+            normalizeToTime();
             setActiveFrom();
           }}
           class="form-control form-control-sm inline"
@@ -154,7 +126,7 @@
           max="23"
           bind:value={hrsTo}
           on:change={() => {
-            hrsTo = normalizeHrsTo(parseInt(hrsTo) || 0);
+            hrsTo = Math.max(0, Math.min(23, parseInt(hrsTo) || 0));
             setActiveTo();
           }}
           class="form-control form-control-sm inline"
@@ -167,7 +139,7 @@
           max="59"
           bind:value={minTo}
           on:change={() => {
-            minTo = normalizeMinTo(parseInt(minTo) || 0);
+            minTo = Math.max(0, Math.min(59, parseInt(minTo) || 0));
             setActiveTo();
           }}
           class="form-control form-control-sm inline"
