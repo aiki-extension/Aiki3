@@ -638,7 +638,7 @@ export default {
   clearStorage,
   origin: { get: getOrigin, set: setOrigin, remove: removeOrigin },
   learningUri: { get: getLearningUri, set: setLearningUri },
-  list: { set: setList, get: getList },
+  list: { set: setList, get: getList }, // this is list of time-wasting sites defined by the user
   uid: { set: setUid, get: getUid },
   redirection: { toggle: toggleRedirection, get: getRedirectionToggled },
   stats: {
