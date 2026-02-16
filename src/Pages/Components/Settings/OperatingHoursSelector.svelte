@@ -6,10 +6,6 @@
   import storage from "../../../util/storage";
   import { saveUserPreferences } from "../../../util/logger";
 
-  let hourOptions = Array.from({ length: 24 }, (_, i) => i);
-  let minuteOptions = Array.from({ length: 60 }, (_, i) => i);
-
-
   export let settings;
   export let update;
   export let user;
@@ -72,6 +68,37 @@
     const target = hrsTo * 60 + value;
     if (threshhold >= target) return true;
   }
+
+  function normalizeMinTo(value) {
+  value = Math.max(0, Math.min(59, value));
+
+  const threshold = hrsFrom * 60 + minFrom;
+  const target = hrsTo * 60 + value;
+
+  if (threshold >= target) {
+    return minFrom;
+  }
+
+  return value;
+}
+
+  function normalizeHrsTo(value) {
+    value = Math.max(0, Math.min(23, value));
+
+    const threshold = hrsFrom * 60 + minFrom;
+    const target = value * 60 + minTo;
+
+    if (threshold >= target) {
+      return hrsFrom;
+    }
+
+    return value;
+  }
+
+  
+
+
+  
 </script>
 
 <!-- ActiveFrom -->
@@ -83,40 +110,30 @@
   <div class="col-sm">
     <div class="wrapper">
       <!-- svelte-ignore a11y-no-onchange -->
-      <select
-        selected={hrsFrom}
-        id="hrs"
-        on:change={(e) => {
-          hrsFrom = parseInt(e.target.value);
-          setActiveFrom();
-        }}
-        class="custom-select custom-select-sm inline"
-      >
-        {#each hourOptions as value}
-          <option selected={value === hrsFrom} {value}
-            >{parseNumberToTime(value)}</option
-          >
-        {/each}
-      </select>
+      <input
+          type="number"
+          min="0"
+          max="23"
+          bind:value={hrsFrom}
+          on:change={() => {
+            hrsFrom = Math.max(0, Math.min(23, parseInt(hrsFrom) || 0));
+            setActiveFrom();
+          }}
+          class="form-control form-control-sm inline"
+        />
       <p>:</p>
       <!-- svelte-ignore a11y-no-onchange -->
-      <select
-        selected={minFrom}
-        id="min"
-        on:change={(e) => {
-          minFrom = parseInt(e.target.value);
-          setActiveFrom();
-        }}
-        class="custom-select custom-select-sm inline"
-      >
-        {#each minuteOptions as value}
-          <option
-            disabled={hrsFrom === 0 && value === 0}
-            selected={value === minFrom}
-            {value}>{parseNumberToTime(value)}</option
-          >
-        {/each}
-      </select>
+      <input
+          type="number"
+          min="0"
+          max="59"
+          bind:value={minFrom}
+          on:change={() => {
+            minFrom = Math.max(0, Math.min(59, parseInt(minFrom) || 0));
+            setActiveFrom();
+          }}
+          class="form-control form-control-sm inline"
+        />
       <p><small>{"Hrs/Min"}</small></p>
     </div>
   </div>
@@ -137,7 +154,7 @@
           max="23"
           bind:value={hrsTo}
           on:change={() => {
-            hrsTo = Math.max(0, Math.min(23, parseInt(hrsTo) || 0));
+            hrsTo = normalizeHrsTo(parseInt(hrsTo) || 0);
             setActiveTo();
           }}
           class="form-control form-control-sm inline"
@@ -150,7 +167,7 @@
           max="59"
           bind:value={minTo}
           on:change={() => {
-            minTo = Math.max(0, Math.min(59, parseInt(minTo) || 0));
+            minTo = normalizeMinTo(parseInt(minTo) || 0);
             setActiveTo();
           }}
           class="form-control form-control-sm inline"
