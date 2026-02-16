@@ -82,7 +82,15 @@
     learningUri = parseUrl(await storage.learningUri.get())
     let site = parseUrl(addItemValue);
 
-    if (addItemValue === "" ||  learningUri.name === site.name) {
+    if (addItemValue === "") {
+      toast.pop();
+      toast.push("Input cannot be empty.", {
+        theme: themes.infoTheme(toastCoords),
+      });
+      return;
+    }
+    
+    if (learningUri.name === site.name) {
       toast.pop();
       toast.push("This site is set in your redirection!", {
         theme: themes.infoTheme(toastCoords),
