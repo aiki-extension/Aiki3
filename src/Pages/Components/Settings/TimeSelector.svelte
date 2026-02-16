@@ -10,7 +10,7 @@
   import { AIKI_VARIANT } from "../../../util/variant";
 
   let minuteOptions = Array.from({ length: 121 }, (_, i) => i); // 0 - 120 minutes
-  let secondsOptions = [0, 15, 30, 45]; // 15-second intervals
+  let secondsOptions = Array.from({ length: 60 }, (_, i) => i); // 
   
   // Minimum learning time for experimental variant: 2 minutes
   const MIN_LEARNING_MINUTES_EXP = 2;

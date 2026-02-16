@@ -6,8 +6,9 @@
   import storage from "../../../util/storage";
   import { saveUserPreferences } from "../../../util/logger";
 
-  let hourOptions = Array.from({ length: 25 }, (_, i) => i);
-  let minuteOptions = [0, 15, 30, 45];
+  let hourOptions = Array.from({ length: 24 }, (_, i) => i);
+  let minuteOptions = Array.from({ length: 60 }, (_, i) => i);
+
 
   export let settings;
   export let update;
@@ -130,42 +131,31 @@
   <div class="col-sm">
     <!-- svelte-ignore a11y-no-onchange -->
     <div class="wrapper">
-      <select
-        selected={hrsTo}
-        id="hrs"
-        on:change={(e) => {
-          hrsTo = parseInt(e.target.value);
-          setActiveTo();
-        }}
-        class="custom-select custom-select-sm inline"
-      >
-        {#each hourOptions as value}
-          <option
-            disabled={hrsToDisabled(value)}
-            selected={value === hrsTo}
-            {value}>{parseNumberToTime(value)}</option
-          >
-        {/each}
-      </select>
+       <input
+          type="number"
+          min="0"
+          max="23"
+          bind:value={hrsTo}
+          on:change={() => {
+            hrsTo = Math.max(0, Math.min(23, parseInt(hrsTo) || 0));
+            setActiveTo();
+          }}
+          class="form-control form-control-sm inline"
+        />
       <p>:</p>
       <!-- svelte-ignore a11y-no-onchange -->
-      <select
-        selected={minTo}
-        id="min"
-        on:change={(e) => {
-          minTo = parseInt(e.target.value);
-          setActiveTo();
-        }}
-        class="custom-select custom-select-sm inline"
-      >
-        {#each minuteOptions as value}
-          <option
-            disabled={minToDisabled(value)}
-            selected={value === minTo}
-            {value}>{parseNumberToTime(value)}</option
-          >
-        {/each}
-      </select>
+        <input
+          type="number"
+          min="0"
+          max="59"
+          bind:value={minTo}
+          on:change={() => {
+            minTo = Math.max(0, Math.min(59, parseInt(minTo) || 0));
+            setActiveTo();
+          }}
+          class="form-control form-control-sm inline"
+        />
+
       <p><small>{"Hrs/Min"}</small></p>
     </div>
   </div>
