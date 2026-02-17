@@ -142,6 +142,7 @@ function createRewardOverlay({
     let cleanupCalled = false;
     let warningShown = false;
     let experimentalGoal = 0;
+    let zeroSampleCount = 0;
 
     const update = (msg) => {
       if (!msg) return;
@@ -169,7 +170,15 @@ function createRewardOverlay({
         goal = experimentalGoal;
       }
 
+      if (remaining > 0) {
+        zeroSampleCount = 0;
+      }
+
       if (goal <= 0 && remaining <= 0) {
+        zeroSampleCount += 1;
+        if (zeroSampleCount < 2) {
+          return;
+        }
         cleanup();
         return;
       }
@@ -194,11 +203,15 @@ function createRewardOverlay({
           heading.textContent = "⚠️ Time's almost up!";
         }
         setPanelBackground("linear-gradient(135deg, #dc2626, #b91c1c)");
-        status.textContent = `Returning to learning in ${Math.ceil(remaining / 1000)} seconds...`;
+        status.textContent = `Returning to productive site in ${Math.ceil(remaining / 1000)} seconds...`;
       } else if (remaining <= 0) {
-        status.textContent = "Reward time over! Returning to learning...";
+        zeroSampleCount += 1;
+        status.textContent = "Reward time over! Returning to productive site...";
         setPanelBackground("linear-gradient(135deg, #6366f1, #8b5cf6)");
         snoozeBtn.style.display = "none";
+        if (zeroSampleCount < 2) {
+          return;
+        }
         // Timer hit zero. Let background drive the next prompt/redirect and remove this UI.
         cleanup();
         return;

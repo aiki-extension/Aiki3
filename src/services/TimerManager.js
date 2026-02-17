@@ -53,9 +53,17 @@ class TimerManager {
     this.rewardTimeRemaining = 0;
     this.rewardTimeIntervalRef = undefined;
     this.rewardUnlockAt = 0;
+    this.rewardTrackingTabId = null;
     this.lastRewardExpirySignal = 0;
     this.bonusTime = 0;
     this.bonusTimeIntervalRef = undefined;
+
+    // Internal guards to prevent overlapping async ticks / duplicate expiry handling.
+    this.rewardTickInFlight = false;
+    this.legacyRewardTickInFlight = false;
+    this.rewardExpiryInFlight = false;
+    this.hasRestoredState = false;
+    this.legacyLearningCompletionHandled = false;
   }
 
   // ============================================
@@ -68,11 +76,11 @@ class TimerManager {
    * @param {number} durationMs - Duration in milliseconds
    * @param {Function} onComplete - Callback when timer completes
    */
-  startTimer(type, durationMs, onComplete) {
+  startTimer(type, durationMs, onComplete, options = {}) {
     if (type === "learning") {
       this._startLearningTimer(durationMs, onComplete);
     } else if (type === "reward") {
-      this._startRewardTimer(durationMs, onComplete);
+      this._startRewardTimer(durationMs, onComplete, options);
     }
   }
 
@@ -94,6 +102,18 @@ class TimerManager {
     timer.completed = false;
     timer.onComplete = null;
     timer.startedAt = null;
+
+    if (type === "reward") {
+      this.clearRewardTimer();
+      this.rewardTrackingTabId = null;
+      this.rewardTimeRemaining = 0;
+      this.rewardUnlockAt = 0;
+      this.lastRewardExpirySignal = 0;
+      this.rewardTickInFlight = false;
+      this.legacyRewardTickInFlight = false;
+      this.rewardExpiryInFlight = false;
+      storage.rewardUnlock.set(0).catch(() => { });
+    }
 
     this._persistState();
   }
@@ -148,7 +168,6 @@ class TimerManager {
     // Keep those in sync so prompt gating does not reopen while snoozed.
     const legacyRemaining = Math.max(
       0,
-      typeof this.rewardUnlockAt === "number" ? this.rewardUnlockAt - now : 0,
       typeof this.rewardTimeRemaining === "number" ? this.rewardTimeRemaining : 0
     );
     const hasLegacyReward = legacyRemaining > 0;
@@ -158,7 +177,9 @@ class TimerManager {
       timer.goal += durationMs;
       this.rewardTimeRemaining = timer.remaining;
       this.rewardUnlockAt = now + timer.remaining;
+      this.lastRewardExpirySignal = 0;
       storage.rewardUnlock.set(this.rewardUnlockAt).catch(() => { });
+      storage.shouldRedirect.set(false).catch(() => { });
       console.log(`[Timer] Extended ${type} timer by ${durationMs / 1000}s (unified)`);
 
       // Restart interval if it was stopped
@@ -219,10 +240,13 @@ class TimerManager {
     this._persistState();
   }
 
-  _startRewardTimer(durationMs, onComplete) {
+  _startRewardTimer(durationMs, onComplete, options = {}) {
     // Stop learning timer but keep its state for reference
     this.stopTimer("learning");
     this.stopTimer("reward");
+
+    const trackedTabId = Number.isFinite(options?.tabId) ? Number(options.tabId) : null;
+    this.rewardTrackingTabId = trackedTabId;
 
     const timer = this.timers.reward;
     timer.goal = durationMs;
@@ -231,9 +255,16 @@ class TimerManager {
     timer.onComplete = onComplete;
     timer.startedAt = Date.now();
 
+    this.rewardTimeRemaining = durationMs;
+    this.lastRewardExpirySignal = 0;
+    this.rewardTickInFlight = false;
+    this.legacyRewardTickInFlight = false;
+    this.rewardExpiryInFlight = false;
+
     // Also update legacy rewardUnlockAt for experimental variant overlay
     this.rewardUnlockAt = Date.now() + durationMs;
     storage.rewardUnlock.set(this.rewardUnlockAt).catch(() => { });
+    storage.shouldRedirect.set(false).catch(() => { });
 
     this.updateBadge();
 
@@ -277,31 +308,83 @@ class TimerManager {
   }
 
   async _decrementReward() {
+    if (this.rewardTickInFlight) return;
+    this.rewardTickInFlight = true;
+
     const timer = this.timers.reward;
-    timer.elapsed += 1000;
+    try {
+      const isActive = await this._isRewardTabActive();
 
-    if (timer.remaining > 0) {
-      timer.remaining -= 1000;
-
-      // Update legacy rewardTimeRemaining for overlay compatibility
-      this.rewardTimeRemaining = timer.remaining;
-
-      if (timer.remaining <= 0) {
-        timer.remaining = 0;
-        clearInterval(timer.intervalRef);
-        timer.intervalRef = null;
-
-        // Clear legacy storage
-        this.rewardUnlockAt = 0;
-        await storage.rewardUnlock.set(0);
-        await storage.shouldRedirect.set(true);
-
-        if (typeof timer.onComplete === "function") {
-          timer.onComplete();
-        }
+      // Only count "time spent" on the reward page when it is actually in view.
+      if (isActive) {
+        timer.elapsed += 1000;
       }
 
+      const now = Date.now();
+      let remaining =
+        this.rewardUnlockAt > 0
+          ? Math.max(0, this.rewardUnlockAt - now)
+          : Math.max(0, timer.remaining - 1000);
+
+      if (remaining > 0 && this.rewardUnlockAt <= 0) {
+        this.rewardUnlockAt = now + remaining;
+      }
+
+      if (remaining > 0) {
+        timer.remaining = remaining;
+        this.rewardTimeRemaining = remaining;
+        this.rewardUnlockAt = now + remaining;
+        storage.rewardUnlock.set(this.rewardUnlockAt).catch(() => { });
+        this._persistState();
+        return;
+      }
+
+      timer.remaining = 0;
+      this.rewardTimeRemaining = 0;
+      await this._expireRewardTimer(() => {
+        if (typeof timer.onComplete === "function") {
+          const onComplete = timer.onComplete;
+          timer.onComplete = null;
+          Promise.resolve(onComplete()).catch(() => { });
+        }
+      });
+    } finally {
+      this.rewardTickInFlight = false;
+    }
+  }
+
+  async _expireRewardTimer(onComplete) {
+    if (this.rewardExpiryInFlight || this.lastRewardExpirySignal > 0) return;
+    this.rewardExpiryInFlight = true;
+    try {
+      this.lastRewardExpirySignal = Date.now();
+
+      const trackedTabId = this.rewardTrackingTabId;
+      if (Number.isFinite(trackedTabId)) {
+        storage.promptLocks.remove(trackedTabId).catch(() => { });
+      }
+
+      this.clearRewardTimer();
+      const unifiedReward = this.timers.reward;
+      if (unifiedReward.intervalRef) {
+        clearInterval(unifiedReward.intervalRef);
+        unifiedReward.intervalRef = null;
+      }
+
+      this.rewardTrackingTabId = null;
+      this.rewardTimeRemaining = 0;
+      this.rewardUnlockAt = 0;
+      this.timers.reward.remaining = 0;
+
+      storage.rewardUnlock.set(0).catch(() => { });
+      storage.shouldRedirect.set(true).catch(() => { });
       this._persistState();
+
+      if (typeof onComplete === "function") {
+        await Promise.resolve(onComplete());
+      }
+    } finally {
+      this.rewardExpiryInFlight = false;
     }
   }
 
@@ -327,6 +410,11 @@ class TimerManager {
           elapsed: this.timers.reward.elapsed,
           startedAt: this.timers.reward.startedAt,
         },
+        rewardTrackingTabId: this.rewardTrackingTabId,
+        legacyReward: {
+          remaining: this.rewardTimeRemaining,
+          unlockAt: this.rewardUnlockAt,
+        },
         savedAt: Date.now(),
       };
       await browser.storage.local.set({ [TIMER_STORAGE_KEY]: state });
@@ -337,7 +425,10 @@ class TimerManager {
     try {
       const result = await browser.storage.local.get(TIMER_STORAGE_KEY);
       const state = result?.[TIMER_STORAGE_KEY];
-      if (!state) return;
+      if (!state) {
+        this.hasRestoredState = true;
+        return;
+      }
 
       // Restore learning timer state without wall-clock adjustment.
       // Learning time is focus-based and should only move via _decrementLearning().
@@ -356,12 +447,42 @@ class TimerManager {
         this.timers.reward.goal = state.reward.goal || 0;
         this.timers.reward.elapsed = state.reward.elapsed || 0;
         this.timers.reward.startedAt = state.reward.startedAt;
-        if (!this.timers.reward.intervalRef && state.reward.remaining > 0) {
-          const timeSinceSave = Date.now() - state.savedAt;
-          this.timers.reward.remaining = Math.max(0, state.reward.remaining - timeSinceSave);
-        }
+        this.timers.reward.remaining = Math.max(0, state.reward.remaining || 0);
+      }
+
+      this.rewardTrackingTabId = Number.isFinite(state.rewardTrackingTabId)
+        ? Number(state.rewardTrackingTabId)
+        : this.rewardTrackingTabId;
+
+      const now = Date.now();
+      const storedUnlockAt = await storage.rewardUnlock.get();
+      const persistedUnlockAt = Math.max(
+        0,
+        Number.isFinite(storedUnlockAt)
+          ? Number(storedUnlockAt)
+          : Number(state?.legacyReward?.unlockAt) || 0
+      );
+      const hadRewardWindow =
+        persistedUnlockAt > 0 ||
+        (state?.reward?.remaining || 0) > 0 ||
+        (state?.legacyReward?.remaining || 0) > 0;
+      const derivedRemaining = persistedUnlockAt > now ? persistedUnlockAt - now : 0;
+
+      this.rewardUnlockAt = persistedUnlockAt > now ? persistedUnlockAt : 0;
+      this.rewardTimeRemaining = derivedRemaining;
+      this.timers.reward.remaining = derivedRemaining;
+
+      if (derivedRemaining > 0) {
+        await storage.shouldRedirect.set(false);
+      } else if (hadRewardWindow) {
+        await storage.rewardUnlock.set(0);
+        await storage.shouldRedirect.set(true);
+        this.rewardUnlockAt = 0;
+        this.rewardTimeRemaining = 0;
+        this.timers.reward.remaining = 0;
       }
     } catch (_) { }
+    this.hasRestoredState = true;
   }
 
   // ============================================
@@ -396,6 +517,27 @@ class TimerManager {
   // ============================================
   // ACTIVITY CHECK
   // ============================================
+
+  async _isRewardTabActive() {
+    if (!Number.isFinite(this.rewardTrackingTabId)) return false;
+    try {
+      const tab = await browser.tabs.get(this.rewardTrackingTabId);
+      if (!tab || !tab.active || typeof tab.url !== "string") return false;
+
+      const windowInfo = await browser.windows.get(tab.windowId);
+      if (!windowInfo || !windowInfo.focused) return false;
+
+      const procrastinationHosts = await siteDetector.getProcrastinationHosts();
+      return siteDetector.isProcrastinationSite(tab.url, procrastinationHosts);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  setRewardTrackingTab(tabId) {
+    this.rewardTrackingTabId = Number.isFinite(tabId) ? Number(tabId) : null;
+    this._persistState();
+  }
 
   async checkActive() {
     const [isEnabled, fromTime, toTime] = await Promise.all([
@@ -458,42 +600,57 @@ class TimerManager {
   // SYNC & GETTERS
   // ============================================
 
-  async sync() {
-    return this.syncDailyState();
+  _hasRunningTimers() {
+    return (
+      Boolean(this.timers.learning.intervalRef) ||
+      Boolean(this.timers.reward.intervalRef) ||
+      Boolean(this.learningTimeIntervalRef) ||
+      Boolean(this.rewardTimeIntervalRef)
+    );
   }
 
-  async syncDailyState() {
+  async sync(options = {}) {
+    return this.syncDailyState(options);
+  }
+
+  async syncDailyState(options = {}) {
+    const { restoreState = false } = options || {};
     const goal = parseTime.toSystem(await storage.timeSettings.dailyGoal.get());
     const progress = await storage.dailyProgress.get();
     this.dailyGoal = goal;
     this.dailyProgress = progress;
 
-    // Sync legacy reward state
-    this.rewardUnlockAt = await storage.rewardUnlock.get();
-    if (this.rewardUnlockAt) {
-      this.rewardTimeRemaining = Math.max(0, this.rewardUnlockAt - Date.now());
-      if (this.rewardTimeRemaining === 0) {
-        const expiredUnlockAt = this.rewardUnlockAt;
-        this.rewardUnlockAt = 0;
-        await storage.rewardUnlock.set(0);
-        await storage.shouldRedirect.set(true);
-        const isEnabled = await storage.redirection.get();
-
-        // Service workers can restart during experimental reward windows.
-        // Signal expiry on sync so the prompt flow still resumes.
-        if (isEnabled && !isControlled() && expiredUnlockAt !== this.lastRewardExpirySignal) {
-          this.lastRewardExpirySignal = expiredUnlockAt;
-          try {
-            await browser.runtime.sendMessage({ type: "reward:expired" });
-          } catch (_) { }
-        }
-      }
-    } else {
-      this.rewardTimeRemaining = 0;
+    // Restore persisted timer state only on startup/recovery, not on every poll.
+    if (restoreState || (!this.hasRestoredState && !this._hasRunningTimers())) {
+      await this._restoreState();
     }
 
-    // Restore persisted timer state
-    await this._restoreState();
+    const rewardRemaining = Math.max(0, this.rewardTimeRemaining || 0);
+    if (rewardRemaining > 0) {
+      await storage.shouldRedirect.set(false);
+    }
+
+    const hasUnifiedRewardTimer = Boolean(this.timers.reward.intervalRef);
+    if (
+      !isControlled() &&
+      rewardRemaining > 0 &&
+      !hasUnifiedRewardTimer &&
+      !this.rewardTimeIntervalRef
+    ) {
+      this.rewardTimeIntervalRef = setInterval(() => {
+        this.decrementRewardTime(async () => {
+          try {
+            const isEnabled = await storage.redirection.get();
+            if (isEnabled) {
+              await browser.runtime.sendMessage({ type: "reward:expired" });
+            }
+          } catch (_) { }
+        }).catch(() => { });
+      }, 1000);
+    } else if (rewardRemaining <= 0) {
+      this.clearRewardTimer();
+    }
+
     this.updateBadge();
   }
 
@@ -573,6 +730,7 @@ class TimerManager {
     this.dailyGoal = dailyGoal;
     this.dailyProgress = progress;
     this.sessionElapsed = 0;
+    this.legacyLearningCompletionHandled = false;
 
     // Cap session duration to remaining daily goal (prevent session > remaining goal)
     const remainingGoal = Math.max(0, dailyGoal - progress);
@@ -589,31 +747,34 @@ class TimerManager {
   }
 
   async decrementLearningTime() {
-    if (await this.checkActive()) {
-      if (this.learningTimeRemaining > 0) {
-        this.learningTimeRemaining -= 1000;
-        if (this.learningTimeRemaining < 0) {
-          this.learningTimeRemaining = 0;
-        }
-        // Track session elapsed time and daily progress
-        this.sessionElapsed += 1000;
-        this.dailyProgress += 1000;
-        await storage.dailyProgress.set(this.dailyProgress);
-        this.updateBadge();
-        if (this.learningTimeRemaining === 0) {
-          await this.handleSessionCompletion();
-        }
-      } else {
-        await this.handleSessionCompletion();
+    if (!(await this.checkActive())) return;
+
+    if (this.learningTimeRemaining > 0) {
+      this.learningTimeRemaining -= 1000;
+      if (this.learningTimeRemaining < 0) {
+        this.learningTimeRemaining = 0;
       }
+    }
+
+    // Track active learning time even after reaching the session goal.
+    this.sessionElapsed += 1000;
+    this.dailyProgress += 1000;
+    await storage.dailyProgress.set(this.dailyProgress);
+    this.updateBadge();
+
+    if (this.learningTimeRemaining === 0) {
+      await this.handleSessionCompletion();
     }
   }
 
   async handleSessionCompletion() {
     this.learningTimeRemaining = 0;
-    this.sessionElapsed = 0;
-    clearInterval(this.learningTimeIntervalRef);
-    this.learningTimeIntervalRef = undefined;
+
+    if (this.legacyLearningCompletionHandled) {
+      this.updateBadge();
+      return;
+    }
+    this.legacyLearningCompletionHandled = true;
 
     // Check if daily goal is met
     if (this.dailyProgress >= this.dailyGoal) {
@@ -631,6 +792,7 @@ class TimerManager {
   stopLearningSession() {
     clearInterval(this.learningTimeIntervalRef);
     this.learningTimeIntervalRef = undefined;
+    this.legacyLearningCompletionHandled = false;
     // Preserve actual accumulated progress; do not derive progress from remaining session time.
     storage.dailyProgress.set(this.dailyProgress).catch(() => { });
     this.learningTimeRemaining = 0;
@@ -645,39 +807,87 @@ class TimerManager {
   }
 
   async decrementRewardTime(callback) {
-    const isEnabled = await storage.redirection.get();
-    if (!this.rewardUnlockAt) {
-      this.rewardTimeRemaining = 0;
-      this.clearRewardTimer();
-      await storage.rewardUnlock.set(0);
-      await storage.shouldRedirect.set(true);
-      if (isEnabled && typeof callback === "function") callback();
-      return;
-    }
+    if (this.legacyRewardTickInFlight) return;
+    this.legacyRewardTickInFlight = true;
 
-    this.rewardTimeRemaining = Math.max(0, this.rewardUnlockAt - Date.now());
-    if (this.rewardTimeRemaining === 0) {
-      this.clearRewardTimer();
-      this.rewardUnlockAt = 0;
-      await storage.rewardUnlock.set(0);
-      await storage.shouldRedirect.set(true);
-      if (isEnabled && typeof callback === "function") callback();
+    try {
+      const isEnabled = await storage.redirection.get();
+
+      // Countdown runs in real-time, but spent time only accrues when reward tab is active.
+      const isActive = await this._isRewardTabActive();
+      if (isActive) {
+        this.timers.reward.elapsed += 1000;
+      }
+
+      const now = Date.now();
+      const derivedRemaining =
+        this.rewardUnlockAt > 0
+          ? Math.max(0, this.rewardUnlockAt - now)
+          : Math.max(0, this.rewardTimeRemaining - 1000);
+
+      if (derivedRemaining > 0 && this.rewardUnlockAt <= 0) {
+        this.rewardUnlockAt = now + derivedRemaining;
+      }
+
+      this.rewardTimeRemaining = derivedRemaining;
+      this.timers.reward.remaining = derivedRemaining;
+
+      if (derivedRemaining > 0) {
+        this.rewardUnlockAt = now + derivedRemaining;
+        storage.rewardUnlock.set(this.rewardUnlockAt).catch(() => { });
+        this._persistState();
+        return;
+      }
+
+      this.rewardTimeRemaining = 0;
+      this.timers.reward.remaining = 0;
+      await this._expireRewardTimer(() => {
+        if (isEnabled && typeof callback === "function") {
+          Promise.resolve(callback()).catch(() => { });
+        }
+      });
+    } finally {
+      this.legacyRewardTickInFlight = false;
     }
   }
 
-  async startProcrastinationSession(callback, rewardTime) {
+  async startProcrastinationSession(callback, rewardTime, options = {}) {
     this.stopLearningSession();
     this.stopBonusTime();
     this.clearRewardTimer();
+    this.stopTimer("reward");
+
+    let trackedTabId = Number.isFinite(options?.tabId) ? Number(options.tabId) : null;
+    if (!Number.isFinite(trackedTabId)) {
+      try {
+        const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
+        trackedTabId = Number.isFinite(activeTab?.id) ? Number(activeTab.id) : null;
+      } catch (_) {
+        trackedTabId = null;
+      }
+    }
+    this.rewardTrackingTabId = trackedTabId;
+
+    // Keep unified compatibility fields in sync for legacy reward sessions.
+    this.timers.reward.goal = rewardTime;
+    this.timers.reward.remaining = rewardTime;
+    this.timers.reward.elapsed = 0;
+    this.timers.reward.startedAt = Date.now();
+    this.timers.reward.onComplete = null;
 
     this.rewardTimeRemaining = rewardTime;
     this.lastRewardExpirySignal = 0;
+    this.rewardTickInFlight = false;
+    this.legacyRewardTickInFlight = false;
+    this.rewardExpiryInFlight = false;
 
     if (this.rewardTimeRemaining <= 0) {
       this.rewardUnlockAt = 0;
+      this.rewardTrackingTabId = null;
       await storage.rewardUnlock.set(0);
       await storage.shouldRedirect.set(true);
       if (typeof callback === "function") callback();
+      this._persistState();
       return;
     }
 
@@ -688,14 +898,21 @@ class TimerManager {
     this.rewardTimeIntervalRef = setInterval(() => {
       this.decrementRewardTime(callback).catch(() => { });
     }, 1000);
+    this._persistState();
   }
 
   async stopProcrastinationSession(callback) {
     this.clearRewardTimer();
     this.rewardTimeRemaining = 0;
     this.rewardUnlockAt = 0;
+    this.rewardTrackingTabId = null;
+    this.lastRewardExpirySignal = 0;
+    this.rewardTickInFlight = false;
+    this.legacyRewardTickInFlight = false;
+    this.rewardExpiryInFlight = false;
     await storage.rewardUnlock.set(0);
     await storage.shouldRedirect.set(true);
+    this._persistState();
     if (typeof callback === "function") callback();
   }
 
@@ -738,9 +955,11 @@ class TimerManager {
     storage.rewardUnlock.set(0).catch(() => { });
     this.rewardTimeRemaining = 0;
     this.rewardUnlockAt = 0;
+    this.rewardTrackingTabId = null;
     this.lastRewardExpirySignal = 0;
     this.bonusTime = 0;
     this.learningTimeRemaining = 0;
+    this.legacyLearningCompletionHandled = false;
     this.dailyGoal = 0;
     this.dailyProgress = 0;
   }
@@ -762,8 +981,8 @@ class TimerManager {
     return Boolean(this.timers.learning.intervalRef);
   }
 
-  startControlledRewardSession(rewardMs, onComplete) {
-    this.startTimer("reward", rewardMs, onComplete);
+  startControlledRewardSession(rewardMs, onComplete, options = {}) {
+    this.startTimer("reward", rewardMs, onComplete, options);
   }
 
   stopControlledRewardSession() {

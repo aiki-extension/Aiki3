@@ -9,7 +9,7 @@
 
   let minuteOptions = Array.from({ length: 121 }, (_, i) => i); // 0 - 120 minutes
 
-  export let update;
+  export let update = undefined;
   export let user;
 
   let goalMin = 30;
@@ -56,12 +56,14 @@
   }
 </script>
 
-<div class="row">
-  <div class="col-sm">
-    <p>Daily Productive Goal:</p>
+<div class="goal-row">
+  <div class="goal-copy">
+    <p class="goal-title"><strong>Daily Productive Goal:</strong></p>
+    <p class="goal-description">
+      Set the number of minutes you want to spend on your activity before distractions are no longer intercepted
+    </p>
   </div>
-  <div class="col-sm" />
-  <div class="col-sm">
+  <div class="goal-control">
     <div class="wrapper">
       <!-- svelte-ignore a11y-no-onchange -->
       <select
@@ -73,12 +75,50 @@
           <option {value}>{parseNumberToTime(value)}</option>
         {/each}
       </select>
-      <p><small>{"Min"}</small></p>
+      <p class="unit-label"><small>{"Min"}</small></p>
     </div>
   </div>
 </div>
 
 <style>
+  .goal-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .goal-copy {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .goal-control {
+    flex: 0 0 auto;
+  }
+
+  .goal-title,
+  .goal-description,
+  .unit-label {
+    padding: 0;
+    margin: 0;
+    font-family: var(--fontContent);
+    font-size: var(--fontSizeSettings);
+  }
+
+  .goal-title {
+    margin-bottom: 10px;
+  }
+
+  .goal-description {
+    margin-right: 8px;
+  }
+
+  .unit-label {
+    margin: 0px 5px 20px 0px;
+    white-space: nowrap;
+  }
+
   .inline {
     display: inline !important;
     width: 25%;
@@ -93,12 +133,15 @@
     align-items: center;
   }
 
-  p {
-    display: inline;
-    padding: 0;
-    margin: 0px 5px 20px 0px;
-    font-family: var(--fontContent);
-    font-size: var(--fontSizeSettings);
+  @media (max-width: 768px) {
+    .goal-row {
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .goal-control {
+      align-self: flex-start;
+    }
   }
 
   select,

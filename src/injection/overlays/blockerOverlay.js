@@ -25,7 +25,7 @@ function createBlockerOverlay({
     );
 
     const title = document.createElement("h2");
-    title.textContent = "Keep learning";
+    title.textContent = "Keep Being Productive";
     title.setAttribute("style", "margin: 0; font-size: clamp(1.15em, 1vw + 0.65em, 1.45em); font-weight: 700; letter-spacing: 0.01em; color: #f8fafc;");
 
     const description = document.createElement("p");
@@ -71,7 +71,7 @@ function createBlockerOverlay({
       );
 
     const button = document.createElement("button");
-    button.textContent = "Return to learning";
+    button.textContent = "Return to productive site";
     button.setAttribute(
       "style",
       `padding: 10px 16px; background: linear-gradient(135deg, #2563eb, #7c3aed); color: #fff; border: none; border-radius: 999px; font-weight: 600; cursor: pointer; box-shadow: 0 12px 24px rgba(37, 99, 235, 0.28);`

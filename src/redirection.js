@@ -23,6 +23,7 @@ const promptCoordinator = new PromptCoordinator({
 
 let shouldShowWelcome = true;
 const PROMPT_SUPPRESS_DURATION = 2 * 60 * 1000; // 2 minutes
+const CONTINUE_TRANSITION_SUPPRESS_MS = 2000;
 const PREPROMPT_ID = "__aiki-preprompt";
 
 function buildProcrastinationUrlFilters(list = []) {
@@ -80,9 +81,16 @@ async function canInterceptNow() {
 
   let shouldRedirect = await storage.shouldRedirect.get();
   if (!shouldRedirect) {
-    const unlockAt = await storage.rewardUnlock.get();
-    if (unlockAt && unlockAt <= Date.now()) {
-      await storage.rewardUnlock.set(0);
+    const unlockAtRaw = await storage.rewardUnlock.get();
+    const unlockAt = typeof unlockAtRaw === "number" ? unlockAtRaw : 0;
+    const hasActiveRewardWindow = unlockAt > Date.now();
+
+    // Self-heal stale gating state:
+    // if reward window is not active, interception should be enabled.
+    if (!hasActiveRewardWindow) {
+      if (unlockAt > 0) {
+        await storage.rewardUnlock.set(0);
+      }
       await storage.shouldRedirect.set(true);
       shouldRedirect = true;
     }
@@ -130,12 +138,32 @@ async function validateOriginSession(learningUri = "") {
 async function shouldSkipPrompt(tabId, url) {
   const hostName = parseUrl(url).name;
   if (!hostName) return false;
+
   const promptLock = await storage.promptLocks.get(tabId);
-  if (!promptLock) return false;
-  return (
-    promptLock.host === hostName &&
-    Date.now() - promptLock.timestamp < PROMPT_SUPPRESS_DURATION
-  );
+  if (!promptLock || promptLock.host !== hostName) return false;
+
+  const now = Date.now();
+  const lockTimestamp = Number(promptLock.timestamp);
+  const lockAgeMs = Number.isFinite(lockTimestamp) ? now - lockTimestamp : Number.POSITIVE_INFINITY;
+
+  // Short transition suppress window: prevent immediate re-prompt while reward is being armed.
+  if (lockAgeMs >= 0 && lockAgeMs < CONTINUE_TRANSITION_SUPPRESS_MS) {
+    return true;
+  }
+
+  const [shouldRedirect, unlockAt] = await Promise.all([
+    storage.shouldRedirect.get(),
+    storage.rewardUnlock.get(),
+  ]);
+  const rewardWindowActive =
+    shouldRedirect === false &&
+    typeof unlockAt === "number" &&
+    unlockAt > now;
+
+  // Prompt suppression should only apply while reward is actively running.
+  // Once reward expires, interception should show promptly on first return.
+  if (!rewardWindowActive) return false;
+  return lockAgeMs >= 0 && lockAgeMs < PROMPT_SUPPRESS_DURATION;
 }
 
 async function handleUnifiedNavigation(tabId, url, procrastinationHosts, learningUrl) {
@@ -663,7 +691,13 @@ async function gotoOrigin(event, sourceContext = {}) {
       if (targetTabId !== undefined && targetTabId !== null) {
         await interventionEngine.handleContinue(targetTabId);
       } else {
-        // Fallback: just cleanup
+        // Fallback: finalize tracked learning sessions before cleanup.
+        await SessionService.finalizeAllSessions("procrastination", "session_aborted", {
+          completed: false,
+        });
+        await SessionService.finalizeAllSessions("learning", "session_aborted", {
+          completed: false,
+        });
         interventionEngine.cleanup();
       }
 
@@ -894,10 +928,10 @@ async function gotoOrigin(event, sourceContext = {}) {
   const goalCompleted = await isDailyGoalCompleted();
   if (redirectionToggled && !hasRemainingLearningTabs && !goalCompleted) {
     const rewardTime = await getRewardDurationMs();
-    await storage.shouldRedirect.set(false);
     await timer.startProcrastinationSession(
       () => checkActiveTab({ ignorePromptCooldown: true }),
-      rewardTime
+      rewardTime,
+      { tabId: targetTabId }
     );
   } else if (goalCompleted) {
     await storage.shouldRedirect.set(false);
@@ -925,20 +959,25 @@ async function promptRedirect(tabId, url, originUrl) {
         timestamp: Date.now(),
       });
       navigationGuards.install();
-      await SessionService.startSession(tabId, "procrastination", originUrl);
+      await SessionService.startSession(tabId, "procrastination", originUrl, url, {
+        resumeIfExists: true,
+      });
       await logDeclinedIntervention(originUrl, url);
 
       const rewardTime = await getRewardDurationMs();
-      await storage.shouldRedirect.set(false);
       await timer.startProcrastinationSession(
         () => checkActiveTab({ ignorePromptCooldown: true }),
-        rewardTime
+        rewardTime,
+        { tabId }
       );
 
       // Show reward progress bar (same as controlled variant)
       await showRewardOverlayWithRetry(tabId);
     },
     onAccept: async () => {
+      await SessionService.finalizeSession(tabId, "procrastination", "redirect_accept", {
+        completed: false,
+      });
       addLearningSiteLoadedListener();
       navigationGuards.install();
       await logEvent({
@@ -981,11 +1020,13 @@ async function handleBlockerRelease(tabId, tabUrl = "") {
   if (!currentUrl) return;
 
   const rewardTime = await getRewardDurationMs();
-  await storage.shouldRedirect.set(false);
-  await SessionService.startSession(tabId, "procrastination", currentUrl);
+  await SessionService.startSession(tabId, "procrastination", currentUrl, null, {
+    resumeIfExists: true,
+  });
   await timer.startProcrastinationSession(
     () => checkActiveTab({ ignorePromptCooldown: true }),
-    rewardTime
+    rewardTime,
+    { tabId }
   );
   await setPromptCooldown(tabId, currentUrl);
 
@@ -1044,6 +1085,8 @@ async function removeProcsiteLoadedListener() {
 export default {
   start: async () => {
     navigationGuards.install();
+    await SessionService.reconcileLearningSessions().catch(() => { });
+    await SessionService.reconcileProcrastinationSessions().catch(() => { });
     await addNavigationListener();
     addTabChangeListener();
     addWindowChangeListener();
@@ -1066,6 +1109,8 @@ export default {
     removeTabChangeListener();
     removeOriginTabCloseListener();
     removeLearningSiteLoadedListener();
+    await SessionService.reconcileLearningSessions().catch(() => { });
+    await SessionService.reconcileProcrastinationSessions().catch(() => { });
     await addNavigationListener();
     addTabChangeListener();
     addWindowChangeListener();

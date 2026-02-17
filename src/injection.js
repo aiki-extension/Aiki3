@@ -76,7 +76,15 @@ const scheduleRewardEnsure = async () => {
     rewardEnsureTimeout = null;
     try {
       const data = await browser.runtime.sendMessage({ type: "timer:get" });
-      if (data?.controlledRewardGoal > 0 && !document.getElementById("aiki-reward-overlay")) {
+      const now = Date.now();
+      const hasControlledReward = (data?.controlledRewardRemaining || 0) > 0;
+      const hasExperimentalReward =
+        (data?.rewardUnlockAt || 0) > now ||
+        (data?.rewardTimeRemaining || 0) > 0;
+      if (
+        (hasControlledReward || hasExperimentalReward) &&
+        !document.getElementById("aiki-reward-overlay")
+      ) {
         const result = await browser.storage.local.get("list");
         const procHosts = (result?.list || []).map(item => item?.host || item?.name || "").filter(Boolean);
         if (matchesProcrastinationHost(procHosts)) {
@@ -91,8 +99,10 @@ async function bootstrapRewardOverlayIfNeeded() {
   try {
     const timerData = await browser.runtime.sendMessage({ type: "timer:get" });
     // Check for both controlled variant reward AND experimental variant reward
-    const hasControlledReward = timerData?.controlledRewardGoal > 0;
-    const hasExperimentalReward = timerData?.rewardUnlockAt > Date.now();
+    const hasControlledReward = (timerData?.controlledRewardRemaining || 0) > 0;
+    const hasExperimentalReward =
+      (timerData?.rewardUnlockAt || 0) > Date.now() ||
+      (timerData?.rewardTimeRemaining || 0) > 0;
 
     if (hasControlledReward || hasExperimentalReward) {
       const result = await browser.storage.local.get("list");

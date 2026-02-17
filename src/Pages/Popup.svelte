@@ -23,6 +23,7 @@
 
   let siteName = "";
   let origin = {};
+  let activeTabId = null;
 
   let timeValues = new Promise((resolve) => {});
 
@@ -61,7 +62,10 @@
   });
 
   async function setup() {
-    origin = await storage.origin.get();
+    [origin, activeTabId] = await Promise.all([
+      storage.origin.get(),
+      getActiveTabId(),
+    ]);
   }
 
   $: if (origin) {
@@ -87,6 +91,32 @@
     }
   }
 
+  async function getActiveTabId() {
+    try {
+      const [activeTab] = await browser.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
+      return typeof activeTab?.id === "number" ? activeTab.id : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function shouldShowContinue(values) {
+    if (!values || typeof values !== "object") return false;
+    return (
+      siteName !== "" ||
+      (values.controlledState === "learning" && values.controlledProcrastinationUrl)
+    );
+  }
+
+  function canContinueFromCurrentTab(values) {
+    if (!values || values.controlledState !== "learning") return true;
+    if (typeof values.controlledTabId !== "number") return true;
+    return values.controlledTabId === activeTabId;
+  }
+
   setup();
 </script>
 
@@ -104,9 +134,14 @@
       dailyProgress={values.dailyProgress}
     />
     <hr />
-    {#if siteName !== "" || (values.controlledState === "learning" && values.controlledProcrastinationUrl)}
+    {#if shouldShowContinue(values) && canContinueFromCurrentTab(values)}
       <div class="container">
         <ContinueButton {gotoOrigin} />
+      </div>
+      <hr />
+    {:else if shouldShowContinue(values)}
+      <div class="container hint">
+        Continue is only available from the active learning tab.
       </div>
       <hr />
     {/if}
@@ -119,6 +154,14 @@
     justify-content: center;
     align-items: center;
     flex-direction: row;
+  }
+
+  .hint {
+    font-size: 0.75rem;
+    color: var(--textColorSecondary, rgba(100, 100, 100, 0.75));
+    padding: 0 12px;
+    text-align: center;
+    line-height: 1.35;
   }
 
   hr {

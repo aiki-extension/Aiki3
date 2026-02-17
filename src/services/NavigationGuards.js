@@ -3,6 +3,7 @@ import SessionService from "./SessionService";
 import siteDetector from "./siteDetector";
 import storage from "../util/storage";
 import interventionEngine from "../interventionEngine";
+import { isControlled } from "../util/variantConfig";
 
 /**
  * NavigationGuards centralizes tab/window listeners and delegates session handling.
@@ -66,8 +67,14 @@ class NavigationGuards {
   }
 
   async finalizeAllActiveSessions(reason = "window_blur") {
+    if (reason === "extension_disabled") {
+      await SessionService.finalizeAllSessions("procrastination", reason);
+      await SessionService.finalizeAllSessions("learning", reason);
+      return;
+    }
+
     try {
-      const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+      const tabs = await browser.tabs.query({ active: true });
       for (const tab of tabs) {
         if (tab?.id !== undefined) {
           await SessionService.finalizeSession(tab.id, "procrastination", reason);
@@ -82,30 +89,35 @@ class NavigationGuards {
     const session = await storage.activeSessions.get(tabId);
     if (!session) return;
 
-    const extractName = (value) => {
+    const extractHost = (value) => {
       try {
-        return siteDetector.getSiteName(value || "");
+        return new URL(value || "").hostname.replace(/^www\./, "").toLowerCase();
       } catch (_) {
         return "";
       }
     };
 
-    const nextName = extractName(nextUrl);
+    const nextHost = extractHost(nextUrl);
 
     if (session.sessionType === "procrastination") {
-      const currentName = extractName(session.procrastinationUrl);
-      if (currentName && nextName && currentName === nextName) {
+      const currentHost = extractHost(session.procrastinationUrl);
+      if (currentHost && nextHost && currentHost === nextHost) {
         await storage.activeSessions.set(tabId, { ...session, procrastinationUrl: nextUrl });
+        await SessionService.syncProcrastinationSessionActivity(tabId);
         return;
       }
       await SessionService.finalizeSession(tabId, "procrastination", "navigation");
+      if (await siteDetector.checkIfProcrastination(nextUrl)) {
+        await SessionService.startSession(tabId, "procrastination", nextUrl);
+      }
       return;
     }
 
     if (session.sessionType === "learning") {
-      const currentName = extractName(session.learningUrl);
-      if (currentName && nextName && currentName === nextName) {
+      const currentHost = extractHost(session.learningUrl);
+      if (currentHost && nextHost && currentHost === nextHost) {
         await storage.activeSessions.set(tabId, { ...session, learningUrl: nextUrl });
+        await SessionService.syncLearningSessionActivity(tabId);
         return;
       }
       await SessionService.finalizeSession(tabId, "learning", "navigation");
@@ -141,6 +153,8 @@ class NavigationGuards {
   install() {
     if (this.procrastinationGuardsRegistered) return;
     this.procrastinationGuardsRegistered = true;
+    SessionService.reconcileLearningSessions().catch(() => { });
+    SessionService.reconcileProcrastinationSessions().catch(() => { });
 
     this.onActivatedHandler = async ({ tabId, windowId }) => {
       const previousTabId = this.lastActiveTabByWindow.get(windowId);
@@ -191,10 +205,10 @@ class NavigationGuards {
       if (details.frameId !== 0) return;
       await this.hideImmediatePrompt(details.tabId);
 
-      // Handle learning site navigation via interventionEngine
+      // Handle learning site navigation via interventionEngine (controlled variant only).
       if (details.url) {
         const toggled = await storage.redirection.get();
-        if (toggled) {
+        if (toggled && isControlled()) {
           const procList = await storage.list.get();
           const procHosts = (procList || []).map((item) => item?.host || item?.name || "").filter(Boolean);
           const learningUrl = await storage.learningUri.get();

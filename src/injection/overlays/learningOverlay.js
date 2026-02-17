@@ -130,6 +130,11 @@ function createLearningOverlay({
       // Use shared drag utility
       const dragHandle = makeDraggable(panel);
       let experimentalSessionGoal = 0;
+      const formatGoalMinutes = (value) => {
+        if (typeof value !== "number" || value <= 0) return "0m";
+        const minutes = Math.max(1, Math.round(value / 60000));
+        return `${minutes}m`;
+      };
 
       const update = (msg) => {
         if (!msg) return;
@@ -144,28 +149,66 @@ function createLearningOverlay({
             const remaining = typeof msg.controlledLearningRemaining === "number" ? msg.controlledLearningRemaining : 0;
             const elapsed = typeof msg.controlledLearningElapsed === "number" ? msg.controlledLearningElapsed : 0;
             const completed = msg.controlledLearningCompleted || false;
+            const canClaimReward =
+              msg.learningStartedDuringReward !== true &&
+              typeof msg.controlledProcrastinationUrl === "string" &&
+              msg.controlledProcrastinationUrl.length > 0;
             const progress = Math.max(0, goal - remaining);
             const percent = goal > 0 ? Math.min(100, (progress / goal) * 100) : 0;
 
             barFill.style.width = `${percent}%`;
             barFill.style.background = "linear-gradient(135deg, #22c55e, #14b8a6)";
-            heading.textContent = "📚 Redirection Session";
+            heading.textContent = "📚 Productive Session";
             panel.style.background = defaultBg;
             claimRewardBtn.style.display = "none";
 
             if (goal > 0 && (remaining <= 0 || completed)) {
-              progressLabel.textContent = `${formatDuration(elapsed)} / ${formatDuration(goal)}`;
-              status.textContent = "Session complete! Claim your reward.";
+              progressLabel.textContent = `${formatDuration(elapsed)} / ${formatGoalMinutes(goal)}`;
               panel.style.background = "linear-gradient(135deg, #22c55e, #0ea5e9)";
-              claimRewardBtn.style.display = "block";
+              if (canClaimReward) {
+                status.textContent = "Session complete! Claim your reward.";
+                claimRewardBtn.style.display = "block";
+              } else {
+                status.textContent = "Session complete.";
+                claimRewardBtn.style.display = "none";
+              }
             } else if (goal > 0) {
-              progressLabel.textContent = `${formatDuration(progress)} / ${formatDuration(goal)}`;
+              progressLabel.textContent = `${formatDuration(progress)} / ${formatGoalMinutes(goal)}`;
               status.textContent = `Stay focused for ${formatDuration(remaining)} more.`;
             } else {
               progressLabel.textContent = "Starting...";
               status.textContent = "Session starting...";
             }
           } else if (controlledState === "reward") {
+            const localRemaining = typeof msg.learningTimeRemaining === "number" ? Math.max(0, msg.learningTimeRemaining) : 0;
+            const localElapsed = typeof msg.sessionElapsed === "number" ? Math.max(0, msg.sessionElapsed) : 0;
+            const localComputedGoal = localElapsed + localRemaining;
+            if (localComputedGoal > 0) {
+              experimentalSessionGoal = Math.max(experimentalSessionGoal, localComputedGoal);
+            }
+            const localGoal = localComputedGoal > 0 ? localComputedGoal : experimentalSessionGoal;
+
+            // Reward can stay active globally while this tab starts learning.
+            if (localGoal > 0) {
+              const localProgress = Math.max(0, localGoal - localRemaining);
+              const localPercent = Math.min(100, (localProgress / localGoal) * 100);
+
+              barFill.style.width = `${localPercent}%`;
+              barFill.style.background = "linear-gradient(135deg, #22c55e, #14b8a6)";
+              progressLabel.textContent = `${formatDuration(localProgress)} / ${formatDuration(localGoal)}`;
+              heading.textContent = "📚 Productive Session";
+              claimRewardBtn.style.display = "none";
+              panel.style.background = defaultBg;
+
+              if (localRemaining === 0) {
+                status.textContent = "Session complete.";
+                panel.style.background = "linear-gradient(135deg, #22c55e, #0ea5e9)";
+              } else {
+                status.textContent = `Stay focused for ${formatDuration(localRemaining)} more.`;
+              }
+              return;
+            }
+
             const goal = msg.controlledRewardGoal || 0;
             const remaining = typeof msg.controlledRewardRemaining === "number" ? msg.controlledRewardRemaining : 0;
             const progress = Math.max(0, goal - remaining);
@@ -183,26 +226,33 @@ function createLearningOverlay({
             progressLabel.textContent = "Ready to learn";
             barFill.style.width = "0%";
             barFill.style.background = "linear-gradient(135deg, #22c55e, #14b8a6)";
-            status.textContent = "Visit a procrastination site to start a learning session.";
+            status.textContent = "Visit a procrastination site to start a productive session.";
             panel.style.background = defaultBg;
             claimRewardBtn.style.display = "none";
           }
         } else {
           const remaining = typeof msg.learningTimeRemaining === "number" ? Math.max(0, msg.learningTimeRemaining) : 0;
           const elapsed = typeof msg.sessionElapsed === "number" ? Math.max(0, msg.sessionElapsed) : 0;
-          const computedGoal = elapsed + remaining;
-          if (computedGoal > 0) {
-            experimentalSessionGoal = Math.max(experimentalSessionGoal, computedGoal);
+          if (remaining > 0) {
+            const computedGoal = elapsed + remaining;
+            if (computedGoal > 0) {
+              experimentalSessionGoal = Math.max(experimentalSessionGoal, computedGoal);
+            }
+          } else if (experimentalSessionGoal === 0 && elapsed > 0) {
+            // Fallback for late-mounted overlays with no pre-completion sample.
+            experimentalSessionGoal = elapsed;
           }
 
-          const goal = computedGoal > 0 ? computedGoal : experimentalSessionGoal;
-          const progress = goal > 0 ? Math.max(0, goal - remaining) : 0;
+          const goal = experimentalSessionGoal;
+          // Use elapsed when remaining is 0 so the counter keeps ticking
+          // beyond the goal, letting the user see total time spent.
+          const progress = goal > 0 ? (remaining > 0 ? Math.max(0, goal - remaining) : elapsed) : 0;
           const percent = goal > 0 ? Math.min(100, (progress / goal) * 100) : 0;
 
           barFill.style.width = `${percent}%`;
           barFill.style.background = "linear-gradient(135deg, #22c55e, #14b8a6)";
-          progressLabel.textContent = goal > 0 ? `${formatDuration(progress)} / ${formatDuration(goal)}` : "Starting...";
-          heading.textContent = "📚 Redirection Session";
+          progressLabel.textContent = goal > 0 ? `${formatDuration(progress)} / ${formatGoalMinutes(goal)}` : "Starting...";
+          heading.textContent = "📚 Productive Session";
           claimRewardBtn.style.display = "none";
           panel.style.background = defaultBg;
 

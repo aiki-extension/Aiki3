@@ -71,7 +71,7 @@ browser.runtime.onMessage.addListener((message, sender) => {
   if (message.type === "timer:get") {
     return (async () => {
       try {
-        await timer.sync();
+        await timer.sync({ restoreState: false });
       } catch (_) { }
 
       const timeData = timer.getTime();
@@ -177,7 +177,10 @@ async function installationSetup() {
 
 async function setup() {
   intervals.intervalSetup();
-  storage.shouldRedirect.set(true);
+  const shouldRedirect = await storage.shouldRedirect.get();
+  if (typeof shouldRedirect !== "boolean") {
+    await storage.shouldRedirect.set(true);
+  }
   await redirection.start();
 
   await interventionEngine.init();
@@ -330,7 +333,7 @@ browser.runtime.onConnect.addListener(function (port) {
       case "timer":
         (async () => {
           try {
-            await timer.sync();
+            await timer.sync({ restoreState: false });
           } catch (_) { }
           if (isDisconnected) return;
           try {

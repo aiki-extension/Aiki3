@@ -31,7 +31,7 @@ function createRedirectPromptOverlay({
       );
 
       const title = document.createElement("h2");
-      title.textContent = "Redirect to learning?";
+      title.textContent = "Redirect Me?";
       title.setAttribute("style", "margin: 0; font-size: clamp(1em, 2vw, 1.35em); font-weight: 700; color: #020617; line-height: 1.3;");
 
       const getHostFromString = (value) => {
@@ -62,9 +62,9 @@ function createRedirectPromptOverlay({
           const strong = document.createElement("strong");
           strong.textContent = formatDomain(h);
           description.appendChild(strong);
-          description.appendChild(document.createTextNode(". Switch to your learning platform?"));
+          description.appendChild(document.createTextNode(". Switch to your redirection site?"));
         } else {
-          description.textContent = "You've reached a focus site. Do you want to jump to your learning platform?";
+          description.textContent = "You've reached a focus site. Do you want to jump to your redirection site?";
         }
       };
 
