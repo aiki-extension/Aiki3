@@ -149,6 +149,7 @@
         id="mins"
         min="2"
         max="119"
+        title="Enter a value between 2 and 119"
         bind:value={learnMin}
         on:change={() => {
           learnMin = Math.max(2, Math.min(119, parseInt(learnMin) || 2));
@@ -164,6 +165,7 @@
         id="seconds"
         min="0"
         max="59"
+        title="Enter a value between 0 and 59"
         bind:value={learnSec}
         on:change={() => {
           learnSec = Math.max(0, Math.min(59, parseInt(learnSec) || 0));

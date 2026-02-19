@@ -88,6 +88,7 @@
           type="number"
           min="0"
           max="23"
+          title="Enter a value between 0 and 23"
           bind:value={hrsFrom}
           on:blur={() => {
             hrsFrom = Math.max(0, Math.min(23, parseInt(hrsFrom) || 0));
@@ -106,6 +107,7 @@
           type="number"
           min="0"
           max="59"
+          title="Enter a value between 0 and 59"
           bind:value={minFrom}
           on:blur={() => {
             minFrom = Math.max(0, Math.min(59, parseInt(minFrom) || 0));
@@ -136,6 +138,7 @@
           type="number"
           min="0"
           max="23"
+          title="Enter a value between 0 and 23"
           bind:value={hrsTo}
           on:blur={() => {
             hrsTo = Math.max(0, Math.min(23, parseInt(hrsTo) || 0));
@@ -154,6 +157,7 @@
           type="number"
           min="0"
           max="59"
+          title="Enter a value between 0 and 59"
           bind:value={minTo}
           on:blur={() => {
             minTo = Math.max(0, Math.min(59, parseInt(minTo) || 0));
