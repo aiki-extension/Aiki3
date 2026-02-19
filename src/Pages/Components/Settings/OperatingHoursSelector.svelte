@@ -90,7 +90,6 @@
           bind:value={hrsFrom}
           on:change={() => {
             hrsFrom = Math.max(0, Math.min(23, parseInt(hrsFrom) || 0));
-            normalizeToTime();
             setActiveFrom();
           }}
           class="form-control form-control-sm inline"
@@ -104,7 +103,6 @@
           bind:value={minFrom}
           on:change={() => {
             minFrom = Math.max(0, Math.min(59, parseInt(minFrom) || 0));
-            normalizeToTime();
             setActiveFrom();
           }}
           class="form-control form-control-sm inline"
