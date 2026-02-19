@@ -155,7 +155,7 @@
           ensureMinThreshold();
           setLearningTime();
         }}
-        class="custom-select custom-select-sm inline"
+        class="form-control form-control-sm inline"
       />
       <p>:</p>
       <!-- svelte-ignore a11y-no-onchange -->
@@ -170,7 +170,7 @@
           ensureMinThreshold();
           setLearningTime();
         }}
-        class="custom-select custom-select-sm inline"
+        class="form-control form-control-sm inline"
       />
         
       
