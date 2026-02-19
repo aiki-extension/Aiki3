@@ -13,7 +13,11 @@
   let { hrs: hrsFrom, min: minFrom } = settings.activeFrom;
   let { hrs: hrsTo, min: minTo } = settings.activeTo;
 
-  // reactive normalization
+  /* This reactive statement ensures that the "to" time is always after the "from" time. 
+  If the user sets a "to" time that is before or equal to the "from" time, it automatically adjusts the 
+  "to" time to be one minute after the "from" time. 
+  Preventing users from setting an invalid time range where Aiki would be off during the intended operating hours.
+  */
   $: {
     const fromTotal = hrsFrom * 60 + minFrom;
     let toTotal = hrsTo * 60 + minTo;
@@ -24,9 +28,8 @@
       minTo = toTotal % 60;
     }
   }
-
+ // This function updates the "to" time in storage and attempts to sync the preference with the server.
   async function setActiveTo() {
-    normalizeToTime();
     const setting = { hrs: hrsTo, min: minTo };
     storage.operatingHours.to.set(setting);
     try {
@@ -44,8 +47,8 @@
     update();
   }
 
+  // This function updates the "from" time in storage and attempts to sync the preference with the server.
   async function setActiveFrom() {
-    normalizeToTime();
     if (hrsTo < hrsFrom) {
       hrsTo = hrsFrom === 24 ? hrsFrom : hrsFrom + 1;
 
@@ -71,7 +74,7 @@
 
 </script>
 
-<!-- ActiveFrom -->
+<!-- This is the button from when Aiki should start, it can start from midnight to 11:59 o'clock-->
 <div class="row">
   <div class="col-sm">
     <p>Aiki will turn <strong>ON</strong> at this time:</p>
@@ -111,7 +114,7 @@
   </div>
 </div>
 
-<!-- ActiveTo -->
+<!-- This is the button For when Aiki should turn OFF the turn off time, cant be below the start time -->
 <div class="row">
   <div class="col-sm">
     <p class="header-p">Aiki will turn <strong>OFF</strong> at this time:</p>
