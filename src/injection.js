@@ -190,6 +190,9 @@ const makeDraggable = (element) => {
     dragState.startX = event.clientX;
     dragState.startY = event.clientY;
     
+    // This temporarily "mutes" the 0.3s from getPanelStyle
+    element.style.transition = 'all 0.1s ease-out'
+
     element.style.cursor = "grabbing";
     element.setPointerCapture(event.pointerId);
     event.preventDefault();
@@ -217,6 +220,9 @@ const makeDraggable = (element) => {
     if (!dragState.dragging) return;
     
     dragState.dragging = false;
+    // Dragging is over, 0.3s transition can be re-enabled for snap animation
+    element.style.transition = 'all 0.3s ease';
+
     element.style.cursor = "grab";
     
     // Snap to nearest corner when drag ends
