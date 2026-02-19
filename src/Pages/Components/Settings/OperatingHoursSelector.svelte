@@ -13,12 +13,9 @@
   let { hrs: hrsFrom, min: minFrom } = settings.activeFrom;
   let { hrs: hrsTo, min: minTo } = settings.activeTo;
 
-  /* This reactive statement ensures that the "to" time is always after the "from" time. 
-  If the user sets a "to" time that is before or equal to the "from" time, it automatically adjusts the 
-  "to" time to be one minute after the "from" time. 
-  Preventing users from setting an invalid time range where Aiki would be off during the intended operating hours.
-  */
-  $: {
+  // This function updates the "to" time in storage and attempts to sync the preference with the server.
+  async function setActiveTo() {
+    // Ensure "to" time is always after "from" time
     const fromTotal = hrsFrom * 60 + minFrom;
     let toTotal = hrsTo * 60 + minTo;
 
@@ -27,9 +24,7 @@
       hrsTo = Math.floor(toTotal / 60) % 24;
       minTo = toTotal % 60;
     }
-  }
- // This function updates the "to" time in storage and attempts to sync the preference with the server.
-  async function setActiveTo() {
+
     const setting = { hrs: hrsTo, min: minTo };
     storage.operatingHours.to.set(setting);
     try {
@@ -49,11 +44,17 @@
 
   // This function updates the "from" time in storage and attempts to sync the preference with the server.
   async function setActiveFrom() {
-    if (hrsTo < hrsFrom) {
-      hrsTo = hrsFrom === 24 ? hrsFrom : hrsFrom + 1;
+    // If "from" time is after "to" time, auto-advance "to" time by 1 minute
+    const fromTotal = hrsFrom * 60 + minFrom;
+    let toTotal = hrsTo * 60 + minTo;
 
-      storage.operatingHours.from.set({ hrs: hrsTo, min: minTo });
+    if (toTotal <= fromTotal) {
+      toTotal = fromTotal + 1; 
+      hrsTo = Math.floor(toTotal / 60) % 24;
+      minTo = toTotal % 60;
+      storage.operatingHours.to.set({ hrs: hrsTo, min: minTo });
     }
+
     const setting = { hrs: hrsFrom, min: minFrom };
     storage.operatingHours.from.set(setting);
     try {
@@ -88,9 +89,14 @@
           min="0"
           max="23"
           bind:value={hrsFrom}
-          on:change={() => {
+          on:blur={() => {
             hrsFrom = Math.max(0, Math.min(23, parseInt(hrsFrom) || 0));
             setActiveFrom();
+          }}
+          on:keypress={(e) => {
+            if (e.key === "Enter") {
+              e.target.blur();
+            }
           }}
           class="form-control form-control-sm inline"
         />
@@ -101,9 +107,14 @@
           min="0"
           max="59"
           bind:value={minFrom}
-          on:change={() => {
+          on:blur={() => {
             minFrom = Math.max(0, Math.min(59, parseInt(minFrom) || 0));
             setActiveFrom();
+          }}
+          on:keypress={(e) => {
+            if (e.key === "Enter") {
+              e.target.blur();
+            }
           }}
           class="form-control form-control-sm inline"
         />
@@ -126,9 +137,14 @@
           min="0"
           max="23"
           bind:value={hrsTo}
-          on:change={() => {
+          on:blur={() => {
             hrsTo = Math.max(0, Math.min(23, parseInt(hrsTo) || 0));
             setActiveTo();
+          }}
+          on:keypress={(e) => {
+            if (e.key === "Enter") {
+              e.target.blur();
+            }
           }}
           class="form-control form-control-sm inline"
         />
@@ -139,9 +155,14 @@
           min="0"
           max="59"
           bind:value={minTo}
-          on:change={() => {
+          on:blur={() => {
             minTo = Math.max(0, Math.min(59, parseInt(minTo) || 0));
             setActiveTo();
+          }}
+          on:keypress={(e) => {
+            if (e.key === "Enter") {
+              e.target.blur();
+            }
           }}
           class="form-control form-control-sm inline"
         />
