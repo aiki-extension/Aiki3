@@ -6,9 +6,6 @@
   import storage from "../../../util/storage";
   import { saveUserPreferences } from "../../../util/logger";
 
-  let hourOptions = Array.from({ length: 25 }, (_, i) => i);
-  let minuteOptions = [0, 15, 30, 45];
-
   export let settings;
   export let update;
   export let user;
@@ -16,11 +13,18 @@
   let { hrs: hrsFrom, min: minFrom } = settings.activeFrom;
   let { hrs: hrsTo, min: minTo } = settings.activeTo;
 
-  function parseNumberToTime(number) {
-    return number < 10 ? `0${number}` : number;
-  }
-
+  // This function updates the "to" time in storage and attempts to sync the preference with the server.
   async function setActiveTo() {
+    // Ensure "to" time is always after "from" time
+    const fromTotal = hrsFrom * 60 + minFrom;
+    let toTotal = hrsTo * 60 + minTo;
+
+    if (toTotal <= fromTotal) {
+      toTotal = fromTotal + 1; 
+      hrsTo = Math.floor(toTotal / 60) % 24;
+      minTo = toTotal % 60;
+    }
+
     const setting = { hrs: hrsTo, min: minTo };
     storage.operatingHours.to.set(setting);
     try {
@@ -38,12 +42,19 @@
     update();
   }
 
+  // This function updates the "from" time in storage and attempts to sync the preference with the server.
   async function setActiveFrom() {
-    if (hrsTo < hrsFrom) {
-      hrsTo = hrsFrom === 24 ? hrsFrom : hrsFrom + 1;
+    // If "from" time is after "to" time, auto-advance "to" time by 1 minute
+    const fromTotal = hrsFrom * 60 + minFrom;
+    let toTotal = hrsTo * 60 + minTo;
 
-      storage.operatingHours.from.set({ hrs: hrsTo, min: minTo });
+    if (toTotal <= fromTotal) {
+      toTotal = fromTotal + 1; 
+      hrsTo = Math.floor(toTotal / 60) % 24;
+      minTo = toTotal % 60;
+      storage.operatingHours.to.set({ hrs: hrsTo, min: minTo });
     }
+
     const setting = { hrs: hrsFrom, min: minFrom };
     storage.operatingHours.from.set(setting);
     try {
@@ -61,19 +72,10 @@
     update();
   }
 
-  function hrsToDisabled(value) {
-    const threshhold = hrsFrom * 60 + minFrom;
-    const target = value * 60 + minTo;
-    if (threshhold >= target) return true;
-  }
-  function minToDisabled(value) {
-    const threshhold = hrsFrom * 60 + minFrom;
-    const target = hrsTo * 60 + value;
-    if (threshhold >= target) return true;
-  }
+
 </script>
 
-<!-- ActiveFrom -->
+<!-- This is the button from when Aiki should start, it can start from midnight to 11:59 o'clock-->
 <div class="row">
   <div class="col-sm">
     <p>Aiki will turn <strong>ON</strong> at this time:</p>
@@ -82,46 +84,48 @@
   <div class="col-sm">
     <div class="wrapper">
       <!-- svelte-ignore a11y-no-onchange -->
-      <select
-        selected={hrsFrom}
-        id="hrs"
-        on:change={(e) => {
-          hrsFrom = parseInt(e.target.value);
-          setActiveFrom();
-        }}
-        class="custom-select custom-select-sm inline"
-      >
-        {#each hourOptions as value}
-          <option selected={value === hrsFrom} {value}
-            >{parseNumberToTime(value)}</option
-          >
-        {/each}
-      </select>
+      <input
+          type="number"
+          min="0"
+          max="23"
+          title="Enter a value between 0 and 23"
+          bind:value={hrsFrom}
+          on:blur={() => {
+            hrsFrom = Math.max(0, Math.min(23, parseInt(hrsFrom) || 0));
+            setActiveFrom();
+          }}
+          on:keypress={(e) => {
+            if (e.key === "Enter") {
+              e.target.blur();
+            }
+          }}
+          class="form-control form-control-sm inline"
+        />
       <p>:</p>
       <!-- svelte-ignore a11y-no-onchange -->
-      <select
-        selected={minFrom}
-        id="min"
-        on:change={(e) => {
-          minFrom = parseInt(e.target.value);
-          setActiveFrom();
-        }}
-        class="custom-select custom-select-sm inline"
-      >
-        {#each minuteOptions as value}
-          <option
-            disabled={hrsFrom === 0 && value === 0}
-            selected={value === minFrom}
-            {value}>{parseNumberToTime(value)}</option
-          >
-        {/each}
-      </select>
+      <input
+          type="number"
+          min="0"
+          max="59"
+          title="Enter a value between 0 and 59"
+          bind:value={minFrom}
+          on:blur={() => {
+            minFrom = Math.max(0, Math.min(59, parseInt(minFrom) || 0));
+            setActiveFrom();
+          }}
+          on:keypress={(e) => {
+            if (e.key === "Enter") {
+              e.target.blur();
+            }
+          }}
+          class="form-control form-control-sm inline"
+        />
       <p><small>{"Hrs/Min"}</small></p>
     </div>
   </div>
 </div>
 
-<!-- ActiveTo -->
+<!-- This is the button For when Aiki should turn OFF the turn off time, cant be below the start time -->
 <div class="row">
   <div class="col-sm">
     <p class="header-p">Aiki will turn <strong>OFF</strong> at this time:</p>
@@ -130,42 +134,43 @@
   <div class="col-sm">
     <!-- svelte-ignore a11y-no-onchange -->
     <div class="wrapper">
-      <select
-        selected={hrsTo}
-        id="hrs"
-        on:change={(e) => {
-          hrsTo = parseInt(e.target.value);
-          setActiveTo();
-        }}
-        class="custom-select custom-select-sm inline"
-      >
-        {#each hourOptions as value}
-          <option
-            disabled={hrsToDisabled(value)}
-            selected={value === hrsTo}
-            {value}>{parseNumberToTime(value)}</option
-          >
-        {/each}
-      </select>
+       <input
+          type="number"
+          min="0"
+          max="23"
+          title="Enter a value between 0 and 23"
+          bind:value={hrsTo}
+          on:blur={() => {
+            hrsTo = Math.max(0, Math.min(23, parseInt(hrsTo) || 0));
+            setActiveTo();
+          }}
+          on:keypress={(e) => {
+            if (e.key === "Enter") {
+              e.target.blur();
+            }
+          }}
+          class="form-control form-control-sm inline"
+        />
       <p>:</p>
       <!-- svelte-ignore a11y-no-onchange -->
-      <select
-        selected={minTo}
-        id="min"
-        on:change={(e) => {
-          minTo = parseInt(e.target.value);
-          setActiveTo();
-        }}
-        class="custom-select custom-select-sm inline"
-      >
-        {#each minuteOptions as value}
-          <option
-            disabled={minToDisabled(value)}
-            selected={value === minTo}
-            {value}>{parseNumberToTime(value)}</option
-          >
-        {/each}
-      </select>
+        <input
+          type="number"
+          min="0"
+          max="59"
+          title="Enter a value between 0 and 59"
+          bind:value={minTo}
+          on:blur={() => {
+            minTo = Math.max(0, Math.min(59, parseInt(minTo) || 0));
+            setActiveTo();
+          }}
+          on:keypress={(e) => {
+            if (e.key === "Enter") {
+              e.target.blur();
+            }
+          }}
+          class="form-control form-control-sm inline"
+        />
+
       <p><small>{"Hrs/Min"}</small></p>
     </div>
   </div>

@@ -69,6 +69,16 @@ textarea {
   border: 1px solid #ccc;
   border-radius: 2px;
 }
+/* Remove number input spinners */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
 
 input:disabled {
   color: #ccc;
