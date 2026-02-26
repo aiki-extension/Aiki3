@@ -7,7 +7,7 @@
 
   export let settings;
   export let update;
-  export let user;
+
 
   let { hrs: hrsFrom, min: minFrom } = settings.activeFrom;
   let { hrs: hrsTo, min: minTo } = settings.activeTo;

@@ -17,7 +17,6 @@
   import { toast } from "@zerodevx/svelte-toast";
   import * as themes from "./util/toastThemes";
 
-  export let user = "";
   export let port;
   $: list = [];
 

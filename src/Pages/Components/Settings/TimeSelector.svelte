@@ -15,7 +15,6 @@
   const MIN_LEARNING_MINUTES_EXP = 2;
   export let settings;
   export let update;
-  export let user;
 
   let { min: learnMin, sec: learnSec } = settings.learningTime;
   
