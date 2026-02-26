@@ -1,7 +1,7 @@
 <!-- 
   Statistics display component.
   Used in / Parent components: /src/Pages/Components/Settings/Statistics.svelte
--->
+
 <script>
   export let type = "today";
 
@@ -135,3 +135,4 @@
     color: var(--textColor);
   }
 </style>
+-->

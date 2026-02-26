@@ -174,15 +174,4 @@
     font-size: var(--fontSizeSettings);
   }
 
-  select,
-  option {
-    font-family: var(--fontContent);
-    font-size: 0.875rem;
-    color: #212121;
-  }
-
-  option:disabled {
-    background-color: whitesmoke;
-    color: lightgray;
-  }
 </style>
