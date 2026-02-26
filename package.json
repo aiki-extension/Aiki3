@@ -10,12 +10,15 @@
     "build:firefox": "node scripts/buildFirefox.js && npm run build",
     "build:chrome": "node scripts/buildChrome.js && npm run build",
     "dev:firefox": "node scripts/buildFirefox.js && npm run dev",
-    "dev:chrome": "node scripts/buildChrome.js && npm run dev"
+    "dev:chrome": "node scripts/buildChrome.js && npm run dev",
+    "sign": "node sign.js"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^17.0.0",
     "@rollup/plugin-node-resolve": "^11.0.0",
     "@zerodevx/svelte-toast": "^0.1.4",
+    "cross-env": "^10.1.0",
+    "dotenv-cli": "^11.0.0",
     "rollup": "^2.3.4",
     "rollup-plugin-css-only": "^3.1.0",
     "rollup-plugin-livereload": "^2.0.0",
