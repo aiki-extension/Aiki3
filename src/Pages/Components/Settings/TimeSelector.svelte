@@ -6,7 +6,6 @@
 <script>
   import { onMount } from "svelte";
   import storage from "../../../util/storage";
-  import { saveUserPreferences, logEvent } from "../../../util/logger";
   import { AIKI_VARIANT } from "../../../util/variant";
 
   let minuteOptions = Array.from({ length: 121 }, (_, i) => i); // 0 - 120 minutes
@@ -16,7 +15,6 @@
   const MIN_LEARNING_MINUTES_EXP = 2;
   export let settings;
   export let update;
-  export let user;
 
   let { min: learnMin, sec: learnSec } = settings.learningTime;
   
@@ -52,16 +50,6 @@
     ensureMinThreshold();
     const learningTime = { min: learnMin, sec: learnSec };
     storage.timeSettings.learningTime.set(learningTime);
-    const totalMinutes = learningTime.min + learningTime.sec / 60;
-    try {
-      const participantId = user || (await storage.uid.get());
-      await saveUserPreferences({
-        participantId,
-        learning_time_minutes: totalMinutes,
-      });
-    } catch (e) {
-      console.warn("Failed to sync learning time preference", e);
-    }
     update();
   }
   
@@ -71,31 +59,6 @@
     await storage.controlledTimerSettings.learningMinutes.set(controlledLearningMinutes);
     await storage.controlledTimerSettings.learningSeconds.set(controlledLearningSeconds);
     
-    // Calculate total minutes for UserPreferences
-    const totalMinutes = controlledLearningMinutes + controlledLearningSeconds / 60;
-    
-    // Save to UserPreferences and log the change
-    try {
-      const participantId = user || (await storage.uid.get());
-      
-      // Save to UserPreferences table
-      await saveUserPreferences({
-        participantId,
-        learning_time_minutes: totalMinutes,
-      });
-      
-      // Log the change event
-      await logEvent({
-        participantId,
-        eventType: "audit:setting_change:controlled_learning_time",
-        eventData: JSON.stringify({
-          old: { min: oldMinutes, sec: oldSeconds },
-          new: { min: controlledLearningMinutes, sec: controlledLearningSeconds },
-        }),
-      });
-    } catch (e) {
-      console.warn("Failed to log controlled learning time change", e);
-    }
     update();
   }
   
@@ -105,31 +68,6 @@
     await storage.controlledTimerSettings.rewardMinutes.set(controlledRewardMinutes);
     await storage.controlledTimerSettings.rewardSeconds.set(controlledRewardSeconds);
     
-    // Calculate total minutes for UserPreferences
-    const totalMinutes = controlledRewardMinutes + controlledRewardSeconds / 60;
-    
-    // Save to UserPreferences and log the change
-    try {
-      const participantId = user || (await storage.uid.get());
-      
-      // Save to UserPreferences table
-      await saveUserPreferences({
-        participantId,
-        procrastination_reward_minutes: totalMinutes,
-      });
-      
-      // Log the change event
-      await logEvent({
-        participantId,
-        eventType: "audit:setting_change:controlled_reward_time",
-        eventData: JSON.stringify({
-          old: { min: oldMinutes, sec: oldSeconds },
-          new: { min: controlledRewardMinutes, sec: controlledRewardSeconds },
-        }),
-      });
-    } catch (e) {
-      console.warn("Failed to log controlled reward time change", e);
-    }
     update();
   }
 </script>

@@ -30,9 +30,6 @@
     font-size: var(--fontSizeSettings);
   }
 
-  hr {
-    background-color: var(--hrColor);
-  }
 
   h5 {
     font-family: var(--fontHeaders);

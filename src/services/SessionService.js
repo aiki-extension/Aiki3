@@ -1,54 +1,6 @@
 import storage from "../util/storage";
-import { logEvent as rawLogEvent, logSessionEvent } from "../util/logger";
-
 let cachedGoalSeconds = null;
 let lastGoalFetch = 0;
-
-/**
- * Log an event without awaiting (fire and forget).
- * Used by controlled variant for non-blocking event logging.
- * @param {string} eventType - Event type
- * @param {Object} data - Additional event data
- */
-function logEventAsync(eventType, data = {}) {
-  storage.uid.get().then(participantId => {
-    rawLogEvent({ participantId, eventType, ...data }).catch(() => { });
-  });
-}
-
-/**
- * Log a controlled variant session (learning or reward).
- * @param {Object} options
- * @param {string} options.sessionType - "learning" or "procrastination" (reward)
- * @param {number} options.startedAt - Session start timestamp
- * @param {number} options.durationMs - Actual duration in milliseconds
- * @param {number} options.goalMs - Goal duration in milliseconds
- * @param {boolean} options.completed - Whether the goal was reached
- * @param {string} options.learningSite - Learning site URL
- * @param {string} options.procrastinationSite - Procrastination site URL
- * @returns {Promise<void>}
- */
-async function logControlledSession(options = {}) {
-  const participantId = await storage.uid.get();
-  if (!participantId) return;
-
-  const durationSeconds = Math.round((options.durationMs || 0) / 1000);
-  const goalSeconds = Math.round((options.goalMs || 0) / 1000);
-
-  return logSessionEvent({
-    participantId,
-    sessionType: options.sessionType || "learning",
-    sessionStart: options.startedAt,
-    sessionEnd: Date.now(),
-    durationSeconds,
-    goalSeconds,
-    completed: options.completed === true,
-    siteVisited: options.sessionType === "learning" ? options.learningSite : options.procrastinationSite,
-    triggeredBySite: options.sessionType === "learning" ? options.procrastinationSite : null,
-  }).catch(e => {
-    console.warn("[SessionService] Failed to log controlled session:", e);
-  });
-}
 
 async function getGoalSeconds() {
   const now = Date.now();
@@ -110,17 +62,6 @@ async function finalizeSession(tabId, sessionType, reason = "switch") {
     const startedAt = session.startedAt || now;
     const durationSeconds = Math.max(0, Math.round((now - startedAt) / 1000));
 
-    const logEventReasons = ["tab_switch", "tab_closed", "continue"];
-    if (logEventReasons.includes(reason)) {
-      await rawLogEvent({
-        participantId: session.participantId,
-        eventType: reason,
-        procrastinationSite: session.procrastinationUrl,
-        learningSite: session.learningUrl,
-        eventData: sessionType,
-      });
-    }
-
     const logData = {
       participantId: session.participantId,
       sessionType,
@@ -142,7 +83,6 @@ async function finalizeSession(tabId, sessionType, reason = "switch") {
       logData.learningSite = session.learningUrl;
     }
 
-    await logSessionEvent(logData);
   } finally {
     SessionFinalizer.delete(finalizeKey);
   }
@@ -176,6 +116,6 @@ export default {
   finalizeSession,
   transferActiveSession,
   getGoalSeconds,
-  logEventAsync,
-  logControlledSession,
+  logEventAsync: () => {},
+  logControlledSession: async () => {},
 };

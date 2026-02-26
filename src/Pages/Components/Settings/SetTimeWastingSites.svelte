@@ -5,7 +5,6 @@
 <script>
   import Container from "./Container.svelte";
   import storage from "../../../util/storage";
-  import { saveUserPreferences } from "../../../util/logger";
   import { parseUrl } from "../../../util/utilities";
   import Fa from "svelte-fa";
   import {
@@ -18,12 +17,10 @@
   import { toast } from "@zerodevx/svelte-toast";
   import * as themes from "./util/toastThemes";
 
-  export let user = "";
   export let port;
   $: list = [];
 
   let toastCoords = { y: "add-button", x: "site-input-container" };
-  let syncingPrefs = false;
   let learningUri = ""; 
 
   async function setup() {
@@ -70,7 +67,6 @@
     newList.splice(index, 1);
     list = newList;
     storage.list.set(list);
-    syncPreferences();
     port.postMessage(`Update: list`);
     toast.pop();
     toast.push("Website removed!", {
@@ -112,7 +108,6 @@
       newList.push(site);
       list = newList;
       storage.list.set(list);
-      syncPreferences();
       port.postMessage(`Update: list`);
       addItemValue = "";
       toast.pop();
@@ -141,23 +136,6 @@
     });
   }
 
-  async function syncPreferences() {
-    if (syncingPrefs) return;
-    syncingPrefs = true;
-    try {
-      const participantId = user || (await storage.uid.get());
-      const procrastinationSites = Array.isArray(list)
-        ? list.map((item) => item?.host).filter(Boolean)
-        : [];
-      await saveUserPreferences({
-        participantId,
-        procrastination_sites: procrastinationSites,
-      });
-    } catch (_) {
-    } finally {
-      syncingPrefs = false;
-    }
-  }
 
   function firstLetterUppercase(string) {
     return string.charAt(0).toUpperCase() + string.slice(1);
