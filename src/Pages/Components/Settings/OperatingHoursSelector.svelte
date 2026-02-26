@@ -4,7 +4,6 @@
  -->
 <script>
   import storage from "../../../util/storage";
-  import { saveUserPreferences } from "../../../util/logger";
 
   export let settings;
   export let update;
@@ -27,18 +26,6 @@
 
     const setting = { hrs: hrsTo, min: minTo };
     storage.operatingHours.to.set(setting);
-    try {
-      const participantId = user || (await storage.uid.get());
-      const startMinutes = hrsFrom * 60 + minFrom;
-      const endMinutes = hrsTo * 60 + minTo;
-      await saveUserPreferences({
-        participantId,
-        operating_hours_start: startMinutes,
-        operating_hours_end: endMinutes,
-      });
-    } catch (e) {
-      console.warn("Failed to sync operating hours preference", e);
-    }
     update();
   }
 
@@ -57,18 +44,6 @@
 
     const setting = { hrs: hrsFrom, min: minFrom };
     storage.operatingHours.from.set(setting);
-    try {
-      const participantId = user || (await storage.uid.get());
-      const startMinutes = hrsFrom * 60 + minFrom;
-      const endMinutes = hrsTo * 60 + minTo;
-      await saveUserPreferences({
-        participantId,
-        operating_hours_start: startMinutes,
-        operating_hours_end: endMinutes,
-      });
-    } catch (e) {
-      console.warn("Failed to sync operating hours preference", e);
-    }
     update();
   }
 

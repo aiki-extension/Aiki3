@@ -1,87 +1,14 @@
 <!-- 
-  Statistics display component showing time spent on learning/procrastination sites.
-  Queries the Back4App database for accurate session statistics.
+  Statistics display component.
   Used in / Parent components: /src/Pages/Components/Settings/Statistics.svelte
 -->
 <script>
-  import { fetchSessionStats } from "../../../util/logger";
-
   export let type = "today";
 
+  let loading = false;
+  let error = "Statistics unavailable.";
   let stats = null;
-  let loading = true;
-  let error = null;
-
-  const timeFrameLabels = {
-    today: "Today",
-    weekly: "This Week",
-    allTime: "All Time",
-  };
-
-  $: windowLabel = timeFrameLabels[type] || "this period";
-
-  function getDateRange(rangeType) {
-    const now = new Date();
-    const endDate = now;
-    let startDate;
-
-    switch (rangeType) {
-      case "today": {
-        startDate = new Date(now);
-        startDate.setHours(0, 0, 0, 0);
-        break;
-      }
-      case "weekly": {
-        startDate = new Date(now);
-        startDate.setDate(startDate.getDate() - 7);
-        startDate.setHours(0, 0, 0, 0);
-        break;
-      }
-      case "allTime":
-      default: {
-        startDate = null; // No start limit
-        break;
-      }
-    }
-
-    return { startDate, endDate };
-  }
-
-  function formatDuration(seconds) {
-    if (!seconds || seconds <= 0) return "0m 0s";
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    
-    const parts = [];
-    if (hrs > 0) parts.push(`${hrs}h`);
-    if (mins > 0 || hrs > 0) parts.push(`${mins}m`);
-    parts.push(`${secs}s`);
-    
-    return parts.join(" ");
-  }
-
-  async function loadStats(rangeType) {
-    loading = true;
-    error = null;
-    try {
-      const { startDate, endDate } = getDateRange(rangeType);
-      stats = await fetchSessionStats({ startDate, endDate });
-    } catch (e) {
-      console.error("Failed to load stats:", e);
-      error = "Failed to load statistics";
-      stats = null;
-    } finally {
-      loading = false;
-    }
-  }
-
-  // React to type changes
-  $: loadStats(type);
-
-  $: noStats = !loading && stats && 
-    stats.learningSeconds === 0 && 
-    stats.procrastinationSeconds === 0;
+  let noStats = false;
 </script>
 
 {#if loading}

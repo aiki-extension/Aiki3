@@ -2,8 +2,6 @@
   "name": "svelte-app",
   "version": "1.0.0",
   "scripts": {
-    "prebuild": "node scripts/generateBack4AppConfig.js",
-    "predev": "node scripts/generateBack4AppConfig.js",
     "build": "rollup -c",
     "dev": "rollup -c -w",
     "start": "sirv public",
@@ -28,7 +26,6 @@
     "@fortawesome/free-solid-svg-icons": "^5.15.3",
     "chart.js": "^3.2.1",
     "chartjs": "^0.3.24",
-    "parse": "^7.0.2",
     "sirv-cli": "^1.0.0",
     "svelte-check": "^1.5.2",
     "svelte-fa": "^2.2.0",
