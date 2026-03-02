@@ -91,13 +91,14 @@
         bind:value={learnMin}
         on:change={() => {
           learnMin = Math.max(2, Math.min(119, parseInt(learnMin) || 2));
+          learnSec = 0; // Reset seconds to 0 if minutes are changed to enforce minimum time
           ensureMinThreshold();
           setLearningTime();
         }}
         class="form-control form-control-sm inline"
       />
-      <p>:</p>
-      <!-- svelte-ignore a11y-no-onchange -->
+     <!-- <p>:</p>
+        svelte-ignore a11y-no-onchange 
       <input
         type = "number"
         id="seconds"
@@ -113,8 +114,8 @@
         class="form-control form-control-sm inline"
       />
         
-      
-      <p><small>{"Min/Sec"}</small></p>
+      -->
+      <p><small>{"Min"}</small></p>
     </div>
   </div>
 </div>
