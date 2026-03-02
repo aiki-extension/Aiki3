@@ -107,7 +107,7 @@
 </script>
 
 <Container headline="Redirection Settings">
-  <h5>Your Learning Platform:</h5>
+  <h5>Your Redirection Platform:</h5>
   <div class="container">
     <div class="full" id="learning-url-container">
       <input

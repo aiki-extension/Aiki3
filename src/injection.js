@@ -710,7 +710,7 @@ function renderLearningContent() {
     collapseBtn.addEventListener("mouseleave", () => { collapseBtn.style.color = "rgba(248, 250, 252, 0.6)"; });
 
     const heading = document.createElement("strong");
-    heading.textContent = "Learning progress";
+    heading.textContent = "📚 Learning Session";
     heading.setAttribute("style", `font-size: 1em; letter-spacing: 0.01em; font-weight: 600; display: ${isCollapsed ? "none" : "block"};`);
 
     const progressLabel = document.createElement("span");
@@ -888,7 +888,7 @@ function renderLearningContent() {
         barFill.style.width = `${percent}%`;
         barFill.style.background = "linear-gradient(135deg, #22c55e, #14b8a6)";
         progressLabel.textContent = goal > 0 ? `${formatDuration(progress)} / ${formatDuration(goal)}` : "No goal set yet";
-        heading.textContent = "Learning progress";
+        heading.textContent = "📚 Learning Session";
         claimRewardBtn.style.display = "none";
         panel.style.background = defaultBg;
 
