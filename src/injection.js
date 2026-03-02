@@ -42,6 +42,12 @@ const formatDuration = (value) => {
   const seconds = totalSeconds % 60;
   return `${minutes}m ${seconds}s`;
 };
+const formatDurationShort = (value) => {
+  if (typeof value !== "number" || value <= 0) return "0m";
+  const totalSeconds = Math.floor(value / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  return `${minutes}m`;
+};
 
 /**
  * Make an element draggable.
@@ -846,12 +852,12 @@ function renderLearningContent() {
           claimRewardBtn.style.display = "none";
 
           if (goal > 0 && (remaining <= 0 || completed)) {
-            progressLabel.textContent = `${formatDuration(elapsed)} / ${formatDuration(goal)}`;
+            progressLabel.textContent = `${formatDuration(elapsed)} / ${formatDurationShort(goal)}`;
             status.textContent = "Session complete! Claim your reward.";
             panel.style.background = "linear-gradient(135deg, #22c55e, #0ea5e9)";
             claimRewardBtn.style.display = "block";
           } else if (goal > 0) {
-            progressLabel.textContent = `${formatDuration(progress)} / ${formatDuration(goal)}`;
+            progressLabel.textContent = `${formatDuration(progress)} / ${formatDurationShort(goal)}`;
             status.textContent = `Stay focused for ${formatDuration(remaining)} more.`;
           } else {
             progressLabel.textContent = "Starting...";
@@ -865,7 +871,7 @@ function renderLearningContent() {
 
           barFill.style.width = `${percent}%`;
           barFill.style.background = "linear-gradient(135deg, #ffffffff, #32CD32)";
-          progressLabel.textContent = goal > 0 ? `${formatDuration(progress)} / ${formatDuration(goal)}` : "Enjoy!";
+          progressLabel.textContent = goal > 0 ? `${formatDuration(progress)} / ${formatDurationShort(goal)}` : "Enjoy!";
           heading.textContent = "🎉 Reward Time";
           status.textContent = goal > 0 ? `Enjoy! ${formatDuration(remaining)} remaining.` : "Your reward time!";
           panel.style.background = "linear-gradient(135deg, #ffffff, #32CD32)";
@@ -887,7 +893,7 @@ function renderLearningContent() {
 
         barFill.style.width = `${percent}%`;
         barFill.style.background = "linear-gradient(135deg, #22c55e, #14b8a6)";
-        progressLabel.textContent = goal > 0 ? `${formatDuration(progress)} / ${formatDuration(goal)}` : "No goal set yet";
+        progressLabel.textContent = goal > 0 ? `${formatDuration(progress)} / ${formatDurationShort(goal)}` : "No goal set yet";
         heading.textContent = "Learning progress";
         claimRewardBtn.style.display = "none";
         panel.style.background = defaultBg;
@@ -1021,7 +1027,7 @@ function renderContentBlocker() {
 
     barFill.style.width = `${percent}%`;
     progressLabel.textContent = goal > 0
-      ? `${formatDuration(progress)} / ${formatDuration(goal)}`
+      ? `${formatDuration(progress)} / ${formatDurationShort(goal)}`
       : "No learning goal set yet";
 
     if (goal > 0 && remaining === 0) {
