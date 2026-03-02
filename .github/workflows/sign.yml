@@ -32,6 +32,7 @@ jobs:
 
       - name: Package Chrome extension
         run: |
+          mkdir -p web-ext-artifacts
           cd public
           zip -r ../web-ext-artifacts/chrome-extension.zip . \
             --exclude "*.map"
