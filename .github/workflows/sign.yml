@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - bsc_development_main
+      - feature/firefox-sign-setup
   workflow_dispatch:
 
 permissions:
