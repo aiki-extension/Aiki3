@@ -30,6 +30,9 @@ jobs:
       - name: Build Chrome extension
         run: npm run build:chrome
 
+      - name: Package Chrome extension
+        run: cd public && zip -r ../chrome-extension.zip . --exclude "manifest.chrome.json" --exclude "manifest.firefox.json"
+
       - name: Build Firefox extension
         run: npm run build:firefox
 
@@ -46,7 +49,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: signed-extension
-          path: web-ext-artifacts/*.xpi
+          path: |
+            web-ext-artifacts/*.xpi
+            chrome-extension.zip
           if-no-files-found: error
 
   create_release:
@@ -67,7 +72,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "draft-${{ github.run_number }}" release-assets/*.xpi \
+          gh release create "draft-${{ github.run_number }}" release-assets/*.xpi release-assets/chrome-extension.zip \
             --target "${{ github.sha }}" \
             --title "Signed extension draft ${{ github.run_number }}" \
             --notes "Automated draft release from ${{ github.ref_name }}" \
