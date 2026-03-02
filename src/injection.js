@@ -398,22 +398,22 @@ if (document.readyState === "loading") {
 
 /**
  * Bootstrap reward overlay on page load if we're in reward mode.
- * This handles full page reloads on procrastination sites.
- * Only shows on procrastination sites to avoid appearing on other pages.
+ * This handles full page reloads on time wasting sites.
+ * Only shows on time wasting sites to avoid appearing on other pages.
  */
 async function bootstrapRewardOverlayIfNeeded() {
   try {
     // Query background for current timer state
     const timerData = await browser.runtime.sendMessage({ type: "timer:get" });
 
-    // If reward timer is active (goal > 0), check if we're on a procrastination site
+    // If reward timer is active (goal > 0), check if we're on a time wasting site
     if (timerData && timerData.controlledRewardGoal > 0) {
-      // Get procrastination sites list
+      // Get time wasting sites list
       const result = await browser.storage.local.get("list");
       const procList = result?.list || [];
       const procHosts = procList.map(item => item?.host || item?.name || "").filter(Boolean);
 
-      // Check if current page matches any procrastination site
+      // Check if current page matches any time wasting site
       const currentHost = location.hostname.replace(/^www\./, "");
       const isOnProcrastinationSite = procHosts.some(host => {
         const normalizedHost = host.replace(/^www\./, "");
@@ -1092,7 +1092,7 @@ const scheduleRewardOverlayEnsure = () => {
       // Check with background if we're in reward mode
       const data = await browser.runtime.sendMessage({ type: "timer:get" });
       if (data && data.controlledRewardGoal > 0 && !document.getElementById("aiki-reward-overlay")) {
-        // Also check if we're on a procrastination site
+        // Also check if we're on a time wasting site
         const result = await browser.storage.local.get("list");
         const procList = result?.list || [];
         const procHosts = procList.map(item => item?.host || item?.name || "").filter(Boolean);
@@ -1147,7 +1147,7 @@ function installRewardOverlayPersistence() {
 }
 
 /**
- * Render a reward time overlay for controlled variant on procrastination sites.
+ * Render a reward time overlay for controlled variant on time wasting sites.
  * Non-blocking panel showing countdown until learning resumes.
  * Shows snooze button at 5 seconds remaining.
  */

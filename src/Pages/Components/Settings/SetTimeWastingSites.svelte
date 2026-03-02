@@ -149,9 +149,9 @@
   <p>Type in pages you feel like you spend a little too much time on here (e.g: www.facebook.com, www.reddit.com, 9gag.com).</p>
   <p><strong>NB:</strong> You can still visit these websites, Aiki will just be logging the amount of time you spend on them.</p>
 
-  <!-- This is the button element for adding procrastination Sites-->
+  <!-- This is the button element for adding a Time wasting Site-->
   <form on:submit|preventDefault={addItem}>
-    <div data-tooltip="Add to your list of procrastination sites">
+    <div data-tooltip="Add to your list of time wasting sites">
       <div class="input-group mb-3">
         <input
           bind:value={addItemValue}

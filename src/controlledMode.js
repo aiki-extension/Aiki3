@@ -56,7 +56,7 @@ export async function init() {
  * Handle navigation event.
  * @param {number} tabId - Tab ID
  * @param {string} url - URL being navigated to
- * @param {string[]} procrastinationHosts - List of procrastination hosts
+ * @param {string[]} procrastinationHosts - List of time wasting hosts
  * @param {string} learningUrl - Configured learning URL
  * @returns {boolean} true if handled, false otherwise
  */
@@ -87,7 +87,7 @@ export async function handleNavigation(tabId, url, procrastinationHosts, learnin
         return true;
       }
       // Allow direct learning: if user navigates to learning site while in IDLE,
-      // start a learning session (without a procrastination trigger URL)
+      // start a learning session (without a time wasting trigger URL)
       if (isLearning) {
         startDirectLearningSession(tabId, learningUrl);
         return true;
@@ -109,7 +109,7 @@ export async function handleNavigation(tabId, url, procrastinationHosts, learnin
     case State.REWARD:
       if (isProcrastination) {
         sessionData.tabId = tabId;
-        return false; // Allow procrastination during reward
+        return false; // Allow time wasting during reward
       }
       break;
   }
@@ -143,16 +143,16 @@ async function checkActiveTime() {
 
 /**
  * Handle continue button click (bypass learning).
- * Transitions to REWARD state and redirects to procrastination site.
+ * Transitions to REWARD state and redirects to time wasting site.
  * @param {number} tabId - Tab ID
  */
 export async function handleContinue(tabId) {
   console.log("[ControlledMode] handleContinue", { state: currentState, sessionData });
 
-  // Get stored procrastination URL (may be from sessionData or storage)
+  // Get stored time wasting URL (may be from sessionData or storage)
   let procrastinationUrl = sessionData.procrastinationUrl;
 
-  // If no procrastination URL in session, try to get from storage
+  // If no time wasting URL in session, try to get from storage
   if (!procrastinationUrl) {
     try {
       const origin = await browser.storage.local.get("origin");
@@ -200,7 +200,7 @@ export async function handleContinue(tabId) {
     learningSite: sessionData.learningUrl,
   });
 
-  // Transition to REWARD state (not IDLE) - this gives user their procrastination time
+  // Transition to REWARD state (not IDLE) - this gives user their time wasting time
   currentState = State.REWARD;
   sessionData.tabId = tabId;
   sessionData.rewardStartedAt = Date.now();
@@ -223,7 +223,7 @@ export async function handleContinue(tabId) {
     console.log("[ControlledMode] Stored procrastination session in activeSessions", { tabId });
   }
 
-  // Navigate to procrastination site
+  // Navigate to time wasting site
   try {
     await browser.tabs.update(tabId, { url: procrastinationUrl });
   } catch (e) {
@@ -319,7 +319,7 @@ export function snoozeReward() {
 
 /**
  * Redirect back to learning site without starting a new session.
- * Used when user tries to visit a procrastination site while already in LEARNING state.
+ * Used when user tries to visit a time wasting site while already in LEARNING state.
  */
 async function redirectBackToLearning(tabId, learningUrl) {
   console.log("[ControlledMode] Redirecting back to learning (no new session)");
@@ -385,7 +385,7 @@ async function redirectToLearning(tabId, procrastinationUrl, learningUrl) {
 
 /**
  * Start a direct learning session when user navigates to learning site while in IDLE state.
- * This is different from redirectToLearning - no redirect, no procrastination trigger.
+ * This is different from redirectToLearning - no redirect, no time wasting trigger.
  */
 async function startDirectLearningSession(tabId, learningUrl) {
   console.log("[ControlledMode] Starting direct learning session");
@@ -393,7 +393,7 @@ async function startDirectLearningSession(tabId, learningUrl) {
   // Update in-memory state
   timer.stopAllTimers();
   currentState = State.LEARNING;
-  sessionData.procrastinationUrl = null; // No procrastination trigger
+  sessionData.procrastinationUrl = null; // No time wasting trigger
   sessionData.learningUrl = learningUrl;
   sessionData.tabId = tabId;
   sessionData.learningStartedAt = Date.now();
@@ -410,7 +410,7 @@ async function startDirectLearningSession(tabId, learningUrl) {
       sessionType: "learning",
       startedAt: sessionData.learningStartedAt,
       learningUrl: learningUrl,
-      procrastinationUrl: null, // No procrastination trigger
+      procrastinationUrl: null, // No time wasting trigger
       goalMs: learningMs,
     });
   }
@@ -453,7 +453,7 @@ async function onLearningComplete() {
 
 /**
  * Called when user clicks "Claim Reward" button.
- * Transitions to REWARD state and redirects to procrastination site.
+ * Transitions to REWARD state and redirects to time wasting site.
  * @param {number} tabId - Tab ID
  */
 export async function claimReward(tabId) {
@@ -499,7 +499,7 @@ export async function claimReward(tabId) {
     learningSite: learningUrl,
   });
 
-  // Redirect to procrastination site
+  // Redirect to time wasting site
   if (tabId && procrastinationUrl) {
     try {
       await browser.tabs.update(tabId, { url: procrastinationUrl });
@@ -508,7 +508,7 @@ export async function claimReward(tabId) {
     }
   }
 
-  // Update activeSessions for reward/procrastination tracking
+  // Update activeSessions for reward/time wasting tracking
   const participantId = await storage.uid.get();
   if (participantId) {
     await storage.activeSessions.set(tabId, {
@@ -558,7 +558,7 @@ async function onRewardComplete() {
   const rewardTimerState = timer.getTimerState("reward");
   const actualRewardDurationMs = rewardTimerState.elapsed || rewardGoalMs || 0;
 
-  // LOG REWARD (PROCRASTINATION) SESSION TO DATABASE with completed=true
+  // LOG REWARD (TIME WASTING) SESSION TO DATABASE with completed=true
   SessionService.logControlledSession({
     sessionType: "procrastination",
     startedAt: rewardStartedAt,
@@ -570,7 +570,7 @@ async function onRewardComplete() {
   });
 
   // Reward session has been logged; clear activeSessions entry to avoid
-  // finalizeSession re-logging the same procrastination session on tab close.
+  // finalizeSession re-logging the same time wasting session on tab close.
   if (tabId) {
     await storage.activeSessions.remove(tabId);
   }
@@ -591,19 +591,19 @@ async function onRewardComplete() {
 
   // NOTE: Session logging happens in Sessions table, not here
 
-  // Redirect the ACTIVE procrastination tab to learning
-  // User may have switched tabs, so we need to find the current active procrastination tab
+  // Redirect the ACTIVE time wasting tab to learning
+  // User may have switched tabs, so we need to find the current active time wasting tab
   if (learningUrl) {
     try {
-      // Get procrastination hosts list
+      // Get time wasting hosts list
       const procList = await storage.list.get();
       const procHosts = (procList || []).map(item => item?.host || item?.name || "").filter(Boolean);
 
-      // Get all tabs and find active procrastination tabs
+      // Get all tabs and find active time wasting tabs
       const allTabs = await browser.tabs.query({});
       const activeTabs = allTabs.filter(tab => tab.active);
 
-      // First, try to redirect the currently focused/active procrastination tab
+      // First, try to redirect the currently focused/active time wasting tab
       let redirected = false;
       for (const tab of activeTabs) {
         if (tab.url && siteDetector.isProcrastinationSite(tab.url, procHosts)) {
@@ -615,7 +615,7 @@ async function onRewardComplete() {
         }
       }
 
-      // If no active procrastination tab, try the original stored tabId
+      // If no active time wasting tab, try the original stored tabId
       if (!redirected && tabId) {
         try {
           const originalTab = await browser.tabs.get(tabId);
@@ -629,7 +629,7 @@ async function onRewardComplete() {
         }
       }
 
-      // If still not redirected, redirect any procrastination tab
+      // If still not redirected, redirect any time wasting tab
       if (!redirected) {
         for (const tab of allTabs) {
           if (tab.url && siteDetector.isProcrastinationSite(tab.url, procHosts)) {

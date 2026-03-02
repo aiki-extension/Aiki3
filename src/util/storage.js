@@ -70,8 +70,8 @@ function toggleRedirection() {
 
 /**
  * @async @function
- * @returns {object} userData that includes a list of procrastination websites as defined by the user, as well as the user ID.
- * @description Returns the user ID and a list of procrastination websites wrapped in an object. */
+ * @returns {object} userData that includes a list of Time wasting websites as defined by the user, as well as the user ID.
+ * @description Returns the user ID and a list of time wasting websites wrapped in an object. */
 /**
  * @async @function
  * @returns {Boolean} Determines whether user should be redirected.
@@ -87,7 +87,7 @@ async function getRedirectionToggled() {
  * @param {object[]} list
  * @param {string} list[].name
  * @param {string} list[].id
- * @description Sets the list of procrastination websites in storage. */
+ * @description Sets the list of time wasting websites in storage. */
 function setList(list) {
   storage.set({ list: list });
 }
@@ -95,7 +95,7 @@ function setList(list) {
 /**
  * @async @function
  * @returns {object[]} list
- * @description returns the list of procrastination websites from storage.*/
+ * @description returns the list of time wasting websites from storage.*/
 async function getList() {
   const result = await storage.get("list");
   return Array.isArray(result.list) ? result.list : [];
@@ -169,7 +169,7 @@ async function getLearningUri() {
  * @async @function
  * @returns {number} learningTime
  * @description returns a userdefined amount of miliseconds
- * before they can continue to their origin procrastination website. */
+ * before they can continue to their origin time wasting website. */
 async function getLearningTime() {
   const result = await storage.get("learningTime");
   const lt = result.learningTime;
@@ -183,7 +183,7 @@ async function getLearningTime() {
  * @function
  * @param {number} time
  * @description sets the amount of time before a user is allowed to
- * continue to the origin procrastination website. */
+ * continue to the origin time wasting website. */
 function setLearningTime(time) {
   storage.set({ learningTime: time });
 }
@@ -192,7 +192,7 @@ function setLearningTime(time) {
  * @async @function
  * @returns {number} rewardTime
  * @description returns the userdefined amount of miliseconds the user is allowed to spend on
- * procrastination websites before interception is turned back on. */
+ * time wasting websites before interception is turned back on. */
 async function getRewardTime() {
   const result = await storage.get("rewardTime");
   const rt = result.rewardTime;
@@ -206,7 +206,7 @@ async function getRewardTime() {
  * @function
  * @param {number} time
  * @description sets in storage the userdefined amount of miliseconds the user is allowed
- * to spend on procrastination websites before interception is turned back on. */
+ * to spend on time wasting websites before interception is turned back on. */
 function setRewardTime(time) {
   storage.set({ rewardTime: time });
 }
@@ -280,7 +280,7 @@ function userTimeInit() {
  * @param {Boolean} state
  * @description sets in storage whether user should be redirected.
  * shouldRedirect is defined by the application when the user has earned
- * procrastination time, and again when this expires. */
+ * time wasting time, and again when this expires. */
 async function setShouldRedirect(state) {
   storage.set({ shouldRedirect: state });
 }
@@ -290,7 +290,7 @@ async function setShouldRedirect(state) {
  * @returns {Boolean} shouldRedirect
  * @description returns the state of whether user should be redirected.
  * shouldRedirect is defined by the application when the user has earned
- * procrastination time, and again when this expires. */
+ * time wasting time, and again when this expires. */
 async function getShouldRedirect() {
   const result = await storage.get("shouldRedirect");
   return result.shouldRedirect;
