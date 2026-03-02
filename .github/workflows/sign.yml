@@ -12,8 +12,8 @@ permissions:
   contents: write
 
 jobs:
-  build_and_sign:
-    name: Build and sign
+  build_chrome:
+    name: Build Chrome extension
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -44,6 +44,21 @@ jobs:
           path: web-ext-artifacts/chrome-extension.zip
           if-no-files-found: error
 
+  build_and_sign_firefox:
+    name: Build and sign Firefox extension
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
       - name: Build Firefox extension
         run: npm run build:firefox
 
@@ -56,16 +71,19 @@ jobs:
           AMO_API_KEY: ${{ secrets.DEV_AMO_API_KEY }}
           AMO_API_SECRET: ${{ secrets.DEV_AMO_API_SECRET }}
 
+      - name: Rename signed extension
+        run: mv web-ext-artifacts/*.xpi web-ext-artifacts/aiki3-firefox.xpi
+
       - name: Upload signed extension artifact
         uses: actions/upload-artifact@v4
         with:
           name: signed-extension
-          path: web-ext-artifacts/*.xpi
+          path: web-ext-artifacts/aiki3-firefox.xpi
           if-no-files-found: error
 
   create_release:
     name: Create draft release
-    needs: build_and_sign
+    needs: [build_chrome, build_and_sign_firefox]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
