@@ -10,3 +10,5 @@ back4app.secret
 /src/util/back4appConfig.local.js
 
 .env
+
+web-ext-artifacts/

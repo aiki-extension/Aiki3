@@ -30,6 +30,19 @@ jobs:
       - name: Build Chrome extension
         run: npm run build:chrome
 
+      - name: Package Chrome extension
+        run: |
+          cd public
+          zip -r ../web-ext-artifacts/chrome-extension.zip . \
+            --exclude "*.map"
+
+      - name: Upload Chrome extension artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: chrome-extension
+          path: web-ext-artifacts/chrome-extension.zip
+          if-no-files-found: error
+
       - name: Build Firefox extension
         run: npm run build:firefox
 
@@ -63,6 +76,12 @@ jobs:
           name: signed-extension
           path: release-assets
 
+      - name: Download Chrome extension artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: chrome-extension
+          path: release-assets
+
       - name: Create source code zip
         run: |
           zip -r release-assets/source-code.zip . \
@@ -74,7 +93,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "draft-${{ github.run_number }}" release-assets/*.xpi release-assets/source-code.zip \
+          gh release create "draft-${{ github.run_number }}" \
+            release-assets/*.xpi \
+            release-assets/chrome-extension.zip \
+            release-assets/source-code.zip \
             --target "${{ github.sha }}" \
             --title "Signed extension draft ${{ github.run_number }}" \
             --notes "Automated draft release from ${{ github.ref_name }}" \
