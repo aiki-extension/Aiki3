@@ -1,0 +1,70 @@
+name: Sign & release extension
+
+on:
+  push:
+    branches:
+      - main
+      - bsc_development_main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build_and_sign:
+    name: Build and sign
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Chrome extension
+        run: npm run build:chrome
+
+      - name: Build Firefox extension
+        run: npm run build:firefox
+
+      - name: Bump dev version
+        run: node scripts/bump-dev-version.js
+
+      - name: Sign extension
+        run: npm run sign:dev
+        env:
+          AMO_API_KEY: ${{ secrets.DEV_AMO_API_KEY }}
+          AMO_API_SECRET: ${{ secrets.DEV_AMO_API_SECRET }}
+
+      - name: Upload signed extension artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: signed-extension
+          path: web-ext-artifacts/*.xpi
+          if-no-files-found: error
+
+  create_release:
+    name: Create draft release
+    needs: build_and_sign
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download signed extension artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: signed-extension
+          path: release-assets
+
+      - name: Create draft release and upload asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "draft-${{ github.run_number }}" release-assets/*.xpi \
+            --target "${{ github.sha }}" \
+            --title "Signed extension draft ${{ github.run_number }}" \
+            --notes "Automated draft release from ${{ github.ref_name }}" \
+            --draft
