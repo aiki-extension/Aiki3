@@ -63,11 +63,18 @@ jobs:
           name: signed-extension
           path: release-assets
 
+      - name: Create source code zip
+        run: |
+          zip -r release-assets/source-code.zip . \
+            --exclude "*.git*" \
+            --exclude "node_modules/*" \
+            --exclude "release-assets/*"
+
       - name: Create draft release and upload asset
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "draft-${{ github.run_number }}" release-assets/*.xpi \
+          gh release create "draft-${{ github.run_number }}" release-assets/*.xpi release-assets/source-code.zip \
             --target "${{ github.sha }}" \
             --title "Signed extension draft ${{ github.run_number }}" \
             --notes "Automated draft release from ${{ github.ref_name }}" \
