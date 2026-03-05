@@ -80,7 +80,7 @@
       <p class="meta">{formatDuration(rewardProgress)} / {formatDuration(controlledRewardGoal)}</p>
     </div>
   {:else}
-    <div class="container" data-tooltip="Start learning by visiting a procrastination site">
+    <div class="container" data-tooltip="Start learning by visiting a time wasting site">
       <h6 class="item">Session status:</h6>
       <p class="item idle">Ready to learn</p>
     </div>

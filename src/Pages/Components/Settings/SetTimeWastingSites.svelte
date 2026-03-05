@@ -146,7 +146,7 @@
 <Container id="site-input-container" headline="Set Time Wasting Sites">
   <p>Type in pages you feel like you spend a little too much time on here (e.g: www.facebook.com, www.reddit.com, 9gag.com).</p>
 
-  <!-- This is the button element for adding procrastination Sites-->
+  <!-- This is the button element for adding a Time wasting Site-->
   <form on:submit|preventDefault={addItem}>
     <div data-tooltip="Add to your list of time wasting sites">
       <div class="input-group mb-3">

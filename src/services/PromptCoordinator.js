@@ -13,7 +13,7 @@ class PromptCoordinator {
   async promptRedirect(tabId, learningUrl, originUrl, callbacks = {}, attempt = 0) {
     const { onAccept, onContinue } = callbacks;
 
-    // Validate tab still exists and is on the intended procrastination site before retrying
+    // Validate tab still exists and is on the intended time wasting site before retrying
     if (attempt > 0) {
       try {
         const tab = await browser.tabs.get(tabId);
@@ -23,7 +23,7 @@ class PromptCoordinator {
         const currentHost = new URL(tab.url).hostname.replace(/^www\./, "");
         const intendedHost = new URL(originUrl).hostname.replace(/^www\./, "");
         if (currentHost !== intendedHost) {
-          // Tab navigated away from the procrastination site, abort retries
+          // Tab navigated away from the time wasting site, abort retries
           await this.hideImmediatePrompt(tabId).catch(() => { });
           await this.removePreemptiveHide(tabId).catch(() => { });
           return;

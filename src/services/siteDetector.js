@@ -1,14 +1,14 @@
 /**
- * Site Detector - Shared detection logic for procrastination and learning sites
+ * Site Detector - Shared detection logic for time wasting and learning sites
  */
 
 import storage from "../util/storage";
 import { parseUrl } from "../util/utilities";
 
 /**
- * Check if a URL is a procrastination site.
+ * Check if a URL is a time wasting site.
  * @param {string} url - URL to check
- * @param {string[]} hosts - List of procrastination host names
+ * @param {string[]} hosts - List of time wasting host names
  * @returns {boolean}
  */
 export function isProcrastinationSite(url, hosts) {
@@ -42,7 +42,7 @@ export function isLearningSite(url, learningUrl) {
 }
 
 /**
- * Get procrastination hosts from storage.
+ * Get time wasting hosts from storage.
  * @returns {Promise<string[]>}
  */
 export async function getProcrastinationHosts() {
@@ -62,7 +62,7 @@ export async function getLearningUrl() {
 }
 
 /**
- * Check if URL is a procrastination site using stored list.
+ * Check if URL is a time wasting site using stored list.
  * @param {string} url - URL to check
  * @returns {Promise<boolean>}
  */

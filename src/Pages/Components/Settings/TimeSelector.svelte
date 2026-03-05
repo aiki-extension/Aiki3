@@ -81,9 +81,10 @@
   <div class="col-sm" />
   <div class="col-sm">
     <div class="wrapper">
-      <!-- svelte-ignore a11y-no-onchange -->
+      <input class="form-control form-control-sm inline placeholder" disabled />
+      <p class="placeholder">:</p>
       <input
-        type = "number"
+        type="number"
         id="mins"
         min="2"
         max="119"
@@ -91,30 +92,13 @@
         bind:value={learnMin}
         on:change={() => {
           learnMin = Math.max(2, Math.min(119, parseInt(learnMin) || 2));
+          learnSec = 0;
           ensureMinThreshold();
           setLearningTime();
         }}
         class="form-control form-control-sm inline"
       />
-      <p>:</p>
-      <!-- svelte-ignore a11y-no-onchange -->
-      <input
-        type = "number"
-        id="seconds"
-        min="0"
-        max="59"
-        title="Enter a value between 0 and 59"
-        bind:value={learnSec}
-        on:change={() => {
-          learnSec = Math.max(0, Math.min(59, parseInt(learnSec) || 0));
-          ensureMinThreshold();
-          setLearningTime();
-        }}
-        class="form-control form-control-sm inline"
-      />
-        
-      
-      <p><small>{"Min/Sec"}</small></p>
+      <p><small>Min&nbsp;&nbsp;&nbsp;&nbsp;</small></p>
     </div>
   </div>
 </div>
@@ -193,6 +177,10 @@
     width: 25%;
     min-width: 55px;
     margin: 0px 5px 20px 0px;
+  }
+
+  .placeholder {
+    visibility: hidden;
   }
 
   .wrapper {
