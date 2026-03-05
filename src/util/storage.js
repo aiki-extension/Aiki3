@@ -70,7 +70,7 @@ function toggleRedirection() {
 
 /**
  * @async @function
- * @returns {object} userData that includes a list of Time wasting websites as defined by the user, as well as the user ID.
+ * @returns {object} userData that includes a list of time wasting websites as defined by the user, as well as the user ID.
  * @description Returns the user ID and a list of time wasting websites wrapped in an object. */
 /**
  * @async @function

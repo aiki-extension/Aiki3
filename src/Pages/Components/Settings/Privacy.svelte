@@ -18,7 +18,7 @@ import Container from "./Container.svelte";
 <p><strong>For example:</strong> You added Facebook.com as a time wasting site to Aiki. You then visited 
     Facebook for 45 seconds on Tuesday. Aiki would log that you spent 45 seconds on Facebook.com on Tuesday, 
     but absolutely nothing else. To be clear, Aiki will not know anything about the content of the pages you 
-    visit. We will later use this data to see if Aiki helped you to time waste a little less.</p>
+    visit. We will later use this data to see if Aiki helped you to waste less time.</p>
 </Container>
 
 <style>

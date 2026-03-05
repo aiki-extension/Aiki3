@@ -16,7 +16,7 @@
 <h5>Set Learning Time:</h5>
 <p>
   Set a daily learning goal so Aiki knows how long to keep you on your
-  learning platform before letting a time wasting sites through.
+  learning platform before letting time wastings sites through.
 </p>
 {#await timeSettings}
   LOADING...
