@@ -13,10 +13,11 @@
   export let user;
 </script>
 
-<h5>Set Learning Time:</h5>
+<h5>Redirection Settings:</h5>
 <p>
-  Set a daily learning goal so Aiki knows how long to keep you on your
-  learning platform before letting time wastings sites through.
+	•	Daily goal (total time you aim to spend on the redirected site each day)<br>
+	•	Session duration (time per learning session)<br>
+	•	Reward time (time allowed on the procrastination site)<br>
 </p>
 {#await timeSettings}
   LOADING...

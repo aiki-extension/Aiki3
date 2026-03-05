@@ -144,10 +144,7 @@
 
 <!-- Header element for describing the set time wasting sites-->
 <Container id="site-input-container" headline="Set Time Wasting Sites">
-  <h5>Add your Time Wasting Sites here:</h5>
-  <hr />
   <p>Type in pages you feel like you spend a little too much time on here (e.g: www.facebook.com, www.reddit.com, 9gag.com).</p>
-  <p><strong>NB:</strong> You can still visit these websites, Aiki will just be logging the amount of time you spend on them.</p>
 
   <!-- This is the button element for adding a Time wasting Site-->
   <form on:submit|preventDefault={addItem}>
