@@ -4,7 +4,6 @@ import storage from "./util/storage";
 import redirection from "./redirection";
 import timer from "./services/TimerManager";
 import { setTheme } from "./util/themes";
-import badge from "./badge";
 import controlledMode from "./controlledMode";
 import { isControlled } from "./util/variantConfig";
 
@@ -164,7 +163,6 @@ async function killAiki() {
   timer.stopLearningSession();
   timer.stopBonusTime();
   timer.killAiki();
-  badge.remove();
 }
 
 async function reviveAiki() {

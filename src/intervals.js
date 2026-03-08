@@ -119,7 +119,7 @@ function calculateCategoryTime(data, siteList) {
 function storeData(snapshot) {
   if (!user) return;
 
-  // Store locally for stats/badge display only
+  // Store locally for stats display only
   // Session logging is handled by redirection.js on tab switch/close
   storage.stats.storeSession(snapshot);
 }
