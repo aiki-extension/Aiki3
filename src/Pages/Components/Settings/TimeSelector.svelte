@@ -11,7 +11,6 @@
 
   let { min: learnMin, sec: learnSec } = settings.learningTime;
 
-
   // Ensure that the learning time does not go below the minimum threshold of 2 minutes. If the user tries to set it below this, it will automatically adjust back
   function ensureMinThreshold() {
     // Enforce 2-minute minimum for learning time
