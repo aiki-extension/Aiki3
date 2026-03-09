@@ -4,11 +4,10 @@
  -->
 <script>
   import storage from "../../../util/storage";
-  import { saveUserPreferences } from "../../../util/logger";
 
   export let settings;
   export let update;
-  export let user;
+
 
   let { hrs: hrsFrom, min: minFrom } = settings.activeFrom;
   let { hrs: hrsTo, min: minTo } = settings.activeTo;
@@ -27,18 +26,6 @@
 
     const setting = { hrs: hrsTo, min: minTo };
     storage.operatingHours.to.set(setting);
-    try {
-      const participantId = user || (await storage.uid.get());
-      const startMinutes = hrsFrom * 60 + minFrom;
-      const endMinutes = hrsTo * 60 + minTo;
-      await saveUserPreferences({
-        participantId,
-        operating_hours_start: startMinutes,
-        operating_hours_end: endMinutes,
-      });
-    } catch (e) {
-      console.warn("Failed to sync operating hours preference", e);
-    }
     update();
   }
 
@@ -57,18 +44,6 @@
 
     const setting = { hrs: hrsFrom, min: minFrom };
     storage.operatingHours.from.set(setting);
-    try {
-      const participantId = user || (await storage.uid.get());
-      const startMinutes = hrsFrom * 60 + minFrom;
-      const endMinutes = hrsTo * 60 + minTo;
-      await saveUserPreferences({
-        participantId,
-        operating_hours_start: startMinutes,
-        operating_hours_end: endMinutes,
-      });
-    } catch (e) {
-      console.warn("Failed to sync operating hours preference", e);
-    }
     update();
   }
 
@@ -199,15 +174,4 @@
     font-size: var(--fontSizeSettings);
   }
 
-  select,
-  option {
-    font-family: var(--fontContent);
-    font-size: 0.875rem;
-    color: #212121;
-  }
-
-  option:disabled {
-    background-color: whitesmoke;
-    color: lightgray;
-  }
 </style>

@@ -1,6 +1,5 @@
 import storage from "../util/storage";
 import browser from "webextension-polyfill";
-import badge from "../badge";
 import { parseTime, parseUrl } from "../util/utilities";
 
 class TimerManager {
@@ -45,12 +44,6 @@ class TimerManager {
     return `${minutes}m`;
   }
 
-  updateBadge() {
-    try {
-      badge.setProgress(this.getRemainingLabel(), this.computeProgressPercent());
-    } catch (_) { }
-  }
-
   async decrementLearningTime() {
     if (await this.checkActive()) {
       if (this.learningTimeRemaining > 0) {
@@ -60,7 +53,6 @@ class TimerManager {
         }
         this.dailyProgress = this.dailyProgress + 1000;
         await storage.dailyProgress.set(this.dailyProgress);
-        this.updateBadge();
         if (this.learningTimeRemaining === 0) {
           await this.handleGoalCompletion();
         }
@@ -77,7 +69,6 @@ class TimerManager {
     try {
       await storage.shouldRedirect.set(false);
     } catch (_) { }
-    badge.setProgress("0m", 1);
     clearInterval(this.learningTimeIntervalRef);
     this.learningTimeIntervalRef = undefined;
     this.bonusTime = 0;
@@ -90,13 +81,11 @@ class TimerManager {
     this.rewardTimeRemaining = 0;
     this.rewardUnlockAt = 0;
     storage.rewardUnlock.set(0).catch(() => { });
-    badge.setBusy();
     const goal = parseTime.toSystem(await storage.timeSettings.learningTime.get());
     const progress = await storage.dailyProgress.get();
     this.dailyGoal = goal;
     this.dailyProgress = progress; // Allow progress to exceed goal
     this.learningTimeRemaining = Math.max(goal - this.dailyProgress, 0);
-    this.updateBadge();
     if (this.learningTimeRemaining > 0) {
       this.learningTimeIntervalRef = setInterval(() => {
         this.decrementLearningTime().catch(() => { });
@@ -125,7 +114,6 @@ class TimerManager {
     } else {
       this.rewardTimeRemaining = 0;
     }
-    this.updateBadge();
   }
 
   async sync() {
@@ -140,7 +128,6 @@ class TimerManager {
       storage.dailyProgress.set(consumed).catch(() => { });
     }
     this.learningTimeRemaining = 0;
-    badge.remove();
   }
 
   clearRewardTimer() {
@@ -214,7 +201,6 @@ class TimerManager {
 
   startBonusTime() {
     if (this.bonusTimeIntervalRef) this.stopBonusTime();
-    badge.setProgress("0m", 1);
     clearInterval(this.learningTimeIntervalRef);
     this.learningTimeIntervalRef = undefined;
     this.bonusTimeIntervalRef = setInterval(() => {
@@ -311,8 +297,6 @@ class TimerManager {
     this.controlledLearningCompleted = false;
     this.controlledLearningOnComplete = onComplete;
 
-    badge.setBusy();
-
     if (this.controlledLearningRemaining > 0) {
       this.controlledLearningIntervalRef = setInterval(() => {
         this.decrementControlledLearning().catch(() => { });
@@ -362,8 +346,6 @@ class TimerManager {
     this.controlledRewardRemaining = rewardMs;
     this.controlledRewardElapsed = 0;
     this.controlledRewardOnComplete = onComplete;
-
-    badge.setProgress("🎉", 1);
 
     if (this.controlledRewardRemaining > 0) {
       this.controlledRewardIntervalRef = setInterval(() => {

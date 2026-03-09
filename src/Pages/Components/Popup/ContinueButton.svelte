@@ -22,7 +22,7 @@
   type="default"
   on:click={handleClick}
   class="btn btn-success item"
-  data-tooltip="Takes you back to your original procrastination site!"
+  data-tooltip="Takes you back to your original time wasting site!"
   >Continue
 </button>
 

@@ -1,5 +1,4 @@
 import storage from "./util/storage";
-import { logEvent } from "./util/logger";
 import browser from "webextension-polyfill";
 import timer from "./services/TimerManager";
 import { parseUrl, makeDate, parseTime } from "./util/utilities";
@@ -42,17 +41,6 @@ function buildProcrastinationUrlFilters(list = []) {
 
 const finalizeAllActiveSessions = (reason = "window_blur") =>
   navigationGuards.finalizeAllActiveSessions(reason);
-
-async function logDeclinedIntervention(originUrl, learningUrl) {
-  // Log as event only - "stay" decision shouldn't create a Session row
-  await logEvent({
-    participantId: await storage.uid.get(),
-    eventType: "experimental_redirection",
-    procrastinationSite: originUrl,
-    learningSite: learningUrl,
-    eventData: "stay",
-  });
-}
 
 async function showImmediatePrompt(tabId) {
   if (!tabId) return;
@@ -437,7 +425,7 @@ async function messageLearningResource(details) {
 @function
 @async
 @description Gets currently active tab and sends message to the content script if it
-is a procrastination website. */
+is a time wasting website. */
 async function checkActiveTab() {
   try {
     const tabs = await browser.tabs.query({
@@ -461,17 +449,6 @@ async function checkActiveTab() {
         if (handled) return;
 
         // EXPERIMENTAL VARIANT: Show redirect prompt
-        addRedirectionLog(
-          `Interception: initiating countdown`,
-          tabSiteName,
-          parseUrl(learningUri).name,
-          {
-            eventType: "redirection_prompt",
-            action: "prompt_shown",
-            procrastinationUrl: tab.url,
-            learningUrl: learningUri,
-          }
-        );
         promptRedirect(tab.id, learningUri, tab.url);
       }
     }
@@ -493,7 +470,7 @@ async function checkTabById({ tabId }) {
 /** #CHECKTAB()#
  * @async
  * @function
- * @description Checks a tab against a list of websites defined as procrastination websites.
+ * @description Checks a tab against a list of websites defined as time wasting websites.
  * If a tab's url is found in the list, it calls the redirect function using that tab's details.
  * @param {object} tab
  * @param {number} tab.frameId
@@ -517,7 +494,7 @@ async function checkTab(tab) {
  * @async
  * @function
  * @description Changes location of the tab registered as the tab
- * that triggered a redirection from procrastination to learning site.
+ * that triggered a redirection from time wasting to learning site.
  * The uri was saved upon redirection, and here restored in full in the same tab.
  * Origin is an object of type: {integer: tabId, string: url} */
 async function gotoOrigin(event, sourceContext = {}) {
@@ -672,7 +649,7 @@ async function gotoOrigin(event, sourceContext = {}) {
   const remainingLearningTabs = await getActiveLearningTabs(restoredTabIds);
   const hasRemainingLearningTabs = remainingLearningTabs.length > 0;
 
-  // Start a procrastination session for the destination tab
+  // Start a time wasting session for the destination tab
   console.log("[Aiki Debug] gotoOrigin procrastination session check:", { destinationUrl, targetTabId });
   if (destinationUrl && targetTabId !== undefined) {
     console.log("[Aiki Debug] Starting procrastination session:", { targetTabId, destinationUrl });
@@ -681,23 +658,7 @@ async function gotoOrigin(event, sourceContext = {}) {
     console.log("[Aiki Debug] NOT starting procrastination session - missing destinationUrl or targetTabId");
   }
 
-  if (destinationUrl) {
-    try {
-      const currentLearning = await storage.learningUri.get();
-      addRedirectionLog(
-        `Go to origin: ${normalizedEvent}, source: ${sourceType || "unknown"}`,
-        parseUrl(currentLearning).name,
-        parseUrl(destinationUrl).name,
-        {
-          action: normalizedEvent,
-          source: sourceType,
-          procrastinationUrl: destinationUrl,
-        }
-      );
-    } catch (error) {
-      l(error);
-    }
-  }
+
 
   const redirectionToggled = await storage.redirection.get();
   if (redirectionToggled && !hasRemainingLearningTabs) {
@@ -728,19 +689,11 @@ async function promptRedirect(tabId, url, originUrl) {
       // Start tracking procastination session
       navigationGuards.install();
       await SessionService.startSession(tabId, "procrastination", originUrl);
-      await logDeclinedIntervention(originUrl, url);
     },
     onAccept: async () => {
       addLearningSiteLoadedListener();
       navigationGuards.install();
       await SessionService.startSession(tabId, "learning", url, originUrl);
-      await logEvent({
-        participantId: await storage.uid.get(),
-        eventType: "experimental_redirection",
-        procrastinationSite: originUrl,
-        learningSite: url,
-        eventData: "accept",
-      });
       await timer.startLearningSession();
       storage.origin.set({ url: originUrl, tabId: tabId });
       addOriginUpdatedListener(tabId);
@@ -757,28 +710,6 @@ async function promptRedirect(tabId, url, originUrl) {
         l(error);
       }
     },
-  });
-}
-
-async function addRedirectionLog(event, from, to, details = {}) {
-  const participantId = await storage.uid.get();
-  if (!participantId) return;
-  const timeSettings = await storage.timeSettings.getAll();
-  const { eventType = "redirection", ...rest } = details || {};
-  const metadata = {
-    event,
-    eventData: rest.eventData,
-    continueTap: rest.continueTap,
-    timeSettings,
-  };
-
-  logEvent({
-    eventType: eventType,
-    eventData: rest.eventData,
-    procrastinationSite: rest.procrastinationUrl || from,
-    learningSite: rest.learningUrl || to,
-    promptResponse: JSON.stringify(metadata),
-    participantId,
   });
 }
 

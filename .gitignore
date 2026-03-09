@@ -8,3 +8,7 @@ back4app.secret
 .DS_Store
 /src/API/secret.js
 /src/util/back4appConfig.local.js
+
+.env
+
+web-ext-artifacts/

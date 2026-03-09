@@ -4,7 +4,7 @@
   Used in / Parent components: /src/Pages/Components/Settings/Statistics.svelte
 -->
 <script>
-  import { fetchSessionStats } from "../../../util/logger";
+  // import { fetchSessionStats } from "../../../util/logger";
 
   export let type = "today";
 

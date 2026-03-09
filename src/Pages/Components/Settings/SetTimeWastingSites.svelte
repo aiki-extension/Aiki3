@@ -5,7 +5,6 @@
 <script>
   import Container from "./Container.svelte";
   import storage from "../../../util/storage";
-  import { saveUserPreferences } from "../../../util/logger";
   import { parseUrl } from "../../../util/utilities";
   import Fa from "svelte-fa";
   import {
@@ -18,12 +17,10 @@
   import { toast } from "@zerodevx/svelte-toast";
   import * as themes from "./util/toastThemes";
 
-  export let user = "";
   export let port;
   $: list = [];
 
   let toastCoords = { y: "add-button", x: "site-input-container" };
-  let syncingPrefs = false;
   let learningUri = ""; 
 
   async function setup() {
@@ -70,7 +67,6 @@
     newList.splice(index, 1);
     list = newList;
     storage.list.set(list);
-    syncPreferences();
     port.postMessage(`Update: list`);
     toast.pop();
     toast.push("Website removed!", {
@@ -112,7 +108,6 @@
       newList.push(site);
       list = newList;
       storage.list.set(list);
-      syncPreferences();
       port.postMessage(`Update: list`);
       addItemValue = "";
       toast.pop();
@@ -141,23 +136,6 @@
     });
   }
 
-  async function syncPreferences() {
-    if (syncingPrefs) return;
-    syncingPrefs = true;
-    try {
-      const participantId = user || (await storage.uid.get());
-      const procrastinationSites = Array.isArray(list)
-        ? list.map((item) => item?.host).filter(Boolean)
-        : [];
-      await saveUserPreferences({
-        participantId,
-        procrastination_sites: procrastinationSites,
-      });
-    } catch (_) {
-    } finally {
-      syncingPrefs = false;
-    }
-  }
 
   function firstLetterUppercase(string) {
     return string.charAt(0).toUpperCase() + string.slice(1);
@@ -166,14 +144,11 @@
 
 <!-- Header element for describing the set time wasting sites-->
 <Container id="site-input-container" headline="Set Time Wasting Sites">
-  <h5>Add your Time Wasting Sites here:</h5>
-  <hr />
   <p>Type in pages you feel like you spend a little too much time on here (e.g: www.facebook.com, www.reddit.com, 9gag.com).</p>
-  <p><strong>NB:</strong> You can still visit these websites, Aiki will just be logging the amount of time you spend on them.</p>
 
-  <!-- This is the button element for adding procrastination Sites-->
+  <!-- This is the button element for adding a Time wasting Site-->
   <form on:submit|preventDefault={addItem}>
-    <div data-tooltip="Add to your list of procrastination sites">
+    <div data-tooltip="Add to your list of time wasting sites">
       <div class="input-group mb-3">
         <input
           bind:value={addItemValue}

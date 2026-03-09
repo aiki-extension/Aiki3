@@ -1,0 +1,121 @@
+name: Sign & release extension
+
+on:
+  push:
+    branches:
+      - main
+      - bsc_development_main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build_chrome:
+    name: Build Chrome extension
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Chrome extension
+        run: npm run build:chrome
+
+      - name: Package Chrome extension
+        run: |
+          mkdir -p web-ext-artifacts
+          cd public
+          zip -r ../web-ext-artifacts/aiki3-chrome.zip . \
+            --exclude "*.map"
+
+      - name: Upload Chrome extension artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: chrome-extension
+          path: web-ext-artifacts/aiki3-chrome.zip
+          if-no-files-found: error
+
+  build_and_sign_firefox:
+    name: Build and sign Firefox extension
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Firefox extension
+        run: npm run build:firefox
+
+      - name: Bump dev version
+        run: node scripts/bump-dev-version.js
+
+      - name: Sign extension
+        run: npm run sign:dev
+        env:
+          AMO_API_KEY: ${{ secrets.DEV_AMO_API_KEY }}
+          AMO_API_SECRET: ${{ secrets.DEV_AMO_API_SECRET }}
+
+      - name: Rename signed extension
+        run: mv web-ext-artifacts/*.xpi web-ext-artifacts/aiki3-firefox.xpi
+
+      - name: Upload signed extension artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: signed-extension
+          path: web-ext-artifacts/aiki3-firefox.xpi
+          if-no-files-found: error
+
+  create_release:
+    name: Create draft release
+    needs: [build_chrome, build_and_sign_firefox]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download signed extension artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: signed-extension
+          path: release-assets
+
+      - name: Download Chrome extension artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: chrome-extension
+          path: release-assets
+
+      - name: Create source code zip
+        run: |
+          zip -r release-assets/source-code.zip . \
+            --exclude "*.git*" \
+            --exclude "node_modules/*" \
+            --exclude "release-assets/*"
+
+      - name: Create draft release and upload asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "draft-${{ github.run_number }}" \
+            release-assets/*.xpi \
+            release-assets/aiki3-chrome.zip \
+            release-assets/source-code.zip \
+            --target "${{ github.sha }}" \
+            --title "Signed extension draft ${{ github.run_number }}" \
+            --notes "Automated draft release from ${{ github.ref_name }}" \
+            --draft

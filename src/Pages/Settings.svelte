@@ -17,6 +17,7 @@
   import SetWebsites from "./Components/Settings/SetTimeWastingSites.svelte";
   import Statistics from "./Components/Settings/Statistics.svelte";
   import SetRedirection from "./Components/Settings/SetRedirection.svelte";
+  import AikiDescription from "./Components/Settings/AikiDescription.svelte";
 
   $: user = "";
   $: userIsRegistered = false;
@@ -38,6 +39,9 @@
       <SetUser bind:user bind:userIsRegistered {port} />
     </div>
     {#if userIsRegistered}
+      <div class="container">
+        <AikiDescription {user} {port} />
+      </div>
       <div class="container">
         <SetWebsites {user} {port} />
       </div>

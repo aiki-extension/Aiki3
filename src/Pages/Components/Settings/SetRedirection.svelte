@@ -6,7 +6,6 @@
   // Functional and module imports
   import storage from "../../../util/storage";
   import { onMount, tick } from "svelte";
-  import { saveUserPreferences } from "../../../util/logger";
   import { toast } from "@zerodevx/svelte-toast";
   import * as themes from "./util/toastThemes";
   import { parseUrl } from "../../../util/utilities";
@@ -78,17 +77,6 @@
 
     learningUri = uri;
     await storage.learningUri.set(uri);
-    
-    // Sync to backend
-    try {
-      const participantId = user || (await storage.uid.get());
-      await saveUserPreferences({
-        participantId,
-        learning_sites: [uri],
-      });
-    } catch (e) {
-      console.warn("Failed to sync learning site preference", e);
-    }
 
     hasSaved = true;
     isEditing = false;
@@ -119,7 +107,7 @@
 </script>
 
 <Container headline="Redirection Settings">
-  <h5>Your Learning Platform:</h5>
+  <h5>Your Redirection Platform:</h5>
   <div class="container">
     <div class="full" id="learning-url-container">
       <input
@@ -160,11 +148,6 @@
           >
             Change
           </button>
-        {/if}
-      </div>
-      <div class="status-row">
-        {#if hasSaved && !isEditing}
-          <span class="status-badge saved">Saved for redirection</span>
         {/if}
       </div>
     </div>
@@ -240,26 +223,6 @@
     display: flex;
     justify-content: center;
     margin-top: 8px;
-  }
-
-  .status-badge {
-    font-size: 0.85rem;
-    padding: 4px 12px;
-    border-radius: 999px;
-    border: 1px solid var(--hrColor);
-    color: var(--textColor);
-    background-color: var(--backgroundColorSecondary);
-  }
-
-  .status-badge.saved {
-    border-color: var(--bannerBackgroundColor);
-    background: linear-gradient(
-      135deg,
-      rgba(255, 255, 255, 0.08),
-      rgba(0, 0, 0, 0.08)
-    ),
-    var(--bannerBackgroundColor);
-    color: var(--bannerTextColor);
   }
 
   .center {

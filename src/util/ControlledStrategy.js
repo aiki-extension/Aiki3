@@ -10,7 +10,7 @@ class ControlledStrategy {
 
     const { applyPreemptiveHide, removePreemptiveHide, procrastinationHosts, learningUrl } = helpers;
 
-    // Allow procrastination during reward window
+    // Allow time wasting during reward window
     if (controlledMode.isInReward && controlledMode.isInReward()) {
       return true;
     }

@@ -4,8 +4,6 @@ import storage from "./util/storage";
 import redirection from "./redirection";
 import timer from "./services/TimerManager";
 import { setTheme } from "./util/themes";
-import badge from "./badge";
-import { logAuditEvent, saveUserPreferences } from "./util/logger";
 import controlledMode from "./controlledMode";
 import { isControlled } from "./util/variantConfig";
 
@@ -165,35 +163,10 @@ async function killAiki() {
   timer.stopLearningSession();
   timer.stopBonusTime();
   timer.killAiki();
-  badge.remove();
-  const user = await storage.uid.get();
-  await logAuditEvent({
-    participantId: user,
-    action: "toggle_redirection",
-    settingName: "redirection",
-    oldValue: "on",
-    newValue: "off",
-    participantUpdates: { is_extension_active: false },
-  });
-  try {
-    await saveUserPreferences({ participantId: user, is_active: false });
-  } catch (_) { }
 }
 
 async function reviveAiki() {
   redirection.checkActiveTab();
-  const user = await storage.uid.get();
-  await logAuditEvent({
-    participantId: user,
-    action: "toggle_redirection",
-    settingName: "redirection",
-    oldValue: "off",
-    newValue: "on",
-    participantUpdates: { is_extension_active: true },
-  });
-  try {
-    await saveUserPreferences({ participantId: user, is_active: true });
-  } catch (_) { }
 }
 
 async function gotoOriginTab() {

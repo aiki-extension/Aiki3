@@ -5,7 +5,6 @@
 <script>
   import Container from "./Container.svelte";
   import storage from "../../../util/storage";
-  import { logAuditEvent, resetParticipantCache } from "../../../util/logger";
   import Fa from "svelte-fa";
   import { faUserSlash, faUserPlus } from "@fortawesome/free-solid-svg-icons";
   import { toast } from "@zerodevx/svelte-toast";
@@ -28,18 +27,8 @@
       "Are you certain the provided email is correct?"
     );
     if (confirmation) {
-      const oldValue = previousUser || "";
-      await resetParticipantCache();
       storage.uid.set(user);
       previousUser = user;
-      await logAuditEvent({
-        participantId: user,
-        action: "register_participant",
-        settingName: "participant_id",
-        oldValue,
-        newValue: user,
-        participantUpdates: { is_extension_active: true },
-      });
       userIsRegistered = true;
       port.postMessage(`Update: user`);
       setTimeout(() => {
@@ -55,16 +44,6 @@
       "Are you certain you want to reset your email?"
     );
     if (confirmation) {
-      const oldValue = previousUser || user;
-      await logAuditEvent({
-        participantId: user,
-        action: "reset_participant",
-        settingName: "participant_id",
-        oldValue,
-        newValue: "",
-        participantUpdates: { is_extension_active: false },
-      });
-      await resetParticipantCache();
       storage.uid.set("");
       userIsRegistered = false;
       user = "";
