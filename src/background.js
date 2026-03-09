@@ -5,8 +5,6 @@ import redirection from "./redirection";
 import timer from "./services/TimerManager";
 import { setTheme } from "./util/themes";
 
-
-
 // Manifest V3: No DOM access, no stray variables
 
 browser.runtime.onInstalled.addListener(({ reason }) => {
@@ -30,15 +28,25 @@ browser.runtime.onMessage.addListener((message, sender) => {
     })();
   }
 
-
   if (message.type === "learning:autoStart") {
-
     return (async () => {
       try {
-        if (!timer.isLearningSessionActive()) {
-          await timer.startLearningSession();
+        // Don't start a new session if one is already running
+        if (!timer.isSessionActive()) {
+          // Get session duration from settings (minutes + seconds)
+          const sessionMinutes = await storage.sessionSettings.sessionMinutes.get();
+          const sessionSeconds = await storage.sessionSettings.sessionSeconds.get();
+          const sessionDuration = (sessionMinutes * 60 * 1000) + (sessionSeconds * 1000);
+          
+          // Start the session timer
+          await timer.startSessionTimer(sessionDuration, () => {
+            console.log("[Session] Session complete!");
+            // Timer will stop automatically; user must claim reward via button
+          });
         }
-      } catch (_) { }
+      } catch (e) {
+        console.error("[Session] Failed to start session:", e);
+      }
       return true;
     })();
   }
@@ -48,7 +56,72 @@ browser.runtime.onMessage.addListener((message, sender) => {
     storage.blockedOrigins.remove(sender.tab.id);
   }
 
-
+  // Add handler for claiming rewards
+  if (message.type === "session:claimReward" || message.type === "controlled:claimReward") {
+    return (async () => {
+      try {
+        // Get origin (procrastination site)
+        let origin = await storage.origin.get();
+        let procrastinationUrl = origin?.url;
+        
+        // If no origin saved (manual navigation), use first site from procrastination list
+        if (!procrastinationUrl) {
+          const procList = await storage.list.get();
+          if (procList && procList.length > 0) {
+            const firstProc = procList[0];
+            // Build URL from host or name
+            if (firstProc.host) {
+              procrastinationUrl = firstProc.host.startsWith('http') 
+                ? firstProc.host 
+                : `https://${firstProc.host}`;
+            } else if (firstProc.name) {
+              procrastinationUrl = `https://${firstProc.name}`;
+            }
+            console.log("[Session] No origin saved, using first procrastination site:", procrastinationUrl);
+          }
+        }
+        
+        if (!procrastinationUrl) {
+          console.error("[Session] No procrastination site found!");
+          return false;
+        }
+        
+        // Redirect to procrastination site 
+        if (sender?.tab?.id) {
+          console.log("[Session] Redirecting to:", procrastinationUrl);
+          await browser.tabs.update(sender.tab.id, { url: procrastinationUrl });
+        }
+        
+        // Get reward duration from settings
+        const rewardMinutes = await storage.sessionSettings.rewardMinutes.get();
+        const rewardSeconds = await storage.sessionSettings.rewardSeconds.get();
+        const rewardDuration = (rewardMinutes * 60 * 1000) + (rewardSeconds * 1000);
+        
+        // Start reward timer with callback to show redirect prompt when done
+        await timer.startSessionRewardTimer(rewardDuration, async () => {
+          console.log("[Session] Reward complete! Showing redirect prompt...");
+          
+          // Show prompt on the procrastination site
+          try {
+            const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+            if (tabs.length > 0 && tabs[0].id) {
+              const learningUrl = await storage.learningUri.get();
+              await browser.tabs.sendMessage(tabs[0].id, {
+                action: "display: redirectPrompt",
+                url: learningUrl,
+                originUrl: procrastinationUrl
+              });
+            }
+          } catch (e) {
+            console.error("[Session] Failed to show redirect prompt:", e);
+          }
+        });
+      } catch (e) {
+        console.error("[Session] Failed to start reward:", e);
+      }
+      return true;
+    })();
+  }
 });
 
 async function installationSetup() {

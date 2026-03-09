@@ -619,7 +619,7 @@ async function removeGlobalPromptLock() {
 
 async function getSessionMinutes() {
   const result = await storage.get("sessionMinutes");
-  if (typeof result.getSessionMinutes === "number") {
+  if (typeof result.sessionMinutes === "number") {
     return result.sessionMinutes;
   } else {
     return 5; // Default is 5 minutes

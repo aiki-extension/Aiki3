@@ -830,84 +830,65 @@ function renderLearningContent() {
     const dragHandle = makeDraggable(panel);
 
     const update = (msg) => {
-      if (!msg) return;
+    if (!msg) return;
 
-      const isControlledVariant = msg.isControlledVariant === true;
-      const controlledState = msg.controlledState;
-      const defaultBg = "rgba(15, 23, 42, 0.96)";
+    const defaultBg = "rgba(15, 23, 42, 0.96)";
+    
+    // Session-based learning
+    const sessionRewardGoal = typeof msg.sessionRewardGoal === "number" ? msg.sessionRewardGoal : 0;
+    const sessionRewardRemaining = typeof msg.sessionRewardRemaining === "number" ? msg.sessionRewardRemaining : 0;
+    const sessionGoal = typeof msg.sessionGoal === "number" ? msg.sessionGoal : 0;
+    const sessionRemaining = typeof msg.sessionRemaining === "number" ? msg.sessionRemaining : 0;
+    const sessionCompleted = msg.sessionCompleted || false;
 
-      if (isControlledVariant) {
-        if (controlledState === "learning") {
-          const goal = msg.controlledLearningGoal || 0;
-          const remaining = typeof msg.controlledLearningRemaining === "number" ? msg.controlledLearningRemaining : 0;
-          const elapsed = typeof msg.controlledLearningElapsed === "number" ? msg.controlledLearningElapsed : 0;
-          const completed = msg.controlledLearningCompleted || false;
-          const progress = Math.max(0, goal - remaining);
-          const percent = goal > 0 ? Math.min(100, (progress / goal) * 100) : 0;
+    // Check if in reward mode
+    if (sessionRewardGoal > 0) {
+      const progress = Math.max(0, sessionRewardGoal - sessionRewardRemaining);
+      const percent = sessionRewardGoal > 0 ? Math.min(100, (progress / sessionRewardGoal) * 100) : 0;
 
-          barFill.style.width = `${percent}%`;
-          barFill.style.background = "linear-gradient(135deg, #22c55e, #14b8a6)";
-          heading.textContent = "📚 Learning Session";
-          panel.style.background = defaultBg;
-          claimRewardBtn.style.display = "none";
+      barFill.style.width = `${percent}%`;
+      barFill.style.background = "linear-gradient(135deg, #ffffffff, #32CD32)";
+      progressLabel.textContent = `${formatDuration(progress)} / ${formatDurationShort(sessionRewardGoal)}`;
+      heading.textContent = "🎉 Reward Time";
+      status.textContent = `Enjoy! ${formatDuration(sessionRewardRemaining)} remaining.`;
+      panel.style.background = "linear-gradient(135deg, #ffffff, #32CD32)";
+      claimRewardBtn.style.display = "none";
+    }
+    // Check if in active session
+    else if (sessionGoal > 0) {
+      const progress = Math.max(0, sessionGoal - sessionRemaining);
+      const percent = sessionGoal > 0 ? Math.min(100, (progress / sessionGoal) * 100) : 0;
 
-          if (goal > 0 && (remaining <= 0 || completed)) {
-            progressLabel.textContent = `${formatDuration(elapsed)} / ${formatDurationShort(goal)}`;
-            status.textContent = "Session complete! Claim your reward.";
-            panel.style.background = "linear-gradient(135deg, #22c55e, #0ea5e9)";
-            claimRewardBtn.style.display = "block";
-          } else if (goal > 0) {
-            progressLabel.textContent = `${formatDuration(progress)} / ${formatDurationShort(goal)}`;
-            status.textContent = `Stay focused for ${formatDuration(remaining)} more.`;
-          } else {
-            progressLabel.textContent = "Starting...";
-            status.textContent = "Session starting...";
-          }
-        } else if (controlledState === "reward") {
-          const goal = msg.controlledRewardGoal || 0;
-          const remaining = typeof msg.controlledRewardRemaining === "number" ? msg.controlledRewardRemaining : 0;
-          const progress = Math.max(0, goal - remaining);
-          const percent = goal > 0 ? Math.min(100, (progress / goal) * 100) : 0;
+      barFill.style.width = `${percent}%`;
+      barFill.style.background = "linear-gradient(135deg, #22c55e, #14b8a6)";
+      heading.textContent = "📚 Learning Session";
+      panel.style.background = defaultBg;
 
-          barFill.style.width = `${percent}%`;
-          barFill.style.background = "linear-gradient(135deg, #ffffffff, #32CD32)";
-          progressLabel.textContent = goal > 0 ? `${formatDuration(progress)} / ${formatDurationShort(goal)}` : "Enjoy!";
-          heading.textContent = "🎉 Reward Time";
-          status.textContent = goal > 0 ? `Enjoy! ${formatDuration(remaining)} remaining.` : "Your reward time!";
-          panel.style.background = "linear-gradient(135deg, #ffffff, #32CD32)";
-          claimRewardBtn.style.display = "none";
-        } else {
-          heading.textContent = "📚 Aiki Learning";
-          progressLabel.textContent = "Ready to learn";
-          barFill.style.width = "0%";
-          barFill.style.background = "linear-gradient(135deg, #22c55e, #14b8a6)";
-          status.textContent = "Visit a procrastination site to start a learning session.";
-          panel.style.background = defaultBg;
-          claimRewardBtn.style.display = "none";
-        }
-      } else {
-        const goal = typeof msg.dailyGoal === "number" ? msg.dailyGoal : 0;
-        const progress = typeof msg.dailyProgress === "number" ? msg.dailyProgress : 0;
-        const remaining = Math.max(goal - progress, 0);
-        const percent = goal > 0 ? Math.min(100, (progress / goal) * 100) : 0; // Cap bar at 100% visually
-
-        barFill.style.width = `${percent}%`;
-        barFill.style.background = "linear-gradient(135deg, #22c55e, #14b8a6)";
-        progressLabel.textContent = goal > 0 ? `${formatDuration(progress)} / ${formatDurationShort(goal)}` : "No goal set yet";
-        heading.textContent = "📚 Learning Session";
-        claimRewardBtn.style.display = "none";
-        panel.style.background = defaultBg;
-
-        if (goal > 0 && remaining === 0) {
-          status.textContent = "Daily goal complete! Great work.";
-          panel.style.background = "linear-gradient(135deg, #22c55e, #0ea5e9)";
-        } else if (goal > 0) {
-          status.textContent = `Stay focused for ${formatDuration(remaining)} more.`;
-        } else {
-          status.textContent = "Set a goal in Aiki settings to track progress.";
-        }
+      // Session complete - show claim button
+      if (sessionRemaining <= 0 || sessionCompleted) {
+        progressLabel.textContent = `${formatDuration(sessionGoal)} / ${formatDurationShort(sessionGoal)}`;
+        status.textContent = "Session complete! Claim your reward.";
+        panel.style.background = "linear-gradient(135deg, #22c55e, #0ea5e9)";
+        claimRewardBtn.style.display = "block";
       }
-    };
+      // Session in progress
+      else {
+        progressLabel.textContent = `${formatDuration(progress)} / ${formatDurationShort(sessionGoal)}`;
+        status.textContent = `Keep going for ${formatDuration(sessionRemaining)} more.`;
+        claimRewardBtn.style.display = "none";
+      }
+    }
+    // Idle state - no active session
+    else {
+      heading.textContent = "📚 Aiki Learning";
+      progressLabel.textContent = "Ready to learn";
+      barFill.style.width = "0%";
+      barFill.style.background = "linear-gradient(135deg, #22c55e, #14b8a6)";
+      status.textContent = "Visit a procrastination site to start a session.";
+      panel.style.background = defaultBg;
+      claimRewardBtn.style.display = "none";
+    }
+  };
 
     // Use shared timer port utility
     const timerPort = createTimerPort(update);
