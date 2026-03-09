@@ -4,16 +4,15 @@
 <script>
   import storage from "../../../util/storage";
 
-  // Minimum learning time in minutes to ensure users set a reasonable goal. This is enforced both in the UI and programmatically.
+  // Minimum learning time in minutes to ensure users set a reasonable goal. This is enforced both in the UI and in the logic.
   const MIN_LEARNING_MINUTES = 2;
   export let settings;
   export let update;
 
   let { min: learnMin, sec: learnSec } = settings.learningTime;
 
-  // Ensure that the learning time does not go below the minimum threshold of 2 minutes. If the user tries to set it below this, it will automatically adjust back
+  // Ensures that the learning time meets the minimum threshold. If the user tries to set a value below the minimum, it will automatically adjust it to the minimum allowed value. This function is called before saving the settings to ensure data integrity.
   function ensureMinThreshold() {
-    // Enforce 2-minute minimum for learning time
     if (learnMin < MIN_LEARNING_MINUTES) {
       learnMin = MIN_LEARNING_MINUTES;
       learnSec = 0;

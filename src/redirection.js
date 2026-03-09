@@ -17,6 +17,7 @@ const promptCoordinator = new PromptCoordinator({
   hideImmediatePrompt: (tabId) => navigationGuards.hideImmediatePrompt(tabId),
 });
 // Was previously used to select between different redirection strategies (e.g. controlled vs experimental variants). 
+// todo: Refactor to not support multiple strategies in the same codebase, as this adds unnecessary complexity and indirection. If we want to run experiments, we can use feature flags and conditionals within a single strategy implementation.
 const strategy = {
   handleNavigation: async () => false,
   onLearningSiteNavigation: async () => { },
