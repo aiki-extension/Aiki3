@@ -150,11 +150,6 @@
           </button>
         {/if}
       </div>
-      <div class="status-row">
-        {#if hasSaved && !isEditing}
-          <span class="status-badge saved">Saved for redirection</span>
-        {/if}
-      </div>
     </div>
   </div>
   <hr />
@@ -228,26 +223,6 @@
     display: flex;
     justify-content: center;
     margin-top: 8px;
-  }
-
-  .status-badge {
-    font-size: 0.85rem;
-    padding: 4px 12px;
-    border-radius: 999px;
-    border: 1px solid var(--hrColor);
-    color: var(--textColor);
-    background-color: var(--backgroundColorSecondary);
-  }
-
-  .status-badge.saved {
-    border-color: var(--bannerBackgroundColor);
-    background: linear-gradient(
-      135deg,
-      rgba(255, 255, 255, 0.08),
-      rgba(0, 0, 0, 0.08)
-    ),
-    var(--bannerBackgroundColor);
-    color: var(--bannerTextColor);
   }
 
   .center {
