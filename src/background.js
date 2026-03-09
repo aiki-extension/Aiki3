@@ -4,8 +4,8 @@ import storage from "./util/storage";
 import redirection from "./redirection";
 import timer from "./services/TimerManager";
 import { setTheme } from "./util/themes";
-import controlledMode from "./controlledMode";
-import { isControlled } from "./util/variantConfig";
+
+
 
 // Manifest V3: No DOM access, no stray variables
 
@@ -25,25 +25,7 @@ browser.runtime.onMessage.addListener((message, sender) => {
       try {
         await timer.sync();
       } catch (_) { }
-
       const timeData = timer.getTime();
-
-      // Add controlled mode state if controlled variant
-      if (isControlled()) {
-        const controlledState = controlledMode.getState();
-        return {
-          ...timeData,
-          isControlledVariant: true,
-          controlledState: controlledState.state,
-          controlledLearningRemaining: controlledState.state === "learning" ? controlledState.remainingMs : 0,
-          controlledLearningGoal: controlledState.state === "learning" ? controlledState.goalMs : 0,
-          controlledLearningElapsed: controlledState.state === "learning" ? controlledState.elapsedMs : 0,
-          controlledLearningCompleted: controlledState.state === "learning" ? controlledState.completed : false,
-          controlledRewardRemaining: controlledState.state === "reward" ? controlledState.remainingMs : 0,
-          controlledRewardGoal: controlledState.state === "reward" ? controlledState.goalMs : 0,
-        };
-      }
-
       return { ...timeData, isControlledVariant: false };
     })();
   }
@@ -66,35 +48,7 @@ browser.runtime.onMessage.addListener((message, sender) => {
     storage.blockedOrigins.remove(sender.tab.id);
   }
 
-  // Handle claim reward for controlled variant
-  if (message.type === "controlled:claimReward" && sender && sender.tab) {
-    return (async () => {
-      try {
-        if (isControlled()) {
-          // Use the dedicated claimReward function which handles the full transition
-          await controlledMode.claimReward(sender.tab.id);
-        }
-      } catch (e) {
-        console.log("[Background] Failed to claim reward:", e);
-      }
-      return true;
-    })();
-  }
 
-  // Handle snooze reward for controlled variant (adds 1 minute)
-  if (message.type === "controlled:snoozeReward") {
-    return (async () => {
-      try {
-        if (isControlled()) {
-          const success = controlledMode.snoozeReward();
-          console.log("[Background] Snooze reward result:", success);
-        }
-      } catch (e) {
-        console.log("[Background] Failed to snooze reward:", e);
-      }
-      return true;
-    })();
-  }
 });
 
 async function installationSetup() {
@@ -123,12 +77,6 @@ async function setup() {
   intervals.intervalSetup();
   storage.shouldRedirect.set(true);
   await redirection.start();
-
-  // Initialize controlled mode if applicable
-  if (isControlled()) {
-    await controlledMode.init();
-    console.log("[Background] Controlled mode initialized");
-  }
 }
 
 async function killAiki() {
@@ -139,16 +87,6 @@ async function killAiki() {
     console.log("[Background] Finalized all active sessions on extension disable");
   } catch (e) {
     console.warn("[Background] Failed to finalize sessions on disable:", e);
-  }
-
-  // For controlled variant, also cleanup controlledMode state
-  if (isControlled()) {
-    try {
-      await controlledMode.cleanup();
-      console.log("[Background] Controlled mode cleaned up on extension disable");
-    } catch (e) {
-      console.warn("[Background] Failed to cleanup controlled mode:", e);
-    }
   }
 
   const tabs = await browser.tabs.query({
@@ -225,25 +163,9 @@ browser.runtime.onConnect.addListener(function (port) {
           if (isDisconnected) return;
           try {
             const timeData = timer.getTime();
-            // Add controlled mode state if controlled variant
-            if (isControlled()) {
-              const controlledState = controlledMode.getState();
-              port.postMessage({
-                ...timeData,
-                isControlledVariant: true,
-                controlledState: controlledState.state,
-                controlledLearningRemaining: controlledState.state === "learning" ? controlledState.remainingMs : 0,
-                controlledLearningGoal: controlledState.state === "learning" ? controlledState.goalMs : 0,
-                controlledLearningElapsed: controlledState.state === "learning" ? controlledState.elapsedMs : 0,
-                controlledLearningCompleted: controlledState.state === "learning" ? controlledState.completed : false,
-                controlledRewardRemaining: controlledState.state === "reward" ? controlledState.remainingMs : 0,
-                controlledRewardGoal: controlledState.state === "reward" ? controlledState.goalMs : 0,
-              });
-            } else {
-              port.postMessage({ ...timeData, isControlledVariant: false });
-            }
+            port.postMessage({ ...timeData, isControlledVariant: false });
+            
           } catch (error) {
-            // Port might have been disconnected between sync and post
           }
         })();
         break;

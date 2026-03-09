@@ -216,7 +216,6 @@
       </tbody>
     </table>
   {/if}
-  <!-- Add pagination for more than 10 sites? -->
 </Container>
 
 <style>
