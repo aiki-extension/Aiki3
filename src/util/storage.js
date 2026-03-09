@@ -617,6 +617,58 @@ async function removeGlobalPromptLock() {
   return storage.remove("globalPromptLock");
 }
 
+async function getSessionMinutes() {
+  const result = await storage.get("sessionMinutes");
+  if (typeof result.getSessionMinutes === "number") {
+    return result.sessionMinutes;
+  } else {
+    return 5; // Default is 5 minutes
+  }
+}
+
+async function setSessionMinutes(minutes) {
+  await storage.set({ sessionMinutes: minutes });
+}
+
+async function getSessionSeconds() {
+  const result = await storage.get("sessionSeconds");
+  if (typeof result.sessionSeconds === "number") {
+    return result.sessionSeconds;
+  } else {
+    return 0; // Default is 0 seconds
+  }
+}
+
+async function setSessionSeconds(seconds) {
+  await storage.set({ sessionSeconds: seconds });
+}
+
+async function getSessionRewardMinutes() {
+  const result = await storage.get("sessionRewardMinutes");
+  if (typeof result.sessionRewardMinutes === "number") {
+    return result.sessionRewardMinutes;
+  } else {
+    return 2; // Default is 2 minutes
+  }
+}
+
+async function setSessionRewardMinutes(minutes) {
+  await storage.set({ sessionRewardMinutes: minutes });
+}
+
+async function getSessionRewardSeconds() {
+  const result = await storage.get("sessionRewardSeconds");
+  if (typeof result.sessionRewardSeconds === "number") {
+    return result.sessionRewardSeconds;
+  } else {
+    return 0; // Default is 0 seconds
+  }
+}
+
+async function setSessionRewardSeconds(seconds) {
+  await storage.set({ sessionRewardSeconds: seconds });
+}
+
 
 export default {
   timeSettings: {
@@ -701,5 +753,11 @@ export default {
     rewardMinutes: { get: getControlledRewardMinutes, set: setControlledRewardMinutes },
     rewardSeconds: { get: getControlledRewardSeconds, set: setControlledRewardSeconds },
   },
+  sessionSettings: {  // All session and reward based storage settings
+  sessionMinutes: { get: getSessionMinutes, set: setSessionMinutes },
+  sessionSeconds: { get: getSessionSeconds, set: setSessionSeconds },
+  rewardMinutes: { get: getSessionRewardMinutes, set: setSessionRewardMinutes },
+  rewardSeconds: { get: getSessionRewardSeconds, set: setSessionRewardSeconds },
+},
   forgetOrigin: () => storage.remove("origin"),
 };

@@ -32,6 +32,20 @@ class TimerManager {
     this.controlledRewardGoal = 0;
     this.controlledRewardElapsed = 0;
     this.controlledRewardOnComplete = null;
+
+    // Session duration timers
+    this.sessionRemaining = 0;
+    this.sessionIntervalRef = undefined;
+    this.sessionGoal = 0;
+    this.sessionElapsed = 0;
+    this.sessionCompleted = false;
+    this.sessionOnComplete = null;
+
+    this.sessionRewardRemaining = 0;
+    this.sessionRewardIntervalRef = undefined;
+    this.sessionRewardGoal = 0;
+    this.sessionRewardElapsed = 0;
+    this.sessionRewardOnComplete = null;
   }
 
   computeProgressPercent() {
@@ -404,6 +418,132 @@ class TimerManager {
     };
   }
 
+  // Get session durations and reward durations from storage
+  async getSessionAndRewardDurations() {
+  const sessionMin = await storage.sessionSettings.sessionMinutes.get();
+  const sessionSec = await storage.sessionSettings.sessionSeconds.get();
+  const rewardMin = await storage.sessionSettings.rewardMinutes.get();
+  const rewardSec = await storage.sessionSettings.rewardSeconds.get();
+  return {
+    sessionMs: (sessionMin * 60 + sessionSec) * 1000,
+    rewardMs: (rewardMin * 60 + rewardSec) * 1000,
+  };
+  }
+
+  // Decrement session timer
+  async decrementSession() {
+    if (await this.checkActive()) {
+      this.sessionElapsed += 1000;
+      
+      if (this.sessionRemaining > 0) {
+        this.sessionRemaining -= 1000;
+        this.dailyProgress += 1000; // Also update daily progress
+        await storage.dailyProgress.set(this.dailyProgress);
+        
+        if (this.sessionRemaining <= 0) {
+          this.sessionRemaining = 0;
+          this.sessionCompleted = true;
+          if (typeof this.sessionOnComplete === "function") {
+            this.sessionOnComplete();
+            this.sessionOnComplete = null;
+          }
+        }
+      }
+    }
+  }
+
+  // Start a learning session timer
+  startSessionTimer(durationMs, onComplete) {
+    this.stopSessionTimer();
+    this.stopSessionRewardTimer();
+    
+    this.sessionGoal = durationMs;
+    this.sessionRemaining = durationMs;
+    this.sessionElapsed = 0;
+    this.sessionCompleted = false;
+    this.sessionOnComplete = onComplete;
+    
+    if (this.sessionRemaining > 0) {
+      this.sessionIntervalRef = setInterval(() => {
+        this.decrementSession().catch(() => {});
+      }, 1000);
+    } else if (typeof onComplete === "function") {
+      onComplete();
+    }
+  }
+
+  // Stop session timer
+  stopSessionTimer() {
+    if (this.sessionIntervalRef) {
+      clearInterval(this.sessionIntervalRef);
+      this.sessionIntervalRef = undefined;
+    }
+    this.sessionRemaining = 0;
+    this.sessionGoal = 0;
+    this.sessionElapsed = 0;
+    this.sessionCompleted = false;
+    this.sessionOnComplete = null;
+  }
+
+  // Check if session timer is running
+  isSessionActive() {
+    return Boolean(this.sessionIntervalRef);
+  }
+
+  // Decrement session reward timer
+  async decrementSessionReward() {
+    this.sessionRewardElapsed += 1000;
+    
+    if (this.sessionRewardRemaining > 0) {
+      this.sessionRewardRemaining -= 1000;
+      if (this.sessionRewardRemaining <= 0) {
+        this.sessionRewardRemaining = 0;
+        clearInterval(this.sessionRewardIntervalRef);
+        this.sessionRewardIntervalRef = undefined;
+        if (typeof this.sessionRewardOnComplete === "function") {
+          this.sessionRewardOnComplete();
+        }
+      }
+    }
+  }
+
+  // Start session reward timer
+  startSessionRewardTimer(durationMs, onComplete) {
+    this.stopSessionTimer();
+    this.stopSessionRewardTimer();
+    
+    this.sessionRewardGoal = durationMs;
+    this.sessionRewardRemaining = durationMs;
+    this.sessionRewardElapsed = 0;
+    this.sessionRewardOnComplete = onComplete;
+    
+    if (this.sessionRewardRemaining > 0) {
+      this.sessionRewardIntervalRef = setInterval(() => {
+        this.decrementSessionReward().catch(() => {});
+      }, 1000);
+    } else if (typeof onComplete === "function") {
+      onComplete();
+    }
+  }
+
+
+  // Stop session reward timer
+  stopSessionRewardTimer() {
+    if (this.sessionRewardIntervalRef) {
+      clearInterval(this.sessionRewardIntervalRef);
+      this.sessionRewardIntervalRef = undefined;
+    }
+    this.sessionRewardRemaining = 0;
+    this.sessionRewardGoal = 0;
+    this.sessionRewardElapsed = 0;
+    this.sessionRewardOnComplete = null;
+  }
+
+  // Check if session reward timer is running
+  isSessionRewardActive() {
+    return Boolean(this.sessionRewardIntervalRef);
+  }
+
   stopAllTimers() {
     this.killControlledTimers();
   }
@@ -457,6 +597,14 @@ class TimerManager {
       controlledLearningGoal: this.controlledLearningGoal,
       controlledRewardRemaining: this.controlledRewardRemaining,
       controlledRewardGoal: this.controlledRewardGoal,
+
+      // Session Duration and Reward relevant code
+      sessionRemaining: this.sessionRemaining,
+      sessionGoal: this.sessionGoal,
+      sessionElapsed: this.sessionElapsed,
+      sessionCompleted: this.sessionCompleted,
+      sessionRewardRemaining: this.sessionRewardRemaining,
+      sessionRewardGoal: this.sessionRewardGoal,
     };
   }
 }
