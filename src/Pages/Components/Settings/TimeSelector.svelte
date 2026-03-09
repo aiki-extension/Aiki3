@@ -1,18 +1,18 @@
 <!-- 
-  Time settings for learning goals.
-  For controlled variant, shows session-based learning and reward time.
-  Used in / Parent components: /src/Pages/Settings.svelte
+  Time settings for Daily learning goals.
  -->
 <script>
   import storage from "../../../util/storage";
 
-  // 
+  // Minimum learning time in minutes to ensure users set a reasonable goal. This is enforced both in the UI and programmatically.
   const MIN_LEARNING_MINUTES = 2;
   export let settings;
   export let update;
 
   let { min: learnMin, sec: learnSec } = settings.learningTime;
 
+
+  // Ensure that the learning time does not go below the minimum threshold of 2 minutes. If the user tries to set it below this, it will automatically adjust back
   function ensureMinThreshold() {
     // Enforce 2-minute minimum for learning time
     if (learnMin < MIN_LEARNING_MINUTES) {
@@ -20,7 +20,7 @@
       learnSec = 0;
     }
   }
-
+  // This function saves the learning time settings to storage and attempts to sync the preference with the server.
   async function setLearningTime() {
     ensureMinThreshold();
     const learningTime = { min: learnMin, sec: learnSec };
