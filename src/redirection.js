@@ -16,7 +16,7 @@ const promptCoordinator = new PromptCoordinator({
   showImmediatePrompt,
   hideImmediatePrompt: (tabId) => navigationGuards.hideImmediatePrompt(tabId),
 });
-
+// Was previously used to select between different redirection strategies (e.g. controlled vs experimental variants). 
 const strategy = {
   handleNavigation: async () => false,
   onLearningSiteNavigation: async () => { },
