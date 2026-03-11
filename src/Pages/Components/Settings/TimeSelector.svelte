@@ -5,7 +5,7 @@
   import { onMount } from "svelte";
   import storage from "../../../util/storage";
 
-  // Minimum learning time in minutes to ensure users set a reasonable goal. This is enforced both in the UI and programmatically.
+  // Minimum learning time in minutes to ensure users set a reasonable goal. This is enforced both in the UI and in the logic.
   const MIN_LEARNING_MINUTES = 5;
   export let settings;
   export let update;
@@ -20,7 +20,7 @@
     rewardMinutes = await storage.sessionSettings.rewardMinutes.get();
   });
 
-  // Ensure that the learning time does not go below the minimum threshold of 5 minutes. If the user tries to set it below this, it will automatically adjust back
+  // Ensures that the learning time meets the minimum threshold. If the user tries to set a value below the minimum, it will automatically adjust it to the minimum allowed value. This function is called before saving the settings to ensure data integrity.
   function ensureMinThreshold() {
     // Enforce 5-minute minimum for learning time
     if (learnMin < MIN_LEARNING_MINUTES) {
