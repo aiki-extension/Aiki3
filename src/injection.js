@@ -746,7 +746,7 @@ function renderLearningContent() {
     );
     status.textContent = "Stay focused here to earn your time.";
 
-    // Claim Reward button for controlled variant (initially hidden)
+    // Claim Reward button
     const claimRewardBtn = document.createElement("button");
     claimRewardBtn.textContent = "Claim Reward";
     claimRewardBtn.setAttribute(
@@ -1117,7 +1117,7 @@ const scheduleRewardOverlayEnsure = () => {
     try {
       // Check with background if we're in reward mode
       const data = await browser.runtime.sendMessage({ type: "timer:get" });
-      if (data && data.controlledRewardGoal > 0 && !document.getElementById("aiki-reward-overlay")) {
+      if (data && data.sessionRewardGoal > 0 && !document.getElementById("aiki-reward-overlay")) {
         // Also check if we're on a time wasting site
         const result = await browser.storage.local.get("list");
         const procList = result?.list || [];

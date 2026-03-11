@@ -525,70 +525,6 @@ async function getUserPreferencesId() {
 }
 
 
-
-// Controlled variant session state
-async function setControlledSession(session) {
-  if (session && typeof session === "object") {
-    await storage.set({ controlledSession: session });
-  } else {
-    await storage.remove("controlledSession");
-  }
-}
-
-async function getControlledSession() {
-  const result = await storage.get("controlledSession");
-  return result && result.controlledSession ? result.controlledSession : null;
-}
-
-async function clearControlledSession() {
-  return storage.remove("controlledSession");
-}
-
-// Controlled variant timer settings (session-based, separate from daily goal)
-async function getControlledLearningMinutes() {
-  const result = await storage.get("controlledLearningMinutes");
-  return typeof result.controlledLearningMinutes === "number"
-    ? result.controlledLearningMinutes
-    : 5; // Default 5 minutes
-}
-
-async function setControlledLearningMinutes(minutes) {
-  await storage.set({ controlledLearningMinutes: minutes });
-}
-
-async function getControlledRewardMinutes() {
-  const result = await storage.get("controlledRewardMinutes");
-  return typeof result.controlledRewardMinutes === "number"
-    ? result.controlledRewardMinutes
-    : 15; // Default 15 minutes
-}
-
-async function setControlledRewardMinutes(minutes) {
-  await storage.set({ controlledRewardMinutes: minutes });
-}
-
-async function getControlledLearningSeconds() {
-  const result = await storage.get("controlledLearningSeconds");
-  return typeof result.controlledLearningSeconds === "number"
-    ? result.controlledLearningSeconds
-    : 0; // Default 0 seconds
-}
-
-async function setControlledLearningSeconds(seconds) {
-  await storage.set({ controlledLearningSeconds: seconds });
-}
-
-async function getControlledRewardSeconds() {
-  const result = await storage.get("controlledRewardSeconds");
-  return typeof result.controlledRewardSeconds === "number"
-    ? result.controlledRewardSeconds
-    : 0; // Default 0 seconds
-}
-
-async function setControlledRewardSeconds(seconds) {
-  await storage.set({ controlledRewardSeconds: seconds });
-}
-
 // Global prompt lock (replaces per-tab promptLocks for 10-minute global cooldown)
 
 
@@ -741,17 +677,6 @@ export default {
     get: activeSessionsStore.get,
     remove: activeSessionsStore.remove,
     clear: activeSessionsStore.clear,
-  },
-  controlledSession: {
-    get: getControlledSession,
-    set: setControlledSession,
-    clear: clearControlledSession,
-  },
-  controlledTimerSettings: {
-    learningMinutes: { get: getControlledLearningMinutes, set: setControlledLearningMinutes },
-    learningSeconds: { get: getControlledLearningSeconds, set: setControlledLearningSeconds },
-    rewardMinutes: { get: getControlledRewardMinutes, set: setControlledRewardMinutes },
-    rewardSeconds: { get: getControlledRewardSeconds, set: setControlledRewardSeconds },
   },
   sessionSettings: {  // All session and reward based storage settings
   sessionMinutes: { get: getSessionMinutes, set: setSessionMinutes },

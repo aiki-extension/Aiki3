@@ -25,7 +25,7 @@ browser.runtime.onMessage.addListener((message, sender) => {
         await timer.sync();
       } catch (_) { }
       const timeData = timer.getTime();
-      return { ...timeData, isControlledVariant: false };
+      return timeData;
     })();
   }
 
@@ -305,7 +305,7 @@ browser.runtime.onConnect.addListener(function (port) {
           if (isDisconnected) return;
           try {
             const timeData = timer.getTime();
-            port.postMessage({ ...timeData, isControlledVariant: false });
+            port.postMessage(timeData);
             
           } catch (error) {
           }
