@@ -59,7 +59,7 @@ browser.runtime.onMessage.addListener((message, sender) => {
   if (message.type === "session:claimReward") {
     return (async () => {
       try {
-        // Get origin (time wasting site site)
+        // Get origin (time wasting site)
         let origin = await storage.origin.get();
         let timeWastingUrl = origin?.url;
         
@@ -85,20 +85,20 @@ browser.runtime.onMessage.addListener((message, sender) => {
           return false;
         }
         
-        // Redirect to time wasting site 
-        if (sender?.tab?.id) {
-          console.log("[Session] Redirecting to:", timeWastingUrl);
-          await browser.tabs.update(sender.tab.id, { url: timeWastingUrl });
-        }
-        
         // Get reward duration from settings
         const rewardMinutes = await storage.sessionSettings.rewardMinutes.get();
         const rewardSeconds = await storage.sessionSettings.rewardSeconds.get();
         const rewardDuration = (rewardMinutes * 60 * 1000) + (rewardSeconds * 1000);
         
+        // This prevents the redirect prompt from showing immediately
+        await storage.shouldRedirect.set(false);
+        
         // Start reward timer with callback to show redirect prompt when done
         await timer.startSessionRewardTimer(rewardDuration, async () => {
           console.log("[Session] Reward complete! Showing redirect prompt...");
+          
+          // Re-enable redirects when reward time expires
+          await storage.shouldRedirect.set(true);
           
           // Show prompt on the time wasting site
           try {
@@ -115,6 +115,25 @@ browser.runtime.onMessage.addListener((message, sender) => {
             console.error("[Session] Failed to show redirect prompt:", e);
           }
         });
+        
+        // Redirect to time wasting site after reward timer started
+        if (sender?.tab?.id) {
+          console.log("[Session] Redirecting to:", timeWastingUrl);
+          await browser.tabs.update(sender.tab.id, { url: timeWastingUrl });
+          
+          // Trigger reward overlay after page loads
+          setTimeout(async () => {
+            try {
+              await browser.tabs.sendMessage(sender.tab.id, {
+                action: "display: rewardOverlay"
+              });
+              console.log("[Session] Reward overlay message sent");
+            } catch (e) {
+              console.error("[Session] Failed to show reward overlay:", e);
+            }
+          }, 1500);
+        }
+        
       } catch (e) {
         console.error("[Session] Failed to start reward:", e);
       }

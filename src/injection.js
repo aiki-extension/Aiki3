@@ -413,7 +413,7 @@ async function bootstrapRewardOverlayIfNeeded() {
     const timerData = await browser.runtime.sendMessage({ type: "timer:get" });
 
     // If reward timer is active (goal > 0), check if we're on a time wasting site
-    if (timerData && timerData.controlledRewardGoal > 0) {
+    if (timerData && timerData.sessionrewardGoal > 0) {
       // Get time wasting sites list
       const result = await browser.storage.local.get("list");
       const procList = result?.list || [];
@@ -1290,8 +1290,8 @@ function renderProcrastinationRewardOverlay() {
 
   const update = (msg) => {
     if (!msg) return;
-    const goal = typeof msg.controlledRewardGoal === "number" ? msg.controlledRewardGoal : 0;
-    const remaining = typeof msg.controlledRewardRemaining === "number" ? msg.controlledRewardRemaining : 0;
+    const goal = typeof msg.sessionRewardGoal === "number" ? msg.sessionRewardGoal : 0;
+    const remaining = typeof msg.sessionRewardRemaining === "number" ? msg.sessionRewardRemaining : 0;
 
     if (goal <= 0) {
       cleanup();
