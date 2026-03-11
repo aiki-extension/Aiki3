@@ -105,11 +105,21 @@ browser.runtime.onMessage.addListener((message, sender) => {
             const tabs = await browser.tabs.query({ active: true, currentWindow: true });
             if (tabs.length > 0 && tabs[0].id) {
               const learningUrl = await storage.learningUri.get();
-              await browser.tabs.sendMessage(tabs[0].id, {
+              
+              // Handles the redirect prompt response
+              const response = await browser.tabs.sendMessage(tabs[0].id, {
                 action: "display: redirectPrompt",
                 url: learningUrl,
                 originUrl: timeWastingUrl
               });
+              
+              // If user clicks "Redirect", then navigate to the learning site
+              if (response && response.action === "redirect") {
+                console.log("[Session] User chose to redirect to learning");
+                await browser.tabs.update(tabs[0].id, { url: learningUrl });
+              } else {
+                console.log("[Session] User chose to stay on time wasting site");
+              }
             }
           } catch (e) {
             console.error("[Session] Failed to show redirect prompt:", e);
