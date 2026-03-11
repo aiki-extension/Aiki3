@@ -856,7 +856,7 @@ function renderLearningContent() {
       // UI updated to show visually that the user is in "Reward Time"
       heading.textContent = "🎉 Reward Time";
       status.textContent = `Enjoy! ${formatDuration(sessionRewardRemaining)} remaining.`;
-      panel.style.background = "linear-gradient(135deg, #ffffff, #32CD32)";
+      panel.style.background = "linear-gradient(135deg, #ADD8E6, #32CD32)";
 
       // Hides claim button during reward time, as the user already has claimed it
       claimRewardBtn.style.display = "none";
@@ -877,12 +877,22 @@ function renderLearningContent() {
       if (sessionRemaining <= 0 || sessionCompleted) {
         // Display full completion 
         progressLabel.textContent = `${formatDuration(sessionGoal)} / ${formatDurationShort(sessionGoal)}`;
-        status.textContent = "Session complete! Claim your reward.";
+        // Check if daily goal is reached
+        const dailyGoal = typeof msg.dailyGoal === "number" ? msg.dailyGoal : 0;
+        const dailyProgress = typeof msg.dailyProgress === "number" ? msg.dailyProgress : 0;
 
-        // Change in gradient to visually showcase completion
-        panel.style.background = "linear-gradient(135deg, #22c55e, #0ea5e9)";
-        // Claim button is visually displayed, so that the user can click on it
-        claimRewardBtn.style.display = "block";
+        if (dailyGoal > 0 && dailyProgress >= dailyGoal) {
+          // Daily goal reached - show celebration instead of claim button
+          heading.textContent = "🎉 Daily Goal Reached!";
+          status.textContent = "Great work today! Come back tomorrow for more.";
+          panel.style.background = "linear-gradient(135deg, #22c55e, #0ea5e9)";
+          claimRewardBtn.style.display = "none";
+      } else {
+          // Session complete but daily goal not reached - show claim button
+          status.textContent = "Session complete! Claim your reward.";
+          panel.style.background = "linear-gradient(135deg, #22c55e, #0ea5e9)";
+          claimRewardBtn.style.display = "block";
+    }
       }
       // Session in progress
       else {
@@ -895,17 +905,27 @@ function renderLearningContent() {
     }
     // Idle state - no active session
     else {
-      // Display ready state
-      heading.textContent = "📚 Aiki Learning";
-      progressLabel.textContent = "Ready to learn";
-      // Empty progress bar, as no active session yet
-      barFill.style.width = "0%";
-      barFill.style.background = "linear-gradient(135deg, #22c55e, #14b8a6)";
-      // Instructions for user to begin a learning session
-      status.textContent = "Visit a learning site to start a session.";
-      panel.style.background = defaultBg;
-      // Hide claim button
-      claimRewardBtn.style.display = "none";
+      // Checks if daily goal has been reached
+      if (msg.dailyGoal > 0 && msg.dailyProgress >= msg.dailyGoal) {
+          heading.textContent = "🎉 Daily Goal Reached!";
+          progressLabel.textContent = `${formatDuration(msg.dailyProgress)} completed`;
+          barFill.style.width = "100%";
+          barFill.style.background = "linear-gradient(135deg, #22c55e, #14b8a6)";
+          status.textContent = "Great work today! Come back tomorrow for more.";
+          panel.style.background = "linear-gradient(135deg, #22c55e, #0ea5e9)";
+      } else {
+        // Display ready state
+        heading.textContent = "📚 Aiki Learning";
+        progressLabel.textContent = "Ready to learn";
+        // Empty progress bar, as no active session yet
+        barFill.style.width = "0%";
+        barFill.style.background = "linear-gradient(135deg, #22c55e, #14b8a6)";
+        // Instructions for user to begin a learning session
+        status.textContent = "Visit a learning site to start a session.";
+        panel.style.background = defaultBg;
+        // Hide claim button
+        claimRewardBtn.style.display = "none";
+      }
     }
   };
 

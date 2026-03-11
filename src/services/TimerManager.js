@@ -420,14 +420,14 @@ class TimerManager {
 
   // Get session durations and reward durations from storage
   async getSessionAndRewardDurations() {
-  const sessionMin = await storage.sessionSettings.sessionMinutes.get();
-  const sessionSec = await storage.sessionSettings.sessionSeconds.get();
-  const rewardMin = await storage.sessionSettings.rewardMinutes.get();
-  const rewardSec = await storage.sessionSettings.rewardSeconds.get();
-  return {
-    sessionMs: (sessionMin * 60 + sessionSec) * 1000,
-    rewardMs: (rewardMin * 60 + rewardSec) * 1000,
-  };
+    const sessionMin = await storage.sessionSettings.sessionMinutes.get();
+    const sessionSec = await storage.sessionSettings.sessionSeconds.get();
+    const rewardMin = await storage.sessionSettings.rewardMinutes.get();
+    const rewardSec = await storage.sessionSettings.rewardSeconds.get();
+    return {
+      sessionMs: (sessionMin * 60 + sessionSec) * 1000,
+      rewardMs: (rewardMin * 60 + rewardSec) * 1000,
+    };
   }
 
   // Decrement session timer
@@ -437,12 +437,23 @@ class TimerManager {
       
       if (this.sessionRemaining > 0) {
         this.sessionRemaining -= 1000;
-        this.dailyProgress += 1000; // Also update daily progress
+        this.dailyProgress += 1000;
         await storage.dailyProgress.set(this.dailyProgress);
         
         if (this.sessionRemaining <= 0) {
           this.sessionRemaining = 0;
           this.sessionCompleted = true;
+          
+          // Ensure full session goal is credited to daily progress
+          const expectedProgress = this.sessionGoal;
+          const actualProgress = this.sessionElapsed;
+          if (actualProgress < expectedProgress) {
+            const missedProgress = expectedProgress - actualProgress;
+            console.log(`[Session] Adding ${missedProgress}ms missed progress to reach full session goal`);
+            this.dailyProgress += missedProgress;
+            await storage.dailyProgress.set(this.dailyProgress);
+          }
+          
           if (typeof this.sessionOnComplete === "function") {
             this.sessionOnComplete();
             this.sessionOnComplete = null;
@@ -453,9 +464,15 @@ class TimerManager {
   }
 
   // Start a learning session timer
-  startSessionTimer(durationMs, onComplete) {
+  async startSessionTimer(durationMs, onComplete) {
     this.stopSessionTimer();
     this.stopSessionRewardTimer();
+    
+    // Sync daily goal progress from storage before starting
+    const goal = parseTime.toSystem(await storage.timeSettings.learningTime.get());
+    const progress = await storage.dailyProgress.get();
+    this.dailyGoal = goal;
+    this.dailyProgress = progress;
     
     this.sessionGoal = durationMs;
     this.sessionRemaining = durationMs;

@@ -4,6 +4,7 @@ import storage from "./util/storage";
 import redirection from "./redirection";
 import timer from "./services/TimerManager";
 import { setTheme } from "./util/themes";
+import { parseTime } from "./util/utilities";
 
 // Manifest V3: No DOM access, no stray variables
 
@@ -31,6 +32,15 @@ browser.runtime.onMessage.addListener((message, sender) => {
   if (message.type === "learning:autoStart") {
     return (async () => {
       try {
+        // Get information on the daily goal
+        const dailyGoal = parseTime.toSystem(await storage.timeSettings.learningTime.get());
+        const dailyProgress = await storage.dailyProgress.get();
+        // Check if user already has met their daily goal, if yes then don't create a new session
+        if (dailyGoal > 0 && dailyProgress >= dailyGoal) {
+          console.log("[Session] Daily goal already reached! Progress:", dailyProgress, "Goal:", dailyGoal);
+          return { goalReached: true };
+        }
+        
         // Get session duration from settings (minutes + seconds)
         const sessionMinutes = await storage.sessionSettings.sessionMinutes.get();
         const sessionSeconds = await storage.sessionSettings.sessionSeconds.get();
