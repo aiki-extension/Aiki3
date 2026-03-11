@@ -6,7 +6,8 @@
   import storage from "../../../util/storage";
 
   // Minimum learning time in minutes to ensure users set a reasonable goal. This is enforced both in the UI and in the logic.
-  const MIN_LEARNING_MINUTES = 5;
+  // IS SET TO 2 TO MORE QUICKLY TEST FUNCTIONALITY, WILL BE CHANGED TO 5 WHEN PR IS APPROVED!
+  const MIN_LEARNING_MINUTES = 2;
   export let settings;
   export let update;
 
