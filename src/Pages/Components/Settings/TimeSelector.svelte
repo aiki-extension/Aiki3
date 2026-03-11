@@ -97,8 +97,8 @@
         bind:value={sessionMinutes}
         on:change={setSessionTime}
         class="custom-select custom-select-sm inline"
-      >
-        {#each [5, 10, 15, 20, 25, 30] as value}
+      ><!-- 1 ONLY AN OPTION FOR TESTING PURPOSE-->
+        {#each [1, 5, 10, 15, 20, 25, 30] as value}
           <option {value}>{value}</option>
         {/each}
       </select>

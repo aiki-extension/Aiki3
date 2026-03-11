@@ -56,40 +56,39 @@ browser.runtime.onMessage.addListener((message, sender) => {
     storage.blockedOrigins.remove(sender.tab.id);
   }
 
-  // Add handler for claiming rewards
-  if (message.type === "session:claimReward" || message.type === "controlled:claimReward") {
+  if (message.type === "session:claimReward") {
     return (async () => {
       try {
-        // Get origin (procrastination site)
+        // Get origin (time wasting site site)
         let origin = await storage.origin.get();
-        let procrastinationUrl = origin?.url;
+        let timeWastingUrl = origin?.url;
         
-        // If no origin saved (manual navigation), use first site from procrastination list
-        if (!procrastinationUrl) {
-          const procList = await storage.list.get();
-          if (procList && procList.length > 0) {
-            const firstProc = procList[0];
+        // If no origin saved (manual navigation), use first site from time wasting list
+        if (!timeWastingUrl) {
+          const timeWasteList = await storage.list.get();
+          if (timeWasteList && timeWasteList.length > 0) {
+            const firstTimeWaste = timeWasteList[0];
             // Build URL from host or name
-            if (firstProc.host) {
-              procrastinationUrl = firstProc.host.startsWith('http') 
-                ? firstProc.host 
-                : `https://${firstProc.host}`;
-            } else if (firstProc.name) {
-              procrastinationUrl = `https://${firstProc.name}`;
+            if (firstTimeWaste.host) {
+              timeWastingUrl = firstTimeWaste.host.startsWith('http') 
+                ? firstTimeWaste.host 
+                : `https://${firstTimeWaste.host}`;
+            } else if (firstTimeWaste.name) {
+              timeWastingUrl = `https://${firstTimeWaste.name}`;
             }
-            console.log("[Session] No origin saved, using first procrastination site:", procrastinationUrl);
+            console.log("[Session] No origin saved, using first time wasting site:", timeWastingUrl);
           }
         }
         
-        if (!procrastinationUrl) {
-          console.error("[Session] No procrastination site found!");
+        if (!timeWastingUrl) {
+          console.error("[Session] No time wasting site found!");
           return false;
         }
         
-        // Redirect to procrastination site 
+        // Redirect to time wasting site 
         if (sender?.tab?.id) {
-          console.log("[Session] Redirecting to:", procrastinationUrl);
-          await browser.tabs.update(sender.tab.id, { url: procrastinationUrl });
+          console.log("[Session] Redirecting to:", timeWastingUrl);
+          await browser.tabs.update(sender.tab.id, { url: timeWastingUrl });
         }
         
         // Get reward duration from settings
@@ -101,7 +100,7 @@ browser.runtime.onMessage.addListener((message, sender) => {
         await timer.startSessionRewardTimer(rewardDuration, async () => {
           console.log("[Session] Reward complete! Showing redirect prompt...");
           
-          // Show prompt on the procrastination site
+          // Show prompt on the time wasting site
           try {
             const tabs = await browser.tabs.query({ active: true, currentWindow: true });
             if (tabs.length > 0 && tabs[0].id) {
@@ -109,7 +108,7 @@ browser.runtime.onMessage.addListener((message, sender) => {
               await browser.tabs.sendMessage(tabs[0].id, {
                 action: "display: redirectPrompt",
                 url: learningUrl,
-                originUrl: procrastinationUrl
+                originUrl: timeWastingUrl
               });
             }
           } catch (e) {

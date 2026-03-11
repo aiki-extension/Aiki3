@@ -763,7 +763,7 @@ function renderLearningContent() {
     });
     claimRewardBtn.addEventListener("click", async () => {
       try {
-        await browser.runtime.sendMessage({ type: "controlled:claimReward" });
+        await browser.runtime.sendMessage({ type: "session:claimReward" });
       } catch (e) {
         console.log("[Aiki] Failed to claim reward:", e);
       }
@@ -843,49 +843,68 @@ function renderLearningContent() {
 
     // Check if in reward mode
     if (sessionRewardGoal > 0) {
+      // Calculates how much time has been used
       const progress = Math.max(0, sessionRewardGoal - sessionRewardRemaining);
       const percent = sessionRewardGoal > 0 ? Math.min(100, (progress / sessionRewardGoal) * 100) : 0;
 
+      // Updates progress bar to show reward time consumption
       barFill.style.width = `${percent}%`;
       barFill.style.background = "linear-gradient(135deg, #ffffffff, #32CD32)";
+      // Displays current/total reward time
       progressLabel.textContent = `${formatDuration(progress)} / ${formatDurationShort(sessionRewardGoal)}`;
+      
+      // UI updated to show visually that the user is in "Reward Time"
       heading.textContent = "🎉 Reward Time";
       status.textContent = `Enjoy! ${formatDuration(sessionRewardRemaining)} remaining.`;
       panel.style.background = "linear-gradient(135deg, #ffffff, #32CD32)";
+
+      // Hides claim button during reward time, as the user already has claimed it
       claimRewardBtn.style.display = "none";
     }
     // Check if in active session
     else if (sessionGoal > 0) {
+      // Calculates learning progress within the session
       const progress = Math.max(0, sessionGoal - sessionRemaining);
       const percent = sessionGoal > 0 ? Math.min(100, (progress / sessionGoal) * 100) : 0;
-
+      
+      // Progress bar updates to show learning completion
       barFill.style.width = `${percent}%`;
       barFill.style.background = "linear-gradient(135deg, #22c55e, #14b8a6)";
       heading.textContent = "📚 Learning Session";
       panel.style.background = defaultBg;
 
-      // Session complete - show claim button
+      // Session complete
       if (sessionRemaining <= 0 || sessionCompleted) {
+        // Display full completion 
         progressLabel.textContent = `${formatDuration(sessionGoal)} / ${formatDurationShort(sessionGoal)}`;
         status.textContent = "Session complete! Claim your reward.";
+
+        // Change in gradient to visually showcase completion
         panel.style.background = "linear-gradient(135deg, #22c55e, #0ea5e9)";
+        // Claim button is visually displayed, so that the user can click on it
         claimRewardBtn.style.display = "block";
       }
       // Session in progress
       else {
+        // Display current progress and goal (example: "8 15 s/ 15 min")
         progressLabel.textContent = `${formatDuration(progress)} / ${formatDurationShort(sessionGoal)}`;
         status.textContent = `Keep going for ${formatDuration(sessionRemaining)} more.`;
+        // Hide claim button
         claimRewardBtn.style.display = "none";
       }
     }
     // Idle state - no active session
     else {
+      // Display ready state
       heading.textContent = "📚 Aiki Learning";
       progressLabel.textContent = "Ready to learn";
+      // Empty progress bar, as no active session yet
       barFill.style.width = "0%";
       barFill.style.background = "linear-gradient(135deg, #22c55e, #14b8a6)";
-      status.textContent = "Visit a procrastination site to start a session.";
+      // Instructions for user to begin a learning session
+      status.textContent = "Visit a learning site to start a session.";
       panel.style.background = defaultBg;
+      // Hide claim button
       claimRewardBtn.style.display = "none";
     }
   };
