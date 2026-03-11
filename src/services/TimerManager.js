@@ -293,21 +293,25 @@ class TimerManager {
         
         if (this.sessionRemaining <= 0) {
           this.sessionRemaining = 0;
-          this.sessionCompleted = true;
           
-          // Ensure full session goal is credited to daily progress
-          const expectedProgress = this.sessionGoal;
-          const actualProgress = this.sessionElapsed;
-          if (actualProgress < expectedProgress) {
-            const missedProgress = expectedProgress - actualProgress;
-            console.log(`[Session] Adding ${missedProgress}ms missed progress to reach full session goal`);
-            this.dailyProgress += missedProgress;
-            await storage.dailyProgress.set(this.dailyProgress);
-          }
-          
-          if (typeof this.sessionOnComplete === "function") {
-            this.sessionOnComplete();
-            this.sessionOnComplete = null;
+          // Only add missed progress once when the session ends
+          if (!this.sessionCompleted) {
+            this.sessionCompleted = true;
+            
+            // Ensure full session goal is credited to daily progress
+            const expectedProgress = this.sessionGoal;
+            const actualProgress = this.sessionElapsed;
+            if (actualProgress < expectedProgress) {
+              const missedProgress = expectedProgress - actualProgress;
+              console.log(`[Session] Adding ${missedProgress}ms missed progress to reach full session goal`);
+              this.dailyProgress += missedProgress;
+              await storage.dailyProgress.set(this.dailyProgress);
+            }
+            
+            if (typeof this.sessionOnComplete === "function") {
+              this.sessionOnComplete();
+              this.sessionOnComplete = null;
+            }
           }
         }
       }
