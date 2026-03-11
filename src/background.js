@@ -31,14 +31,45 @@ browser.runtime.onMessage.addListener((message, sender) => {
   if (message.type === "learning:autoStart") {
     return (async () => {
       try {
-        // Don't start a new session if one is already running
-        if (!timer.isSessionActive()) {
-          // Get session duration from settings (minutes + seconds)
-          const sessionMinutes = await storage.sessionSettings.sessionMinutes.get();
-          const sessionSeconds = await storage.sessionSettings.sessionSeconds.get();
-          const sessionDuration = (sessionMinutes * 60 * 1000) + (sessionSeconds * 1000);
+        // Get session duration from settings (minutes + seconds)
+        const sessionMinutes = await storage.sessionSettings.sessionMinutes.get();
+        const sessionSeconds = await storage.sessionSettings.sessionSeconds.get();
+        const sessionDuration = (sessionMinutes * 60 * 1000) + (sessionSeconds * 1000);
+        
+        // Check if session is already active
+        if (timer.isSessionActive()) {
+          // Gets current session goal
+          const currentGoal = timer.getTime().sessionGoal;
           
-          // Start the session timer
+          // If settings changed, update the session with new duration
+          if (currentGoal && currentGoal !== sessionDuration) {
+            console.log("[Session] Settings changed, updating session duration from", currentGoal, "to", sessionDuration);
+            
+            // Calculate progress percentage
+            const elapsed = timer.getTime().sessionElapsed || 0;
+            const progressRatio = currentGoal > 0 ? elapsed / currentGoal : 0;
+            
+            // Apply same progress ratio to new duration
+            const newElapsed = Math.floor(sessionDuration * progressRatio);
+            const newRemaining = sessionDuration - newElapsed;
+            
+            // Update the timer with new goal and adjusted remaining time
+            timer.stopSessionTimer();
+            timer.sessionGoal = sessionDuration;
+            timer.sessionRemaining = Math.max(0, newRemaining);
+            timer.sessionElapsed = newElapsed;
+            
+            // Restart the timer interval
+            timer.sessionIntervalRef = setInterval(() => {
+              timer.decrementSession().catch(() => {});
+            }, 1000);
+            
+            console.log("[Session] Updated session - goal:", sessionDuration, "remaining:", newRemaining);
+          } else {
+            console.log("[Session] Session already running with same duration");
+          }
+        } else {
+          // Start new session timer
           await timer.startSessionTimer(sessionDuration, () => {
             console.log("[Session] Session complete!");
             // Timer will stop automatically; user must claim reward via button
