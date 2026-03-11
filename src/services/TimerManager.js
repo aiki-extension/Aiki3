@@ -294,19 +294,13 @@ class TimerManager {
         if (this.sessionRemaining <= 0) {
           this.sessionRemaining = 0;
           
-          // Only add missed progress once when the session ends
           if (!this.sessionCompleted) {
             this.sessionCompleted = true;
             
-            // Ensure full session goal is credited to daily progress
-            const expectedProgress = this.sessionGoal;
-            const actualProgress = this.sessionElapsed;
-            if (actualProgress < expectedProgress) {
-              const missedProgress = expectedProgress - actualProgress;
-              console.log(`[Session] Adding ${missedProgress}ms missed progress to reach full session goal`);
-              this.dailyProgress += missedProgress;
-              await storage.dailyProgress.set(this.dailyProgress);
-            }
+            // Add 1-second buffer to compensate for checkActive() timing drift
+            this.dailyProgress += 1000;
+            await storage.dailyProgress.set(this.dailyProgress);
+            console.log("[Session] Added 1s timing buffer to daily progress");
             
             if (typeof this.sessionOnComplete === "function") {
               this.sessionOnComplete();
