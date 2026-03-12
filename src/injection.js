@@ -1407,3 +1407,39 @@ if (typeof window !== "undefined") {
   window.renderProcrastinationRewardOverlay = renderProcrastinationRewardOverlay;
 }
 
+
+// Check if we're in reward mode when content script loads
+// This ensures the overlay persists across navigations
+(async () => {
+  try {
+    // Small delay to ensure page is ready
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // Check with background if we're in reward mode
+    const data = await browser.runtime.sendMessage({ type: "timer:get" });
+    if (data && data.sessionRewardGoal > 0) {
+      // Get time wasting site list
+      const result = await browser.storage.local.get("list");
+      const timeWastingList = result?.list || [];
+      const timeWastingHosts = timeWastingList.map(item => item?.host || item?.name || "").filter(Boolean);
+
+      // Check if we're on a time wasting site
+      const currentHost = location.hostname.replace(/^www\./, "");
+      const isOnTimeWastingSite = timeWastingHosts.some(host => {
+        const normalizedHost = host.replace(/^www\./, "");
+        return currentHost === normalizedHost ||
+          currentHost.endsWith("." + normalizedHost) ||
+          normalizedHost.endsWith("." + currentHost);
+      });
+
+      // If in reward mode and on a time wasting site, show overlay
+      if (isOnTimeWastingSite) {
+        console.log("[Aiki] Auto-restoring reward overlay on page load");
+        renderProcrastinationRewardOverlay();
+      }
+    }
+  } catch (e) {
+    console.log("[Aiki] Failed to bootstrap reward overlay:", e.message || e);
+  }
+})();
+
