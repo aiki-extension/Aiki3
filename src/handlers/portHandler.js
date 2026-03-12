@@ -14,7 +14,6 @@ export function handlePortConnect(port) {
     isDisconnected = true;
   });
 
-
   port.onMessage.addListener(function (msg) {
       console.log("[Aiki Debug] Port message received:", msg, "parsed as:", msg.split(": ")[1]);
       switch (msg.split(": ")[1]) {
@@ -38,7 +37,9 @@ export function handlePortConnect(port) {
                   currentWindow: true,
                 });
                 tabId = activeTab?.id;
-              } catch (_) { }
+              } catch (_) {
+                console.warn("[Background] Failed to get active tab on origin:origin:", _);
+              }
             }
             console.log("[Aiki Debug] Calling redirection.gotoOrigin with:", { action, tabId, type: "popup" });
             redirection.gotoOrigin(action, {
@@ -54,13 +55,16 @@ export function handlePortConnect(port) {
           (async () => {
             try {
               await timer.sync();
-            } catch (_) { }
+            } catch (_) {
+              console.warn("[Background] Failed to sync timer on timer:timer:", _);
+            }
             if (isDisconnected) return;
             try {
               const timeData = timer.getTime();
               port.postMessage({ ...timeData, isControlledVariant: false });
               
             } catch (error) {
+              console.warn("[Background] Failed to get timer time on timer:timer:", error);
             }
           })();
           break;
