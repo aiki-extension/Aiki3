@@ -771,7 +771,6 @@ function renderLearningContent() {
 
     // Collapse/expand toggle handler
     const toggleCollapse = () => {
-      console.log("TOGGLE COLLAPSE IS PRESSED");
       isCollapsed = !isCollapsed;
       localStorage.setItem(isCollapsedKey, isCollapsed.toString());
       collapseBtn.textContent = isCollapsed ? "▼" : "▲";
@@ -797,11 +796,12 @@ function renderLearningContent() {
       progressLabel.style.fontSize = isCollapsed ? "0.95em" : "0.9em";
       progressLabel.style.fontWeight = isCollapsed ? "600" : "400";
       
-      if (isCollapsed && claimRewardBtn.style.display !== "none") {
-        claimRewardBtn.dataset.wasVisible = "true";
-        claimRewardBtn.style.display = "none";
-      } else if (!isCollapsed && claimRewardBtn.dataset.wasVisible === "true") {
-        claimRewardBtn.style.display = "block";
+      // Hide snooze button when collapsed
+      if (isCollapsed && snoozeBtn.style.display !== "none") {
+        snoozeBtn.dataset.wasVisible = "true";
+        snoozeBtn.style.display = "none";
+      } else if (!isCollapsed && snoozeBtn.dataset.wasVisible === "true") {
+        snoozeBtn.style.display = "block";
       }
       
       // Sync the intended position after size change
@@ -1274,12 +1274,32 @@ function renderProcrastinationRewardOverlay() {
     isCollapsed = !isCollapsed;
     localStorage.setItem(isCollapsedKey, isCollapsed.toString());
     collapseBtn.textContent = isCollapsed ? "▼" : "▲";
+    
+    // Store current position before changing styles
+    const currentLeft = panel.style.left;
+    const currentRight = panel.style.right;
+    const currentTop = panel.style.top;
+    const currentBottom = panel.style.bottom;
+    const currentPosition = panel.style.position;
+    const currentTransform = panel.style.transform;
+    
+    // Update the style
     panel.setAttribute("style", getPanelStyle(isCollapsed, currentBg));
+    
+    // Restore positioning properties
+    if (currentPosition) panel.style.position = currentPosition;
+    if (currentLeft) panel.style.left = currentLeft;
+    if (currentRight) panel.style.right = currentRight;
+    if (currentTop) panel.style.top = currentTop;
+    if (currentBottom) panel.style.bottom = currentBottom;
+    if (currentTransform) panel.style.transform = currentTransform;
+    
     heading.style.display = isCollapsed ? "none" : "block";
     status.style.display = isCollapsed ? "none" : "block";
     barShell.style.height = isCollapsed ? "5px" : "8px";
     progressLabel.style.fontSize = isCollapsed ? "0.9em" : "0.85em";
     progressLabel.style.fontWeight = isCollapsed ? "600" : "400";
+    
     // Hide snooze button when collapsed
     if (isCollapsed && snoozeBtn.style.display !== "none") {
       snoozeBtn.dataset.wasVisible = "true";
@@ -1287,6 +1307,13 @@ function renderProcrastinationRewardOverlay() {
     } else if (!isCollapsed && snoozeBtn.dataset.wasVisible === "true") {
       snoozeBtn.style.display = "block";
     }
+    
+    // Sync the intended position after size change
+    setTimeout(() => {
+      if (dragHandle && dragHandle.syncIntendedPosition) {
+        dragHandle.syncIntendedPosition();
+      }
+    }, 300);
   };
   collapseBtn.addEventListener("click", (e) => {
     e.stopPropagation();
