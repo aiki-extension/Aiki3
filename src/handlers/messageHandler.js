@@ -1,5 +1,5 @@
-import storage from "./util/storage";
-import timer from "./services/TimerManager";
+import storage from "../util/storage";
+import timer from "../services/TimerManager";
 //import api from "./services/apiService";
 /*
 This module handles incoming messages from content scripts and other parts of the extension. 
