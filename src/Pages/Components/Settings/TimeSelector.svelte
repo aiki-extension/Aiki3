@@ -6,8 +6,8 @@
   import storage from "../../../util/storage";
 
   // Minimum learning time in minutes to ensure users set a reasonable goal. This is enforced both in the UI and in the logic.
-  // IS SET TO 2 TO MORE QUICKLY TEST FUNCTIONALITY, WILL BE CHANGED TO 5 WHEN PR IS APPROVED!
-  const MIN_LEARNING_MINUTES = 2;
+  const MIN_LEARNING_MINUTES = 5;
+  const SESSION_DURATION_OPTIONS = [5, 10, 15, 20, 25, 30];
   export let settings;
   export let update;
 
@@ -98,8 +98,8 @@
         bind:value={sessionMinutes}
         on:change={setSessionTime}
         class="custom-select custom-select-sm inline"
-      ><!-- 1 ONLY AN OPTION FOR TESTING PURPOSE-->
-        {#each [1, 5, 10, 15, 20, 25, 30] as value}
+      >
+        {#each SESSION_DURATION_OPTIONS as value}
           <option {value}>{value}</option>
         {/each}
       </select>

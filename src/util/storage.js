@@ -1,6 +1,11 @@
 import browser from "webextension-polyfill";
 import { parseUrl } from "./utilities";
 const storage = browser.storage.local;
+const DEFAULT_SESSION_TIME_MINUTES = 5;
+const DEFAULT_SESSION_TIME_SECONDS = 0;
+const DEFAULT_REWARD_TIME_MINUTES = 2;
+const DEFAULT_REWARD_TIME_SECONDS = 0;
+
 
 /**
  * Factory for creating keyed storage accessors (maps with set/get/remove/clear).
@@ -558,7 +563,7 @@ async function getSessionMinutes() {
   if (typeof result.sessionMinutes === "number") {
     return result.sessionMinutes;
   } else {
-    return 5; // Default is 5 minutes
+    return DEFAULT_SESSION_TIME_MINUTES;
   }
 }
 
@@ -571,7 +576,7 @@ async function getSessionSeconds() {
   if (typeof result.sessionSeconds === "number") {
     return result.sessionSeconds;
   } else {
-    return 0; // Default is 0 seconds
+    return DEFAULT_SESSION_TIME_SECONDS;
   }
 }
 
@@ -584,7 +589,7 @@ async function getSessionRewardMinutes() {
   if (typeof result.sessionRewardMinutes === "number") {
     return result.sessionRewardMinutes;
   } else {
-    return 2; // Default is 2 minutes
+    return DEFAULT_REWARD_TIME_MINUTES;
   }
 }
 
@@ -597,7 +602,7 @@ async function getSessionRewardSeconds() {
   if (typeof result.sessionRewardSeconds === "number") {
     return result.sessionRewardSeconds;
   } else {
-    return 0; // Default is 0 seconds
+    return DEFAULT_REWARD_TIME_SECONDS; 
   }
 }
 
