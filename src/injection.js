@@ -413,7 +413,7 @@ async function bootstrapRewardOverlayIfNeeded() {
     const timerData = await browser.runtime.sendMessage({ type: "timer:get" });
 
     // If reward timer is active (goal > 0), check if we're on a time wasting site
-    if (timerData && timerData.controlledRewardGoal > 0) {
+    if (timerData && timerData.sessionrewardGoal > 0) {
       // Get time wasting sites list
       const result = await browser.storage.local.get("list");
       const procList = result?.list || [];
@@ -746,7 +746,7 @@ function renderLearningContent() {
     );
     status.textContent = "Stay focused here to earn your time.";
 
-    // Claim Reward button for controlled variant (initially hidden)
+    // Claim Reward button
     const claimRewardBtn = document.createElement("button");
     claimRewardBtn.textContent = "Claim Reward";
     claimRewardBtn.setAttribute(
@@ -763,7 +763,7 @@ function renderLearningContent() {
     });
     claimRewardBtn.addEventListener("click", async () => {
       try {
-        await browser.runtime.sendMessage({ type: "controlled:claimReward" });
+        await browser.runtime.sendMessage({ type: "session:claimReward" });
       } catch (e) {
         console.log("[Aiki] Failed to claim reward:", e);
       }
@@ -771,7 +771,6 @@ function renderLearningContent() {
 
     // Collapse/expand toggle handler
     const toggleCollapse = () => {
-      console.log("TOGGLE COLLAPSE IS PRESSED");
       isCollapsed = !isCollapsed;
       localStorage.setItem(isCollapsedKey, isCollapsed.toString());
       collapseBtn.textContent = isCollapsed ? "▼" : "▲";
@@ -797,11 +796,12 @@ function renderLearningContent() {
       progressLabel.style.fontSize = isCollapsed ? "0.95em" : "0.9em";
       progressLabel.style.fontWeight = isCollapsed ? "600" : "400";
       
-      if (isCollapsed && claimRewardBtn.style.display !== "none") {
-        claimRewardBtn.dataset.wasVisible = "true";
-        claimRewardBtn.style.display = "none";
-      } else if (!isCollapsed && claimRewardBtn.dataset.wasVisible === "true") {
-        claimRewardBtn.style.display = "block";
+      // Hide snooze button when collapsed
+      if (isCollapsed && snoozeBtn.style.display !== "none") {
+        snoozeBtn.dataset.wasVisible = "true";
+        snoozeBtn.style.display = "none";
+      } else if (!isCollapsed && snoozeBtn.dataset.wasVisible === "true") {
+        snoozeBtn.style.display = "block";
       }
       
       // Sync the intended position after size change
@@ -830,84 +830,104 @@ function renderLearningContent() {
     const dragHandle = makeDraggable(panel);
 
     const update = (msg) => {
-      if (!msg) return;
+    if (!msg) return;
 
-      const isControlledVariant = msg.isControlledVariant === true;
-      const controlledState = msg.controlledState;
-      const defaultBg = "rgba(15, 23, 42, 0.96)";
+    const defaultBg = "rgba(15, 23, 42, 0.96)";
+    
+    // Session-based learning
+    const sessionRewardGoal = typeof msg.sessionRewardGoal === "number" ? msg.sessionRewardGoal : 0;
+    const sessionRewardRemaining = typeof msg.sessionRewardRemaining === "number" ? msg.sessionRewardRemaining : 0;
+    const sessionGoal = typeof msg.sessionGoal === "number" ? msg.sessionGoal : 0;
+    const sessionRemaining = typeof msg.sessionRemaining === "number" ? msg.sessionRemaining : 0;
+    const sessionCompleted = msg.sessionCompleted || false;
 
-      if (isControlledVariant) {
-        if (controlledState === "learning") {
-          const goal = msg.controlledLearningGoal || 0;
-          const remaining = typeof msg.controlledLearningRemaining === "number" ? msg.controlledLearningRemaining : 0;
-          const elapsed = typeof msg.controlledLearningElapsed === "number" ? msg.controlledLearningElapsed : 0;
-          const completed = msg.controlledLearningCompleted || false;
-          const progress = Math.max(0, goal - remaining);
-          const percent = goal > 0 ? Math.min(100, (progress / goal) * 100) : 0;
+    // Check if in reward mode
+    if (sessionRewardGoal > 0) {
+      // Calculates how much time has been used
+      const progress = Math.max(0, sessionRewardGoal - sessionRewardRemaining);
+      const percent = sessionRewardGoal > 0 ? Math.min(100, (progress / sessionRewardGoal) * 100) : 0;
 
-          barFill.style.width = `${percent}%`;
-          barFill.style.background = "linear-gradient(135deg, #22c55e, #14b8a6)";
-          heading.textContent = "📚 Learning Session";
-          panel.style.background = defaultBg;
-          claimRewardBtn.style.display = "none";
+      // Updates progress bar to show reward time consumption
+      barFill.style.width = `${percent}%`;
+      barFill.style.background = "linear-gradient(135deg, #ffffffff, #32CD32)";
+      // Displays current/total reward time
+      progressLabel.textContent = `${formatDuration(progress)} / ${formatDurationShort(sessionRewardGoal)}`;
+      
+      // UI updated to show visually that the user is in "Reward Time"
+      heading.textContent = "🎉 Reward Time";
+      status.textContent = `Enjoy! ${formatDuration(sessionRewardRemaining)} remaining.`;
+      panel.style.background = "linear-gradient(135deg, #ADD8E6, #32CD32)";
 
-          if (goal > 0 && (remaining <= 0 || completed)) {
-            progressLabel.textContent = `${formatDuration(elapsed)} / ${formatDurationShort(goal)}`;
-            status.textContent = "Session complete! Claim your reward.";
-            panel.style.background = "linear-gradient(135deg, #22c55e, #0ea5e9)";
-            claimRewardBtn.style.display = "block";
-          } else if (goal > 0) {
-            progressLabel.textContent = `${formatDuration(progress)} / ${formatDurationShort(goal)}`;
-            status.textContent = `Stay focused for ${formatDuration(remaining)} more.`;
-          } else {
-            progressLabel.textContent = "Starting...";
-            status.textContent = "Session starting...";
-          }
-        } else if (controlledState === "reward") {
-          const goal = msg.controlledRewardGoal || 0;
-          const remaining = typeof msg.controlledRewardRemaining === "number" ? msg.controlledRewardRemaining : 0;
-          const progress = Math.max(0, goal - remaining);
-          const percent = goal > 0 ? Math.min(100, (progress / goal) * 100) : 0;
+      // Hides claim button during reward time, as the user already has claimed it
+      claimRewardBtn.style.display = "none";
+    }
+    // Check if in active session
+    else if (sessionGoal > 0) {
+      // Calculates learning progress within the session
+      const progress = Math.max(0, sessionGoal - sessionRemaining);
+      const percent = sessionGoal > 0 ? Math.min(100, (progress / sessionGoal) * 100) : 0;
+      
+      // Progress bar updates to show learning completion
+      barFill.style.width = `${percent}%`;
+      barFill.style.background = "linear-gradient(135deg, #22c55e, #14b8a6)";
+      heading.textContent = "📚 Learning Session";
+      panel.style.background = defaultBg;
 
-          barFill.style.width = `${percent}%`;
-          barFill.style.background = "linear-gradient(135deg, #ffffffff, #32CD32)";
-          progressLabel.textContent = goal > 0 ? `${formatDuration(progress)} / ${formatDurationShort(goal)}` : "Enjoy!";
-          heading.textContent = "🎉 Reward Time";
-          status.textContent = goal > 0 ? `Enjoy! ${formatDuration(remaining)} remaining.` : "Your reward time!";
-          panel.style.background = "linear-gradient(135deg, #ffffff, #32CD32)";
-          claimRewardBtn.style.display = "none";
-        } else {
-          heading.textContent = "📚 Aiki Learning";
-          progressLabel.textContent = "Ready to learn";
-          barFill.style.width = "0%";
-          barFill.style.background = "linear-gradient(135deg, #22c55e, #14b8a6)";
-          status.textContent = "Visit a procrastination site to start a learning session.";
-          panel.style.background = defaultBg;
-          claimRewardBtn.style.display = "none";
-        }
-      } else {
-        const goal = typeof msg.dailyGoal === "number" ? msg.dailyGoal : 0;
-        const progress = typeof msg.dailyProgress === "number" ? msg.dailyProgress : 0;
-        const remaining = Math.max(goal - progress, 0);
-        const percent = goal > 0 ? Math.min(100, (progress / goal) * 100) : 0; // Cap bar at 100% visually
+      // Session complete
+      if (sessionRemaining <= 0 || sessionCompleted) {
+        // Display full completion 
+        progressLabel.textContent = `${formatDuration(sessionGoal)} / ${formatDurationShort(sessionGoal)}`;
+        // Check if daily goal is reached
+        const dailyGoal = typeof msg.dailyGoal === "number" ? msg.dailyGoal : 0;
+        const dailyProgress = typeof msg.dailyProgress === "number" ? msg.dailyProgress : 0;
 
-        barFill.style.width = `${percent}%`;
-        barFill.style.background = "linear-gradient(135deg, #22c55e, #14b8a6)";
-        progressLabel.textContent = goal > 0 ? `${formatDuration(progress)} / ${formatDurationShort(goal)}` : "No goal set yet";
-        heading.textContent = "📚 Learning Session";
-        claimRewardBtn.style.display = "none";
-        panel.style.background = defaultBg;
-
-        if (goal > 0 && remaining === 0) {
-          status.textContent = "Daily goal complete! Great work.";
+        if (dailyGoal > 0 && dailyProgress >= dailyGoal) {
+          // Daily goal reached - show celebration instead of claim button
+          heading.textContent = "🎉 Daily Goal Reached!";
+          status.textContent = "Great work today! Come back tomorrow for more.";
           panel.style.background = "linear-gradient(135deg, #22c55e, #0ea5e9)";
-        } else if (goal > 0) {
-          status.textContent = `Stay focused for ${formatDuration(remaining)} more.`;
-        } else {
-          status.textContent = "Set a goal in Aiki settings to track progress.";
-        }
+          claimRewardBtn.style.display = "none";
+      } else {
+          // Session complete but daily goal not reached - show claim button
+          status.textContent = "Session complete! Claim your reward.";
+          panel.style.background = "linear-gradient(135deg, #22c55e, #0ea5e9)";
+          claimRewardBtn.style.display = "block";
+    }
       }
-    };
+      // Session in progress
+      else {
+        // Display current progress and goal (example: "8 15 s/ 15 min")
+        progressLabel.textContent = `${formatDuration(progress)} / ${formatDurationShort(sessionGoal)}`;
+        status.textContent = `Keep going for ${formatDuration(sessionRemaining)} more.`;
+        // Hide claim button
+        claimRewardBtn.style.display = "none";
+      }
+    }
+    // Idle state - no active session
+    else {
+      // Checks if daily goal has been reached
+      if (msg.dailyGoal > 0 && msg.dailyProgress >= msg.dailyGoal) {
+          heading.textContent = "🎉 Daily Goal Reached!";
+          progressLabel.textContent = `${formatDuration(msg.dailyProgress)} completed`;
+          barFill.style.width = "100%";
+          barFill.style.background = "linear-gradient(135deg, #22c55e, #14b8a6)";
+          status.textContent = "Great work today! Come back tomorrow for more.";
+          panel.style.background = "linear-gradient(135deg, #22c55e, #0ea5e9)";
+      } else {
+        // Display ready state
+        heading.textContent = "📚 Aiki Learning";
+        progressLabel.textContent = "Ready to learn";
+        // Empty progress bar, as no active session yet
+        barFill.style.width = "0%";
+        barFill.style.background = "linear-gradient(135deg, #22c55e, #14b8a6)";
+        // Instructions for user to begin a learning session
+        status.textContent = "Visit a learning site to start a session.";
+        panel.style.background = defaultBg;
+        // Hide claim button
+        claimRewardBtn.style.display = "none";
+      }
+    }
+  };
 
     // Use shared timer port utility
     const timerPort = createTimerPort(update);
@@ -1097,7 +1117,7 @@ const scheduleRewardOverlayEnsure = () => {
     try {
       // Check with background if we're in reward mode
       const data = await browser.runtime.sendMessage({ type: "timer:get" });
-      if (data && data.controlledRewardGoal > 0 && !document.getElementById("aiki-reward-overlay")) {
+      if (data && data.sessionRewardGoal > 0 && !document.getElementById("aiki-reward-overlay")) {
         // Also check if we're on a time wasting site
         const result = await browser.storage.local.get("list");
         const procList = result?.list || [];
@@ -1254,12 +1274,32 @@ function renderProcrastinationRewardOverlay() {
     isCollapsed = !isCollapsed;
     localStorage.setItem(isCollapsedKey, isCollapsed.toString());
     collapseBtn.textContent = isCollapsed ? "▼" : "▲";
+    
+    // Store current position before changing styles
+    const currentLeft = panel.style.left;
+    const currentRight = panel.style.right;
+    const currentTop = panel.style.top;
+    const currentBottom = panel.style.bottom;
+    const currentPosition = panel.style.position;
+    const currentTransform = panel.style.transform;
+    
+    // Update the style
     panel.setAttribute("style", getPanelStyle(isCollapsed, currentBg));
+    
+    // Restore positioning properties
+    if (currentPosition) panel.style.position = currentPosition;
+    if (currentLeft) panel.style.left = currentLeft;
+    if (currentRight) panel.style.right = currentRight;
+    if (currentTop) panel.style.top = currentTop;
+    if (currentBottom) panel.style.bottom = currentBottom;
+    if (currentTransform) panel.style.transform = currentTransform;
+    
     heading.style.display = isCollapsed ? "none" : "block";
     status.style.display = isCollapsed ? "none" : "block";
     barShell.style.height = isCollapsed ? "5px" : "8px";
     progressLabel.style.fontSize = isCollapsed ? "0.9em" : "0.85em";
     progressLabel.style.fontWeight = isCollapsed ? "600" : "400";
+    
     // Hide snooze button when collapsed
     if (isCollapsed && snoozeBtn.style.display !== "none") {
       snoozeBtn.dataset.wasVisible = "true";
@@ -1267,6 +1307,13 @@ function renderProcrastinationRewardOverlay() {
     } else if (!isCollapsed && snoozeBtn.dataset.wasVisible === "true") {
       snoozeBtn.style.display = "block";
     }
+    
+    // Sync the intended position after size change
+    setTimeout(() => {
+      if (dragHandle && dragHandle.syncIntendedPosition) {
+        dragHandle.syncIntendedPosition();
+      }
+    }, 300);
   };
   collapseBtn.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -1290,8 +1337,8 @@ function renderProcrastinationRewardOverlay() {
 
   const update = (msg) => {
     if (!msg) return;
-    const goal = typeof msg.controlledRewardGoal === "number" ? msg.controlledRewardGoal : 0;
-    const remaining = typeof msg.controlledRewardRemaining === "number" ? msg.controlledRewardRemaining : 0;
+    const goal = typeof msg.sessionRewardGoal === "number" ? msg.sessionRewardGoal : 0;
+    const remaining = typeof msg.sessionRewardRemaining === "number" ? msg.sessionRewardRemaining : 0;
 
     if (goal <= 0) {
       cleanup();
@@ -1359,4 +1406,40 @@ function renderProcrastinationRewardOverlay() {
 if (typeof window !== "undefined") {
   window.renderProcrastinationRewardOverlay = renderProcrastinationRewardOverlay;
 }
+
+
+// Check if we're in reward mode when content script loads
+// This ensures the overlay persists across navigations
+(async () => {
+  try {
+    // Small delay to ensure page is ready
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // Check with background if we're in reward mode
+    const data = await browser.runtime.sendMessage({ type: "timer:get" });
+    if (data && data.sessionRewardGoal > 0) {
+      // Get time wasting site list
+      const result = await browser.storage.local.get("list");
+      const timeWastingList = result?.list || [];
+      const timeWastingHosts = timeWastingList.map(item => item?.host || item?.name || "").filter(Boolean);
+
+      // Check if we're on a time wasting site
+      const currentHost = location.hostname.replace(/^www\./, "");
+      const isOnTimeWastingSite = timeWastingHosts.some(host => {
+        const normalizedHost = host.replace(/^www\./, "");
+        return currentHost === normalizedHost ||
+          currentHost.endsWith("." + normalizedHost) ||
+          normalizedHost.endsWith("." + currentHost);
+      });
+
+      // If in reward mode and on a time wasting site, show overlay
+      if (isOnTimeWastingSite) {
+        console.log("[Aiki] Auto-restoring reward overlay on page load");
+        renderProcrastinationRewardOverlay();
+      }
+    }
+  } catch (e) {
+    console.log("[Aiki] Failed to bootstrap reward overlay:", e.message || e);
+  }
+})();
 

@@ -1,6 +1,11 @@
 import browser from "webextension-polyfill";
 import { parseUrl } from "./utilities";
 const storage = browser.storage.local;
+const DEFAULT_SESSION_TIME_MINUTES = 5;
+const DEFAULT_SESSION_TIME_SECONDS = 0;
+const DEFAULT_REWARD_TIME_MINUTES = 2;
+const DEFAULT_REWARD_TIME_SECONDS = 0;
+
 
 /**
  * Factory for creating keyed storage accessors (maps with set/get/remove/clear).
@@ -525,70 +530,6 @@ async function getUserPreferencesId() {
 }
 
 
-
-// Controlled variant session state
-async function setControlledSession(session) {
-  if (session && typeof session === "object") {
-    await storage.set({ controlledSession: session });
-  } else {
-    await storage.remove("controlledSession");
-  }
-}
-
-async function getControlledSession() {
-  const result = await storage.get("controlledSession");
-  return result && result.controlledSession ? result.controlledSession : null;
-}
-
-async function clearControlledSession() {
-  return storage.remove("controlledSession");
-}
-
-// Controlled variant timer settings (session-based, separate from daily goal)
-async function getControlledLearningMinutes() {
-  const result = await storage.get("controlledLearningMinutes");
-  return typeof result.controlledLearningMinutes === "number"
-    ? result.controlledLearningMinutes
-    : 5; // Default 5 minutes
-}
-
-async function setControlledLearningMinutes(minutes) {
-  await storage.set({ controlledLearningMinutes: minutes });
-}
-
-async function getControlledRewardMinutes() {
-  const result = await storage.get("controlledRewardMinutes");
-  return typeof result.controlledRewardMinutes === "number"
-    ? result.controlledRewardMinutes
-    : 15; // Default 15 minutes
-}
-
-async function setControlledRewardMinutes(minutes) {
-  await storage.set({ controlledRewardMinutes: minutes });
-}
-
-async function getControlledLearningSeconds() {
-  const result = await storage.get("controlledLearningSeconds");
-  return typeof result.controlledLearningSeconds === "number"
-    ? result.controlledLearningSeconds
-    : 0; // Default 0 seconds
-}
-
-async function setControlledLearningSeconds(seconds) {
-  await storage.set({ controlledLearningSeconds: seconds });
-}
-
-async function getControlledRewardSeconds() {
-  const result = await storage.get("controlledRewardSeconds");
-  return typeof result.controlledRewardSeconds === "number"
-    ? result.controlledRewardSeconds
-    : 0; // Default 0 seconds
-}
-
-async function setControlledRewardSeconds(seconds) {
-  await storage.set({ controlledRewardSeconds: seconds });
-}
-
 // Global prompt lock (replaces per-tab promptLocks for 10-minute global cooldown)
 
 
@@ -615,6 +556,58 @@ async function setGlobalPromptLock(value) {
 async function removeGlobalPromptLock() {
   // Removes the global lock from browser storage
   return storage.remove("globalPromptLock");
+}
+
+async function getSessionMinutes() {
+  const result = await storage.get("sessionMinutes");
+  if (typeof result.sessionMinutes === "number") {
+    return result.sessionMinutes;
+  } else {
+    return DEFAULT_SESSION_TIME_MINUTES;
+  }
+}
+
+async function setSessionMinutes(minutes) {
+  await storage.set({ sessionMinutes: minutes });
+}
+
+async function getSessionSeconds() {
+  const result = await storage.get("sessionSeconds");
+  if (typeof result.sessionSeconds === "number") {
+    return result.sessionSeconds;
+  } else {
+    return DEFAULT_SESSION_TIME_SECONDS;
+  }
+}
+
+async function setSessionSeconds(seconds) {
+  await storage.set({ sessionSeconds: seconds });
+}
+
+async function getSessionRewardMinutes() {
+  const result = await storage.get("sessionRewardMinutes");
+  if (typeof result.sessionRewardMinutes === "number") {
+    return result.sessionRewardMinutes;
+  } else {
+    return DEFAULT_REWARD_TIME_MINUTES;
+  }
+}
+
+async function setSessionRewardMinutes(minutes) {
+  await storage.set({ sessionRewardMinutes: minutes });
+}
+
+async function getSessionRewardSeconds() {
+  const result = await storage.get("sessionRewardSeconds");
+  if (typeof result.sessionRewardSeconds === "number") {
+    return result.sessionRewardSeconds;
+  } else {
+    return DEFAULT_REWARD_TIME_SECONDS; 
+  }
+}
+
+async function setSessionRewardSeconds(seconds) {
+  await storage.set({ sessionRewardSeconds: seconds });
 }
 
 
@@ -690,16 +683,11 @@ export default {
     remove: activeSessionsStore.remove,
     clear: activeSessionsStore.clear,
   },
-  controlledSession: {
-    get: getControlledSession,
-    set: setControlledSession,
-    clear: clearControlledSession,
-  },
-  controlledTimerSettings: {
-    learningMinutes: { get: getControlledLearningMinutes, set: setControlledLearningMinutes },
-    learningSeconds: { get: getControlledLearningSeconds, set: setControlledLearningSeconds },
-    rewardMinutes: { get: getControlledRewardMinutes, set: setControlledRewardMinutes },
-    rewardSeconds: { get: getControlledRewardSeconds, set: setControlledRewardSeconds },
-  },
+  sessionSettings: {  // All session and reward based storage settings
+  sessionMinutes: { get: getSessionMinutes, set: setSessionMinutes },
+  sessionSeconds: { get: getSessionSeconds, set: setSessionSeconds },
+  rewardMinutes: { get: getSessionRewardMinutes, set: setSessionRewardMinutes },
+  rewardSeconds: { get: getSessionRewardSeconds, set: setSessionRewardSeconds },
+},
   forgetOrigin: () => storage.remove("origin"),
 };
