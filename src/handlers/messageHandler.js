@@ -14,31 +14,28 @@ if (!message || typeof message !== "object") {
   }
 
   if (message.type === "timer:get") {
-    return (async () => {
-      try {
-        await timer.sync();
-      } catch (_) { }
+    try {
+    await timer.sync();
+    } catch (_) {
+        console.warn("[Background] Failed to sync timer on timer:get:", _);
+     }
       const timeData = timer.getTime();
       return { ...timeData, isControlledVariant: false };
-    })();
-  }
-
+    };
 
   if (message.type === "learning:autoStart") {
-    return (async () => {
-      try {
-        if (!timer.isLearningSessionActive()) {
-          await timer.startLearningSession();
-        }
-      } catch (_) { }
+    try {
+    if (!timer.isLearningSessionActive()) {
+        await timer.startLearningSession();
+    }
+    } catch (_) {
+        console.warn("[Background] Failed to start learning session on learning:autoStart:", _);
+    }
       return true;
-    })();
-  }
+    };
 
   if (message.type === "blocker:release" && sender && sender.tab && sender.tab.id !== undefined) {
     storage.blockedTabs.remove(sender.tab.id);
     storage.blockedOrigins.remove(sender.tab.id);
   }
-
-
 }
