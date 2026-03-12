@@ -41,6 +41,13 @@ browser.runtime.onMessage.addListener((message, sender) => {
           return { goalReached: true };
         }
         
+        // Check if the user is on reward time
+        // If they are, then don't start a new session immediately 
+        if (timer.isSessionRewardActive()) {
+          console.log("[Session] User is in reward mode, not starting new session");
+          return { inRewardMode: true };
+        }
+        
         // Get session duration from settings (minutes + seconds)
         const sessionMinutes = await storage.sessionSettings.sessionMinutes.get();
         const sessionSeconds = await storage.sessionSettings.sessionSeconds.get();
@@ -136,34 +143,97 @@ browser.runtime.onMessage.addListener((message, sender) => {
         
         // Start reward timer with callback to show redirect prompt when done
         await timer.startSessionRewardTimer(rewardDuration, async () => {
-          console.log("[Session] Reward complete! Showing redirect prompt...");
+          console.log("[Session] Reward complete!");
           
           // Re-enable redirects when reward time expires
           await storage.shouldRedirect.set(true);
           
-          // Show prompt on the time wasting site
+          // Check if user is on a time wasting site before showing redirect prompt
           try {
             const tabs = await browser.tabs.query({ active: true, currentWindow: true });
-            if (tabs.length > 0 && tabs[0].id) {
+            if (tabs.length > 0 && tabs[0].id && tabs[0].url) {
+              const currentUrl = tabs[0].url;
               const learningUrl = await storage.learningUri.get();
               
-              // Handles the redirect prompt response
-              const response = await browser.tabs.sendMessage(tabs[0].id, {
-                action: "display: redirectPrompt",
-                url: learningUrl,
-                originUrl: timeWastingUrl
-              });
+              // Checks if URL matches learning site
+              const isOnLearningSite = (url, learningUri) => {
+                if (!learningUri || !url) return false;
+                try {
+                  const learningHost = new URL(learningUri).hostname.replace(/^www\./, "");
+                  const currentHost = new URL(url).hostname.replace(/^www\./, "");
+                  return (
+                    learningHost === currentHost ||
+                    currentHost.endsWith(`.${learningHost}`) ||
+                    learningHost.endsWith(`.${currentHost}`)
+                  );
+                } catch (_) {
+                  return false;
+                }
+              };
               
-              // If user clicks "Redirect", then navigate to the learning site
-              if (response && response.action === "redirect") {
-                console.log("[Session] User chose to redirect to learning");
-                await browser.tabs.update(tabs[0].id, { url: learningUrl });
+              // Checks if URL matches a time wasting site
+              const isOnTimeWastingSite = async (url) => {
+                try {
+                  const currentHost = new URL(url).hostname.replace(/^www\./, "");
+                  const timeWasteList = await storage.list.get();
+                  const procHosts = (timeWasteList || []).map(item => item?.host || item?.name || "").filter(Boolean);
+                  
+                  return procHosts.some(host => {
+                    const normalizedHost = host.replace(/^www\./, "");
+                    return currentHost === normalizedHost ||
+                      currentHost.endsWith("." + normalizedHost) ||
+                      normalizedHost.endsWith("." + currentHost);
+                  });
+                } catch (_) {
+                  return false;
+                }
+              };
+              
+              // Only show redirect prompt if on time wasting site
+              if (await isOnTimeWastingSite(currentUrl)) {
+                console.log("[Session] On time wasting site, showing redirect prompt");
+                
+                // Show redirect prompt
+                const response = await browser.tabs.sendMessage(tabs[0].id, {
+                  action: "display: redirectPrompt",
+                  url: learningUrl,
+                  originUrl: timeWastingUrl
+                });
+                
+                // If user clicks "Redirect", navigate to learning site
+                if (response && response.action === "redirect") {
+                  console.log("[Session] User chose to redirect to learning");
+                  await browser.tabs.update(tabs[0].id, { url: learningUrl });
+                } else {
+                  console.log("[Session] User chose to stay on time wasting site");
+                }
+              } else if (isOnLearningSite(currentUrl, learningUrl)) {
+                console.log("[Session] On learning site, starting new session");
+                // Trigger session start on learning site
+                try {
+                  await browser.tabs.sendMessage(tabs[0].id, {
+                    action: "display: encouragement"
+                  });
+                } catch (e) {
+                  console.log("[Session] Failed to send encouragement message:", e);
+                }
+                // Also trigger learning:autoStart to begin a new session
+                // This will start the session timer and show the learning overlay
+                await (async () => {
+                  const sessionMinutes = await storage.sessionSettings.sessionMinutes.get();
+                  const sessionSeconds = await storage.sessionSettings.sessionSeconds.get();
+                  const sessionDuration = (sessionMinutes * 60 * 1000) + (sessionSeconds * 1000);
+                  
+                  await timer.startSessionTimer(sessionDuration, () => {
+                    console.log("[Session] Session complete!");
+                  });
+                })();
               } else {
-                console.log("[Session] User chose to stay on time wasting site");
+                console.log("[Session] On neutral site, no action needed");
               }
             }
           } catch (e) {
-            console.error("[Session] Failed to show redirect prompt:", e);
+            console.error("[Session] Failed to handle reward completion:", e);
           }
         });
         
