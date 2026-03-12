@@ -71,6 +71,15 @@ class PromptCoordinator {
 
   async renderContentBlocker(details) {
     if (details.frameId === 0) {
+      // Check if reward timer is active - if so, don't block
+      try {
+        const timer = await import("./TimerManager");
+        if (timer.default.isSessionRewardActive()) {
+          console.log("[PromptCoordinator] Skipping blocker - reward mode active");
+          return;
+        }
+      } catch (_) { }
+
       storage.blockedTabs.add(details.tabId);
       if (details.url) {
         storage.blockedOrigins.add(details.tabId, details.url);
