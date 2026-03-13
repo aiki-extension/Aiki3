@@ -19,8 +19,8 @@
   import SetRedirection from "./Components/Settings/SetRedirection.svelte";
   import AikiDescription from "./Components/Settings/AikiDescription.svelte";
 
-  $: user = "";
-  $: userIsRegistered = false;
+  let user = "";
+  let userIsRegistered = false;
 
   const port = browser.runtime.connect({
   name: "Settings Communication"

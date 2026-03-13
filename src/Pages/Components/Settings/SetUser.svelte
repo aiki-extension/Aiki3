@@ -181,36 +181,38 @@
           />
         {/if}
 
-        <button class="btn btn-primary submit-button" type="submit"
-          ><Fa icon={faUserPlus} />
-          {authMode === "register" ? "Register" : "Login"}</button
-        >
+        <button class="btn btn-primary submit-button" type="submit">
+          <Fa icon={faUserPlus} />
+          {authMode === "register" ? "Register" : "Login"}
+        </button>
 
         <div class="auth-switch-copy">
           {#if authMode === "register"}
-            <span>Already have an account?</span>
-            <a
-              href="#login"
-              class="auth-switch-link"
-              on:click|preventDefault={() => {
-                authMode = "login";
-                resetFormFields({ keepUser: true });
-              }}
-            >
-              Log in here
-            </a>
+            <span>Already have an account?
+              <a
+                href="#login"
+                class="auth-switch-link"
+                on:click|preventDefault={() => {
+                  authMode = "login";
+                  resetFormFields({ keepUser: true });
+                }}
+              >
+                Log in here
+              </a>
+            </span>
           {:else}
-            <span>Don't have an account?</span>
-            <a
-              href="#register"
-              class="auth-switch-link"
-              on:click|preventDefault={() => {
-                authMode = "register";
-                resetFormFields({ keepUser: true });
-              }}
-            >
-              Sign up here
-            </a>
+            <span>Don't have an account?
+              <a
+                href="#register"
+                class="auth-switch-link"
+                on:click|preventDefault={() => {
+                  authMode = "register";
+                  resetFormFields({ keepUser: true });
+                }}
+              >
+                Sign up here
+              </a>
+            </span>
           {/if}
         </div>
       </form>
@@ -236,11 +238,11 @@
 
 <style>
   h5 {
-    font-family: var(--fontHeaders);
+    font-family: var(--fontHeaders),serif;
   }
 
   p {
-    font-family: var(--fontContent);
+    font-family: var(--fontContent),serif;
     font-size: var(--fontSizeSettings);
   }
 
