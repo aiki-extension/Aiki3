@@ -1,5 +1,5 @@
 <!-- This component is rendered as a block on the settings 
-  page for users to input their UID for logging purposes.
+  page for users to register or log in with their email.
   Used in / Parent components: /src/Pages/Settings.svelte
 -->
 <script>
@@ -14,40 +14,105 @@
   export let userIsRegistered;
   export let port;
   let toastCoords = { y: "id-input-field", x: "user-settings" };
-  let previousUser = "";
+  let authMode = "login";
+  let password = "";
+  let confirmPassword = "";
+  const basicEmailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-  async function setup() {
-    user = await storage.uid.get();
-    userIsRegistered = user !== "" ? true : false;
-    previousUser = user || "";
+  // Trimming whitespace and converting to lowercase.
+  function normalizeUser(value) {
+    return typeof value === "string" ? value.trim().toLowerCase() : "";
+  }
+  
+  function resetFormFields({ keepUser = false } = {}) {
+    if (!keepUser) {
+      user = "";
+    }
+    password = "";
+    confirmPassword = "";
+  }
+  
+  function isValidEmail(value) {
+    return basicEmailRegex.test(value);
   }
 
-  async function confirmUid() {
-    const confirmation = confirm(
-      "Are you certain the provided email is correct?"
-    );
-    if (confirmation) {
-      storage.uid.set(user);
-      previousUser = user;
-      userIsRegistered = true;
-      port.postMessage(`Update: user`);
-      setTimeout(() => {
-        toast.push("User registered!", {
-          theme: themes.successTheme(toastCoords),
-        });
-      }, 500);
+  function isAuthFormValid() {
+    const normalizedUser = normalizeUser(user);
+    user = normalizedUser;
+
+    if (!normalizedUser) {
+      toast.push("Please enter your email before submitting.", {
+        theme: themes.warningTheme(toastCoords),
+      });
+      return false;
     }
+
+    if (!isValidEmail(normalizedUser)) {
+      toast.push("Please enter a valid email address.", {
+        theme: themes.warningTheme(toastCoords),
+      });
+      return false;
+    }
+
+    if (!password.trim()) {
+      toast.push("Please enter your password before submitting.", {
+        theme: themes.warningTheme(toastCoords),
+      });
+      return false;
+    }
+
+    if (authMode === "register") {
+      if (!confirmPassword.trim()) {
+        toast.push("Please re-enter your password to confirm it.", {
+          theme: themes.warningTheme(toastCoords),
+        });
+        return false;
+      }
+
+      if (password !== confirmPassword) {
+        toast.push("The passwords do not match.", {
+          theme: themes.warningTheme(toastCoords),
+        });
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  async function setup() {
+    user = normalizeUser(storage.uid.get());
+    userIsRegistered = user !== "";
+  }
+
+  async function submitAuth() {
+    if (!isAuthFormValid()) {
+      return;
+    }
+    
+    storage.uid.set(user);
+    userIsRegistered = true;
+    resetFormFields({ keepUser: true });
+    port.postMessage(`Update: user`);
+    setTimeout(() => {
+      toast.push(
+        authMode === "register" ? "Registration successful!" : "Login successful!",
+        {
+        theme: themes.successTheme(toastCoords),
+        }
+      );
+    }, 500);
   }
 
   async function resetUid() {
     const confirmation = confirm(
-      "Are you certain you want to reset your email?"
+      "Are you sure you want to sign out?"
     );
     if (confirmation) {
       storage.uid.set("");
       userIsRegistered = false;
-      user = "";
-      previousUser = "";
+      resetFormFields();
+      authMode = "login";
       port.postMessage(`Update: user`);
     }
   }
@@ -55,32 +120,110 @@
   setup();
 </script>
 
-<Container id="user-settings" headline="Register Email">
+<Container id="user-settings" headline="Account Access">
   {#if userIsRegistered}
-    <h5>Registered Email:</h5>
-    <input
-      id="id-input-field"
-      class="form-control"
-      type="text"
-      placeholder={user}
-      readonly
-    />
+    <!--
+    We will have to rethink showing the mail,
+    since it will be encrypted in the database.
+    An idea is to make the user input a mail, and
+    make a check upon the hashed mail to see if there's a match.    
+    -->
+    <h5>Signed in email:</h5>
+    <div class="auth-field-wrap">
+      <input
+        id="id-input-field"
+        class="form-control signed-in-input"
+        type="email"
+        value={user}
+        readonly
+      />
+    </div>
     <button
       class="btn btn-danger"
       on:click={resetUid}
-      data-tooltip="Removes your email. 
-      WARNING: Aiki cannot log your activity if you do not provide it with an email."
-      ><Fa icon={faUserSlash} /> Remove Email</button
+      data-tooltip="Signs you out of Aiki. 
+      WARNING: Aiki cannot log your activity if you are not signed in."
+      ><Fa icon={faUserSlash} /> Sign Out</button
     >
   {:else}
-    <h5>Add your email here so we can log your activity:</h5>
+    <h5>
+      {#if authMode === "register"}
+        Create your account
+      {:else}
+        Sign in to continue
+      {/if}
+    </h5>
+    <div class="auth-form-wrap">
+      <form class="auth-form" on:submit|preventDefault={submitAuth}>
+        <input
+          id="id-input-field"
+          bind:value={user}
+          type="email"
+          class="form-control auth-input"
+          placeholder="Enter your email here..."
+          autocomplete="email"
+        />
+        <input
+          type="password"
+          bind:value={password}
+          class="form-control auth-input"
+          placeholder="Enter your password..."
+          autocomplete={authMode === "register" ? "new-password" : "current-password"}
+        />
+
+        {#if authMode === "register"}
+          <input
+            bind:value={confirmPassword}
+            type="password"
+            class="form-control auth-input"
+            placeholder="Re-enter your password..."
+            autocomplete="new-password"
+          />
+        {/if}
+
+        <button class="btn btn-primary submit-button" type="submit"
+          ><Fa icon={faUserPlus} />
+          {authMode === "register" ? "Register" : "Login"}</button
+        >
+
+        <div class="auth-switch-copy">
+          {#if authMode === "register"}
+            <span>Already have an account?</span>
+            <a
+              href="#login"
+              class="auth-switch-link"
+              on:click|preventDefault={() => {
+                authMode = "login";
+                resetFormFields({ keepUser: true });
+              }}
+            >
+              Log in here
+            </a>
+          {:else}
+            <span>Don't have an account?</span>
+            <a
+              href="#register"
+              class="auth-switch-link"
+              on:click|preventDefault={() => {
+                authMode = "register";
+                resetFormFields({ keepUser: true });
+              }}
+            >
+              Sign up here
+            </a>
+          {/if}
+        </div>
+      </form>
+    </div>
+
     <hr />
+    <h5>Note</h5>
     <p>
-      <strong>Note:</strong> Please use the same email you used when signing up for this study.
+      Please use the same email you used when signing up for this study.
     </p>
     <p>
-      Secondly, please note that you may be asked to re-enter your email if you
-      clear your cache or browser history, in order for us to resume logging.
+      If you clear your cache or browser history, you may need to log in again
+      before we can resume logging your activity.
     </p>
     <p>
       If you have any questions or problems, contact <a
@@ -88,25 +231,6 @@
       >
       for assistance.
     </p>
-
-    <hr />
-    <!-- Bootstrap Input field. -->
-    <!-- https://getbootstrap.com/docs/4.0/components/input-group/ -->
-    <div class="input-group mb-3">
-      <input
-        bind:value={user}
-        type="text"
-        class="form-control"
-        placeholder="Enter your email here..."
-        aria-label=""
-        aria-describedby="basic-addon2"
-      />
-      <div class="input-group-append">
-        <button on:click={confirmUid} class="btn btn-primary" type="button"
-          ><Fa icon={faUserPlus} /> Submit</button
-        >
-      </div>
-    </div>
   {/if}
 </Container>
 
@@ -122,5 +246,46 @@
 
   hr {
     background-color: var(--hrColor);
+  }
+
+  .auth-form {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+    width: 100%;
+  }
+
+  .auth-form-wrap,
+  .auth-field-wrap {
+    width: min(100%, 20rem);
+    max-width: 20rem;
+  }
+
+  .auth-input,
+  .signed-in-input {
+    display: block;
+    width: 100% !important;
+    max-width: 20rem !important;
+    box-sizing: border-box;
+    flex: 0 0 auto;
+  }
+
+  .submit-button {
+    align-self: flex-start;
+  }
+
+  .auth-switch-copy {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.2rem;
+    margin-top: 0.15rem;
+  }
+
+  .auth-switch-link {
+    color: var(--buttonPrimary, #007bff);
+    cursor: pointer;
+    text-decoration: underline;
   }
 </style>

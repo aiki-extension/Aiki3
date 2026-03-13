@@ -1,6 +1,7 @@
 /node_modules/
 /public/build/
 /.vscode/
+/.idea/
 
 .secret
 back4app.secret

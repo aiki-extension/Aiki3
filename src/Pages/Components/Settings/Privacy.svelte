@@ -7,7 +7,7 @@ import Container from "./Container.svelte";
 </script>
 
 <Container headline="Your Privacy">
-<h5>We want you to know we take your privacy very seriously:</h5>
+<h5>We want you to know we take your privacy very seriously</h5>
 <hr>
 <p>For the duration of this study, Aiki will be logging the amount of time you spend on websites that
     you add to it as time wasting sites. However, Aiki will only log the time spent (in seconds) on each 
