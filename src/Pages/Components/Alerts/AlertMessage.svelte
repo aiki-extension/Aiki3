@@ -1,6 +1,6 @@
 <script>
   import { fade, fly } from 'svelte/transition';
-  import { alertStore } from './alertService';
+  import { alertStore } from '../../../services/alertService';
 
   export let alert; // { id, type: 'success' | 'error' | 'warning' | 'info', message, dismissible, time }
 
@@ -15,14 +15,14 @@
 
 <div 
   class="alert alert-{alert.type}" 
-  in:fly={{ y: -20, duration: alert.time }} 
+  in:fly={{ x: -40, y: 0, duration: 600 }} 
   out:fade
 >
   <span class="icon">{icons[alert.type]}</span>
   <p>{alert.message}</p>
-  <if alert.dismissible>
-    <button on:click={() => alertStore.remove(alert.id)}>Close</button>
-  </if>
+  {#if alert.dismissible}
+    <button class="close" on:click={() => alertStore.remove(alert.id)}>X</button>
+  {/if}
 </div>
 
 <style>
@@ -34,4 +34,16 @@
   .alert-error { background: #F0EEE9; border: 1px solid #dc3545; }
   .alert-info { background: #F0EEE9; border: 1px solid rgb(96, 81, 82); }
   .alert-warning { background: #F0EEE9; border: 1px solid #cb911d; }
+
+  .close {
+    position: absolute;
+    top: 4px;
+    right: 8px;
+    border: none;
+    background: transparent;
+    font-size: 0.9rem;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+  }
 </style>
