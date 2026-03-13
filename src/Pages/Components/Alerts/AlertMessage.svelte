@@ -27,8 +27,18 @@
 
 <style>
   /* Base styles for all alerts */
-  .alert { padding: 1rem; border-radius: 8px; display: flex; gap: 10px; }
-  
+  .alert { 
+    padding: 1rem; 
+    border-radius: 8px; 
+    display: flex; 
+    gap: 10px; 
+  }
+
+  .alert p {
+    margin: 0;
+    transform: translateY(2px); /* subtle downward nudge */
+  }
+
   /* Type-specific styles */
   .alert-success { background: #F0EEE9; border: 1px solid #28a745; }
   .alert-error { background: #F0EEE9; border: 1px solid #dc3545; }

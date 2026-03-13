@@ -7,13 +7,10 @@
   import storage from "../../../util/storage";
   import Fa from "svelte-fa";
   import { faUserSlash, faUserPlus } from "@fortawesome/free-solid-svg-icons";
-  import { toast } from "@zerodevx/svelte-toast";
-  import * as themes from "./util/toastThemes";
 
   export let user = "";
   export let userIsRegistered;
   export let port;
-  let toastCoords = { y: "id-input-field", x: "user-settings" };
   let previousUser = "";
 
   async function setup() {
@@ -32,9 +29,12 @@
       userIsRegistered = true;
       port.postMessage(`Update: user`);
       setTimeout(() => {
-        toast.push("User registered!", {
-          theme: themes.successTheme(toastCoords),
-        });
+        alertStore.add({
+          type: 'success',
+          message: 'User registered!',
+          time: 5000,
+          dismissible: true
+        })
       }, 500);
     }
   }
