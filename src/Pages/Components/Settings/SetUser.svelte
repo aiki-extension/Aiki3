@@ -3,6 +3,7 @@
   Used in / Parent components: /src/Pages/Settings.svelte
 -->
 <script>
+  import { onMount } from "svelte";
   import Container from "./Container.svelte";
   import storage from "../../../util/storage";
   import Fa from "svelte-fa";
@@ -13,10 +14,11 @@
   export let user = "";
   export let userIsRegistered;
   export let port;
-  let toastCoords = { y: "id-input-field", x: "user-settings" };
+  const toastCoords = { y: "id-input-field", x: "user-settings" };
   let authMode = "login";
   let password = "";
   let confirmPassword = "";
+  let isSubmitting = false;
   const basicEmailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
   // Trimming whitespace and converting to lowercase.
@@ -36,43 +38,81 @@
     return basicEmailRegex.test(value);
   }
 
+  function notifyWarning(message) {
+    toast.push(message, {
+      theme: themes.warningTheme(toastCoords),
+    });
+  }
+
+  function notifySuccess(message) {
+    toast.push(message, {
+      theme: themes.successTheme(toastCoords),
+    });
+  }
+
+  function persistSessionLocally(nextUser, token) {
+    storage.uid.set(nextUser);
+    // TODO(api): Save the JWT returned from the backend in storage, fx: storage.token.set(token);
+    
+    void token; // Temporary: keep `token` referenced until backend JWT storage is implemented.
+    
+    user = nextUser;
+    userIsRegistered = true;
+    port?.postMessage("Update: user");
+  }
+
+  function clearSessionLocally() {
+    storage.uid.set("");
+    user = "";
+    userIsRegistered = false;
+    port?.postMessage("Update: user");
+  }
+
+  async function authenticateWithBackend({ mode, email, plainTextPassword }) {
+    // TODO(api): Use a real auth call when backend integration has been set up.
+    // If auth mode is login:
+    if (authMode === "login") {
+      // call login function with login endpoint
+    } else if (authMode === "register") {
+      // call register function with register endpoint
+    }
+    
+    
+    // Temporary: these placeholders prevent unused-parameter warnings until
+    // login/register backend requests are implemented.
+    void email;
+    void plainTextPassword;
+    void mode;
+    return { ok: true, message: "", token: null };
+  }
+
   function isAuthFormValid() {
     const normalizedUser = normalizeUser(user);
     user = normalizedUser;
 
     if (!normalizedUser) {
-      toast.push("Please enter your email before submitting.", {
-        theme: themes.warningTheme(toastCoords),
-      });
+      notifyWarning("Please enter your email before submitting.");
       return false;
     }
 
     if (!isValidEmail(normalizedUser)) {
-      toast.push("Please enter a valid email address.", {
-        theme: themes.warningTheme(toastCoords),
-      });
+      notifyWarning("Please enter a valid email address.");
       return false;
     }
 
     if (!password.trim()) {
-      toast.push("Please enter your password before submitting.", {
-        theme: themes.warningTheme(toastCoords),
-      });
+      notifyWarning("Please enter your password before submitting.");
       return false;
     }
 
     if (authMode === "register") {
       if (!confirmPassword.trim()) {
-        toast.push("Please re-enter your password to confirm it.", {
-          theme: themes.warningTheme(toastCoords),
-        });
+        notifyWarning("Please re-enter your password to confirm it.");
         return false;
       }
 
       if (password !== confirmPassword) {
-        toast.push("The passwords do not match.", {
-          theme: themes.warningTheme(toastCoords),
-        });
+        notifyWarning("The passwords do not match.");
         return false;
       }
     }
@@ -80,44 +120,54 @@
     return true;
   }
 
-  async function setup() {
+  function setup() {
     user = normalizeUser(storage.uid.get());
     userIsRegistered = user !== "";
   }
 
   async function submitAuth() {
-    if (!isAuthFormValid()) {
+    if (isSubmitting || !isAuthFormValid()) {
       return;
     }
-    
-    storage.uid.set(user);
-    userIsRegistered = true;
-    resetFormFields({ keepUser: true });
-    port.postMessage(`Update: user`);
-    setTimeout(() => {
-      toast.push(
-        authMode === "register" ? "Registration successful!" : "Login successful!",
-        {
-        theme: themes.successTheme(toastCoords),
-        }
-      );
-    }, 500);
-  }
 
-  async function resetUid() {
-    const confirmation = confirm(
-      "Are you sure you want to sign out?"
-    );
-    if (confirmation) {
-      storage.uid.set("");
-      userIsRegistered = false;
-      resetFormFields();
-      authMode = "login";
-      port.postMessage(`Update: user`);
+    isSubmitting = true;
+    const normalizedUser = normalizeUser(user);
+    user = normalizedUser;
+
+    try {
+      const authResult = await authenticateWithBackend({
+        mode: authMode,
+        email: normalizedUser,
+        plainTextPassword: password,
+      });
+
+      if (!authResult?.ok) {
+        notifyWarning(authResult?.message || "Authentication failed. Please try again.");
+        return;
+      }
+
+      persistSessionLocally(normalizedUser, authResult.token);
+      resetFormFields({ keepUser: true });
+      notifySuccess(authMode === "register" ? "Registration successful!" : "Login successful!");
+    } finally {
+      isSubmitting = false;
     }
   }
 
-  setup();
+  function resetUid() {
+    if (!confirm("Are you sure you want to sign out?")) {
+      return;
+    }
+
+    // Sign-out is local-only. Clear the stored session (uid + JWT).
+    // TODO(api): Also clear JWT when token is implemented.
+    clearSessionLocally();
+    resetFormFields();
+    authMode = "login";
+    notifySuccess("You have been signed out.");
+  }
+
+  onMount(setup);
 </script>
 
 <Container id="user-settings" headline="Account Access">
@@ -162,6 +212,9 @@
           class="form-control auth-input"
           placeholder="Enter your email here..."
           autocomplete="email"
+          on:blur={() => {
+            user = normalizeUser(user);
+          }}
         />
         <input
           type="password"
@@ -181,9 +234,9 @@
           />
         {/if}
 
-        <button class="btn btn-primary submit-button" type="submit">
+        <button class="btn btn-primary submit-button" type="submit" disabled={isSubmitting}>
           <Fa icon={faUserPlus} />
-          {authMode === "register" ? "Register" : "Login"}
+          {isSubmitting ? "Please wait..." : authMode === "register" ? "Register" : "Login"}
         </button>
 
         <div class="auth-switch-copy">
