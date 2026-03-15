@@ -7,14 +7,29 @@ function createAlertStore() {
   return {
     subscribe,
     
-    // Add a new alert
+    /**
+     * Adds a new alert to the store.
+     *
+     * The alert is displayed immediately and is automatically removed after `time`
+     * milliseconds (unless `time` is `0` or less). The store keeps at most 2
+     * alerts visible at the same time.
+     *
+     * @param {{
+     *   message?: string,
+     *   type?: 'info' | 'success' | 'warning' | 'error',
+     *   dismissible?: boolean,
+     *   time?: number,
+     *   [key: string]: any
+     * }} options Alert configuration.
+     * @returns {void}
+     */
     add: (options) => {
         // Defaults in case some parameters aren't passed
         const alert = {
             id: crypto.randomUUID(),
             type: 'info',
             dismissible: true,
-            time: 3000, // 3 seconds default
+            time: 5000, // 5 seconds default
             ...options
         };
 
@@ -36,7 +51,12 @@ function createAlertStore() {
         }
     },
     
-    // Remove a specific alert by ID
+    /**
+     * Removes a specific alert from the store by its unique ID.
+     *
+     * @param {string} id The alert ID to remove.
+     * @returns {void}
+     */
     remove: (id) => {
       update(alerts => alerts.filter(a => a.id !== id));
     }

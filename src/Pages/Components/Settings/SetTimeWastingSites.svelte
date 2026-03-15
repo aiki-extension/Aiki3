@@ -70,7 +70,6 @@
     alertStore.add({
         type: 'success',
         message: 'Website removed!',
-        time: 5000,
         dismissible: true
       })
   }
@@ -80,7 +79,6 @@
       alertStore.add({
         type: 'warning',
         message: 'Input cannot be empty!',
-        time: 5000,
         dismissible: true
       })
       return;
@@ -94,7 +92,6 @@
       alertStore.add({
         type: 'warning',
         message: 'This site is set as your redirection!',
-        time: 5000,
         dismissible: true
       })
       return;
@@ -104,7 +101,6 @@
       alertStore.add({
         type: 'warning',
         message: 'Website already among your time wasters!',
-        time: 5000,
         dismissible: true
       })
       return;
@@ -121,7 +117,6 @@
       alertStore.add({
         type: 'success',
         message: 'New Website Added!',
-        time: 5000,
         dismissible: true
       })
     }

@@ -32,7 +32,6 @@
         alertStore.add({
           type: 'success',
           message: 'User registered!',
-          time: 5000,
           dismissible: true
         })
       }, 500);
