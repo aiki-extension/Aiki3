@@ -24,25 +24,26 @@ if (!message || typeof message !== "object") {
       return timeData;
     })();
   }
+  
   if (message.type === "auth:login") {
-  return (async () => {
-    const result = await loginUser({ email: message.email, password: message.password });
-    if (result instanceof Error) {
-      return { ok: false, message: result.message, token: null };
-    }
-    return { ok: true, message: "", token: result.token ?? null };
-  })();
-}
+    return (async () => {
+      const result = await loginUser({ email: message.email, password: message.password });
+      if (result instanceof Error) {
+        return { ok: false, message: result.message, token: null };
+      }
+      return { ok: true, message: "", token: result.token ?? null };
+    })();
+  }
 
-if (message.type === "auth:register") {
-  return (async () => {
-    const result = await registerUser({ email: message.email, password: message.password });
-    if (result instanceof Error) {
-      return { ok: false, message: result.message, token: null };
-    }
-    return { ok: true, message: "", token: result.token ?? null };
-  })();
-}
+  if (message.type === "auth:register") {
+    return (async () => {
+      const result = await registerUser({ email: message.email, password: message.password });
+      if (result instanceof Error) {
+        return { ok: false, message: result.message, token: null };
+      }
+      return { ok: true, message: "", token: result.token ?? null };
+    })();
+  }
 
 
   if (message.type === "learning:autoStart") {
