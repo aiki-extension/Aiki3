@@ -19,8 +19,8 @@
   import AikiDescription from "./Components/Settings/AikiDescription.svelte";
   import Alerts from "./Components/Alerts/AlertContainer.svelte";
 
-  $: user = "";
-  $: userIsRegistered = false;
+  let user = "";
+  let userIsRegistered = false;
 
   const port = browser.runtime.connect({
   name: "Settings Communication"
