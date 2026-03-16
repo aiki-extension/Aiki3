@@ -7,7 +7,6 @@
 <script>
   /*Functional and module imports*/
   import browser from "webextension-polyfill";
-  import { SvelteToast } from "@zerodevx/svelte-toast";
 
   /*Components import*/
   import Footer from "./Components/Settings/Footer.svelte";
@@ -18,6 +17,7 @@
   import Statistics from "./Components/Settings/Statistics.svelte";
   import SetRedirection from "./Components/Settings/SetRedirection.svelte";
   import AikiDescription from "./Components/Settings/AikiDescription.svelte";
+  import Alerts from "./Components/Alerts/AlertContainer.svelte";
 
   let user = "";
   let userIsRegistered = false;
@@ -28,6 +28,7 @@
 </script>
 
 <div class="settings">
+  <Alerts />
   <Header />
   <main>
     {#if !userIsRegistered}
@@ -55,7 +56,6 @@
   </main>
   <Footer />
 </div>
-<SvelteToast options={{ reversed: true, intro: { x: 192 } }} />
 
 <style>
   .settings {

@@ -7,6 +7,7 @@
 <script>
 import Popup from './Pages/Popup.svelte'
 import Options from './Pages/Settings.svelte'
+import Alerts from './Pages/Components/Alerts/AlertContainer.svelte'
 
 let selected = Popup;
 
@@ -22,4 +23,5 @@ switch (new URL(window.location).searchParams.get("page")) {
 
 <svelte:component this={selected} />
 
-
+<!-- Root level container, able to access *store anywhere -->
+<Alerts/>
