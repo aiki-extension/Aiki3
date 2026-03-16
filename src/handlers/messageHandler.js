@@ -1,6 +1,6 @@
 import storage from "../util/storage";
 import timer from "../services/TimerManager";
-//import api from "./services/apiService";
+import api from "../services/apiService";
 /*
 This module handles incoming messages from content scripts and other parts of the extension. 
 It processes different message types, such as timer requests, learning session management, and blocker release commands. 
@@ -37,5 +37,15 @@ if (!message || typeof message !== "object") {
   if (message.type === "blocker:release" && sender && sender.tab && sender.tab.id !== undefined) {
     storage.blockedTabs.remove(sender.tab.id);
     storage.blockedOrigins.remove(sender.tab.id);
+  }
+
+  if (message.type === "api:getUserData") {
+    try {
+      const userData = await api.getUserData();
+      return userData;
+    } catch (error) {
+      console.error("Failed to get user data:", error);
+      return { error: "Failed to fetch user data" };
+    }
   }
 }
