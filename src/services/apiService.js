@@ -26,12 +26,12 @@ async function apiCall(endpoint, method = "GET", data = null) {
   try {
     const response = await fetch(url, options);
     if (!response.ok) {
-      throw new Error(`API call failed: ${response.statusText}`);
+      return new Error(`API call failed: ${response.statusText}`);
     }
     return await response.json();
   } catch (error) {
     console.error("API call error:", error);
-    throw error;
+    return error;
   }
 }
 /*
