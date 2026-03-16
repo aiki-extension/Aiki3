@@ -8,7 +8,7 @@ which will be handled in the background script (src/background.js).
 The background script will then call the appropriate function from this apiService based on the message received.
 */
 
-const API_BASE_URL = "http://127.0.0.1:3000/"; // This is the base URL for the backend server. Adjust as needed.
+const API_BASE_URL = "http://127.0.0.1:3000/api/"; // This is the base URL for the backend server. Adjust as needed.
 
 // Template for API call functions
 async function apiCall(endpoint, method = "GET", data = null) {
