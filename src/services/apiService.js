@@ -11,12 +11,13 @@ The background script will then call the appropriate function from this apiServi
 const API_BASE_URL = "http://127.0.0.1:3000/api/"; // This is the base URL for the backend server. Adjust as needed.
 
 // Template for API call functions
-async function apiCall(endpoint, method = "GET", data = null) {
+async function apiCall(endpoint, method = "GET", data = null,jwt = null) {
   const url = `${API_BASE_URL}${endpoint}`;
   const options = {
     method,
     headers: {
       "Content-Type": "application/json",
+      "Authorization": `Bearer ${jwt}`
     },
   };
   if (data) {
@@ -46,12 +47,12 @@ Apicall calls the function apiCall with the appropriate endpoint, method, and da
 */
 
 // Example API functions
-export async function getUserData() {
-  return await apiCall("user/data");
+export async function registerUser(credentials) {
+  return await apiCall("users/", "POST", credentials);
+}
+export async function loginUser(credentials) {
+  return await apiCall("auth/login", "POST", credentials);
 }
 
-export async function updateSettings(settings) {
-  return await apiCall("settings/update", "POST", settings);
-}
 
 

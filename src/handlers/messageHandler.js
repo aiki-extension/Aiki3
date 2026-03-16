@@ -2,7 +2,7 @@ import storage from "../util/storage";
 import timer from "../services/TimerManager";
 import browser from "webextension-polyfill";
 import { parseTime } from "../util/utilities";
-//import api from "../services/apiService";
+import { loginUser, registerUser} from "../services/apiService";
 /*
 This module handles incoming messages from content scripts and other parts of the extension. 
 It processes different message types, such as timer requests, learning session management, and blocker release commands. 
@@ -24,6 +24,26 @@ if (!message || typeof message !== "object") {
       return timeData;
     })();
   }
+  if (message.type === "auth:login") {
+  return (async () => {
+    const result = await loginUser({ email: message.email, password: message.password });
+    if (result instanceof Error) {
+      return { ok: false, message: result.message, token: null };
+    }
+    return { ok: true, message: "", token: result.token ?? null };
+  })();
+}
+
+if (message.type === "auth:register") {
+  return (async () => {
+    const result = await registerUser({ email: message.email, password: message.password });
+    if (result instanceof Error) {
+      return { ok: false, message: result.message, token: null };
+    }
+    return { ok: true, message: "", token: result.token ?? null };
+  })();
+}
+
 
   if (message.type === "learning:autoStart") {
     return (async () => {

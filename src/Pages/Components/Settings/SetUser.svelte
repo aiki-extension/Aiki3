@@ -9,6 +9,7 @@
   import Fa from "svelte-fa";
   import { faUserSlash, faUserPlus } from "@fortawesome/free-solid-svg-icons";
   import { alertStore } from "../../../services/alertService";
+  import browser from "webextension-polyfill";
 
   export let user = "";
   export let userIsRegistered;
@@ -71,21 +72,20 @@
   }
 
   async function authenticateWithBackend({ mode, email, plainTextPassword }) {
-    // TODO(api): Use a real auth call when backend integration has been set up.
-    // If auth mode is login:
-    if (authMode === "login") {
-      // call login function with login endpoint
-    } else if (authMode === "register") {
-      // call register function with register endpoint
+   const type = mode === "register" ? "auth:register" : "auth:login";
+   try {
+     const result = await browser.runtime.sendMessage({
+        type,
+        email,
+        password: plainTextPassword,
+      });
+     if (!result || result instanceof Error) {
+       return { ok: false, message: "Server error. Please try again.", token: null };
+     }
+     return result;
+    } catch (error) {
+      return { ok: false, message: "Could not reach the server.", token: null };
     }
-    
-    
-    // Temporary: these placeholders prevent unused-parameter warnings until
-    // login/register backend requests are implemented.
-    void email;
-    void plainTextPassword;
-    void mode;
-    return { ok: true, message: "", token: null };
   }
 
   function isAuthFormValid() {
