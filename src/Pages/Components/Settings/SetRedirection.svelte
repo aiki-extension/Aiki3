@@ -6,9 +6,8 @@
   // Functional and module imports
   import storage from "../../../util/storage";
   import { onMount, tick } from "svelte";
-  import { toast } from "@zerodevx/svelte-toast";
-  import * as themes from "./util/toastThemes";
   import { parseUrl } from "../../../util/utilities";
+  import { alertStore } from '../../../services/alertService'; 
 
   // Component imports
   import Container from "./Container.svelte";
@@ -23,11 +22,6 @@
   let isEditing = true;
   let hasSaved = false;
   let urlInputRef;
-
-  const toastCoords = {
-    x: "learning-url-container",
-    y: "learning-url-save",
-  };
 
   onMount(async () => {
     try {
@@ -56,22 +50,24 @@
 
     const timeWasteList = (await storage.list.get()) || [];
     if (timeWasteList.some(item => item.host === hostToCompare)) {
-      console.log("Already exists in time wasting list");
-      toast.pop();
-      toast.push("Your learning site cant be the same as a time wasting site", {
-        theme: themes.infoTheme(toastCoords),
-      });
-      return;    }
+      alertStore.add({
+        type: 'warning',
+        message: 'Your learning site cant be the same as a time wasting site',
+        dismissible: true
+      })
+      return;    
+    }
 
     if (!uri) {
       learningUri = "";
       await storage.learningUri.set("");
       hasSaved = false;
       isEditing = true;
-      toast.pop();
-      toast.push("Learning platform cleared.", {
-        theme: themes.infoTheme(toastCoords),
-      });
+      alertStore.add({
+        type: 'success',
+        message: 'Learning platform cleared.',
+        dismissible: true
+      })
       return;
     }
 
@@ -80,10 +76,12 @@
 
     hasSaved = true;
     isEditing = false;
-    toast.pop();
-    toast.push("Learning platform saved!", {
-      theme: themes.successTheme(toastCoords),
-    });
+
+    alertStore.add({
+        type: 'success',
+        message: 'Learning platform saved!',
+        dismissible: true
+      })
   }
 
   async function enableEditing() {
@@ -92,16 +90,17 @@
     isEditing = true;
     await tick();
     urlInputRef && urlInputRef.focus();
-    toast.pop();
   }
 
   function cancelEdit() {
     learningUri = previousUri;
     isEditing = false;
-    toast.pop();
-    toast.push("Changes cancelled.", {
-      theme: themes.infoTheme(toastCoords),
-    });
+
+    alertStore.add({
+      type: 'info',
+      message: 'Changes cancelled.',
+      dismissible: true
+    })
   }
 
 </script>
