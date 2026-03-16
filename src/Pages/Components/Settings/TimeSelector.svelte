@@ -45,7 +45,7 @@
   }
 
   // Save reward time to storage
-  async function setRewardTime() {
+  async function setRewardMinutes() {
     await storage.timeSettings.rewardMinutes.set(rewardMinutes);
     await storage.timeSettings.rewardSeconds.set(0); 
     update();
@@ -127,7 +127,7 @@
         bind:value={rewardMinutes}
         on:change={() => {
           rewardMinutes = Math.max(1, Math.min(60, parseInt(rewardMinutes) || 1));
-          setRewardTime();
+          setRewardMinutes();
         }}
         class="form-control form-control-sm inline"
       />

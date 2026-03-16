@@ -201,38 +201,16 @@ function setLearningTime(time) {
 
 /**
  * @async @function
- * @returns {number} rewardTime
- * @description returns the userdefined amount of miliseconds the user is allowed to spend on
- * time wasting websites before interception is turned back on. */
-async function getRewardTime() {
-  const result = await storage.get("rewardTime");
-  const rt = result.rewardTime;
-  if (rt && typeof rt.min === "number" && typeof rt.sec === "number") {
-    return rt;
-  }
-  return { min: DEFAULT_REWARD_TIME_MINUTES, sec: 0 };
-}
-
-/**
- * @function
- * @param {number} time
- * @description sets in storage the userdefined amount of miliseconds the user is allowed
- * to spend on time wasting websites before interception is turned back on. */
-function setRewardTime(time) {
-  storage.set({ rewardTime: time });
-}
-
-/**
- * @async @function
  * @returns {object} userTimes
  * @description returns an object containing the time-related
- * values set by the user: rewardTime and learningTime. */
+ * values set by the user: rewardMinutes and learningTime. */
 async function getUserTimes() {
-  const [rewardTime, learningTime] = await Promise.all([
-    getRewardTime(),
+  const [rewardMinutes, rewardSeconds, learningTime] = await Promise.all([
+    getSessionRewardMinutes(),
+    getSessionRewardSeconds(),
     getLearningTime(),
   ]);
-  return { rewardTime, learningTime };
+  return { rewardMinutes, rewardSeconds, learningTime };
 }
 
 function getTodayKey() {
@@ -283,8 +261,9 @@ async function getRewardUnlock() {
  * @description Initializes the time settings in storage upon app installation. */
 function userTimeInit() {
   setLearningTime({ min: MIN_LEARNING_MINUTES, sec: 0 });
-  setRewardTime({ min: REWARD_TIME_MINUTES, sec: 0 });
-  setSessionMinutes({ min: SESSION_TIME_MINUTES, sec: 0 });
+  setSessionRewardMinutes(REWARD_TIME_MINUTES);
+  setSessionRewardSeconds(0);
+  setSessionMinutes(SESSION_TIME_MINUTES);
 }
 
 /**
@@ -595,9 +574,8 @@ async function getSessionRewardMinutes() {
   const result = await storage.get("sessionRewardMinutes");
   if (typeof result.sessionRewardMinutes === "number") {
     return result.sessionRewardMinutes;
-  } else {
-    return DEFAULT_REWARD_TIME_MINUTES;
   }
+  return REWARD_TIME_MINUTES;
 }
 
 async function setSessionRewardMinutes(minutes) {
@@ -623,7 +601,6 @@ export default {
     getAll: getUserTimes,
     init: userTimeInit,
     learningTime: { get: getLearningTime, set: setLearningTime },
-    rewardTime: { get: getRewardTime, set: setRewardTime },
     sessionMinutes: { get: getSessionMinutes, set: setSessionMinutes },
     sessionSeconds: { get: getSessionSeconds, set: setSessionSeconds },
     rewardMinutes: { get: getSessionRewardMinutes, set: setSessionRewardMinutes },
