@@ -8,7 +8,7 @@ import redirection from "../redirection";
 import intervals from "../intervals";
 import { setTheme } from "../util/themes";
 
-async function installationSetup() {
+export async function installationSetup() {
   storage.clearStorage();
   storage.stats.init();
   storage.operatingHours.init();
@@ -30,13 +30,8 @@ async function installationSetup() {
   }
 }
 
-async function setup() {
+export async function setup() {
   intervals.intervalSetup();
   storage.shouldRedirect.set(true);
   await redirection.start();
 }
-
-export default {
-  installationSetup,
-  setup,
-};
