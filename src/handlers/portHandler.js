@@ -51,22 +51,19 @@ export function handlePortConnect(port) {
           })();
           break;
         }
-        case "timer":
-          (async () => {
-            try {
-              await timer.sync();
-            } catch (_) {
-              console.warn("[Background] Failed to sync timer on timer:timer:", _);
-            }
-            if (isDisconnected) return;
-            try {
-              const timeData = timer.getTime();
-              port.postMessage({ ...timeData, isControlledVariant: false });
-              
-            } catch (error) {
-              console.warn("[Background] Failed to get timer time on timer:timer:", error);
-            }
-          })();
+      case "timer":
+        (async () => {
+          try {
+            await timer.sync();
+          } catch (_) { }
+          if (isDisconnected) return;
+          try {
+            const timeData = timer.getTime();
+            port.postMessage(timeData);
+            
+          } catch (error) {
+          }
+        })();
           break;
         case "off":
           aikistatus.killAiki();
