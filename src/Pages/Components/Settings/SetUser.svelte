@@ -8,6 +8,7 @@
   import storage from "../../../util/storage";
   import Fa from "svelte-fa";
   import { faUserSlash, faUserPlus } from "@fortawesome/free-solid-svg-icons";
+  import { alertStore } from "../../../services/alertService";
 
   export let user = "";
   export let userIsRegistered;
@@ -37,7 +38,7 @@
 
   function notifyWarning(alertMessage) {
     alertStore.add({
-      type: 'success',
+      type: 'error',
       message: alertMessage,
       dismissible: true
     });
