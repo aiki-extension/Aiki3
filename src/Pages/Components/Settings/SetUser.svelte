@@ -269,6 +269,20 @@
               </a>
             </span>
           {/if}
+          <!-- Guest login -->
+          <span>
+            Or continue as a
+            <a
+              href="#guest"
+              class="auth-switch-link"
+              on:click|preventDefault={() => {
+                persistSessionLocally("guest", null);
+                notifySuccess("You are now signed in as a guest.");
+              }}
+            >
+              guest
+            </a>
+          </span>
         </div>
       </form>
     </div>
