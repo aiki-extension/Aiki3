@@ -1,11 +1,17 @@
 import browser from "webextension-polyfill";
 import { parseUrl } from "./utilities";
-const storage = browser.storage.local;
-const DEFAULT_SESSION_TIME_MINUTES = 5;
-const DEFAULT_SESSION_TIME_SECONDS = 0;
-const DEFAULT_REWARD_TIME_MINUTES = 2;
-const DEFAULT_REWARD_TIME_SECONDS = 0;
+import { 
+  ACTIVE_TIME_TO_HOURS,
+  ACTIVE_TIME_TO_MINUTES,
+  ACTIVE_TIME_FROM_HOURS,
+  ACTIVE_TIME_FROM_MINUTES,
+  SESSION_TIME_MINUTES,
+  REWARD_TIME_MINUTES,
+  MIN_LEARNING_MINUTES
+} from '../values/defaultSettingValues'
 
+
+const storage = browser.storage.local;
 
 /**
  * Factory for creating keyed storage accessors (maps with set/get/remove/clear).
@@ -181,7 +187,7 @@ async function getLearningTime() {
   if (lt && typeof lt.min === "number" && typeof lt.sec === "number") {
     return lt;
   }
-  return { min: 30, sec: 0 };
+  return { min: MIN_LEARNING_MINUTES, sec: 0 };
 }
 
 /**
@@ -204,7 +210,7 @@ async function getRewardTime() {
   if (rt && typeof rt.min === "number" && typeof rt.sec === "number") {
     return rt;
   }
-  return { min: 0, sec: 0 };
+  return { min: DEFAULT_REWARD_TIME_MINUTES, sec: 0 };
 }
 
 /**
@@ -276,8 +282,9 @@ async function getRewardUnlock() {
 /**
  * @description Initializes the time settings in storage upon app installation. */
 function userTimeInit() {
-  setLearningTime({ min: 30, sec: 0 });
-  setRewardTime({ min: 0, sec: 0 });
+  setLearningTime({ min: MIN_LEARNING_MINUTES, sec: 0 });
+  setRewardTime({ min: REWARD_TIME_MINUTES, sec: 0 });
+  setSessionMinutes({ min: SESSION_TIME_MINUTES, sec: 0 });
 }
 
 /**
@@ -444,7 +451,7 @@ function setActiveTimeTo(value) {
 }
 async function getActiveTimeTo() {
   const { activeTo } = await storage.get("activeTo");
-  return activeTo ?? { hrs: 21, min: 30 };
+  return activeTo ?? { hrs: ACTIVE_TIME_TO_HOURS, min: ACTIVE_TIME_TO_MINUTES };
 }
 
 async function getAllActiveTimes() {
@@ -456,8 +463,8 @@ async function getAllActiveTimes() {
 }
 
 function operatingHoursInit() {
-  setActiveTimeFrom({ hrs: 8, min: 0 });
-  setActiveTimeTo({ hrs: 21, min: 30 });
+  setActiveTimeFrom({ hrs: ACTIVE_TIME_FROM_HOURS, min: ACTIVE_TIME_FROM_MINUTES });
+  setActiveTimeTo({ hrs: ACTIVE_TIME_TO_HOURS, min: ACTIVE_TIME_TO_HOURS });
 }
 
 async function addBlockedTabs(tab) {
@@ -563,7 +570,7 @@ async function getSessionMinutes() {
   if (typeof result.sessionMinutes === "number") {
     return result.sessionMinutes;
   } else {
-    return DEFAULT_SESSION_TIME_MINUTES;
+    return SESSION_TIME_MINUTES;
   }
 }
 
@@ -576,7 +583,7 @@ async function getSessionSeconds() {
   if (typeof result.sessionSeconds === "number") {
     return result.sessionSeconds;
   } else {
-    return DEFAULT_SESSION_TIME_SECONDS;
+    return 0;
   }
 }
 
@@ -602,7 +609,7 @@ async function getSessionRewardSeconds() {
   if (typeof result.sessionRewardSeconds === "number") {
     return result.sessionRewardSeconds;
   } else {
-    return DEFAULT_REWARD_TIME_SECONDS; 
+    return 0; 
   }
 }
 
@@ -617,6 +624,10 @@ export default {
     init: userTimeInit,
     learningTime: { get: getLearningTime, set: setLearningTime },
     rewardTime: { get: getRewardTime, set: setRewardTime },
+    sessionMinutes: { get: getSessionMinutes, set: setSessionMinutes },
+    sessionSeconds: { get: getSessionSeconds, set: setSessionSeconds },
+    rewardMinutes: { get: getSessionRewardMinutes, set: setSessionRewardMinutes },
+    rewardSeconds: { get: getSessionRewardSeconds, set: setSessionRewardSeconds },
   },
   dailyProgress: {
     get: getDailyProgress,
@@ -683,11 +694,5 @@ export default {
     remove: activeSessionsStore.remove,
     clear: activeSessionsStore.clear,
   },
-  sessionSettings: {  // All session and reward based storage settings
-  sessionMinutes: { get: getSessionMinutes, set: setSessionMinutes },
-  sessionSeconds: { get: getSessionSeconds, set: setSessionSeconds },
-  rewardMinutes: { get: getSessionRewardMinutes, set: setSessionRewardMinutes },
-  rewardSeconds: { get: getSessionRewardSeconds, set: setSessionRewardSeconds },
-},
   forgetOrigin: () => storage.remove("origin"),
 };
