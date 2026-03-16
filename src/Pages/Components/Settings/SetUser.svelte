@@ -8,13 +8,10 @@
   import storage from "../../../util/storage";
   import Fa from "svelte-fa";
   import { faUserSlash, faUserPlus } from "@fortawesome/free-solid-svg-icons";
-  import { toast } from "@zerodevx/svelte-toast";
-  import * as themes from "./util/toastThemes";
 
   export let user = "";
   export let userIsRegistered;
   export let port;
-  const toastCoords = { y: "id-input-field", x: "user-settings" };
   let authMode = "login";
   let password = "";
   let confirmPassword = "";
@@ -38,15 +35,19 @@
     return basicEmailRegex.test(value);
   }
 
-  function notifyWarning(message) {
-    toast.push(message, {
-      theme: themes.warningTheme(toastCoords),
+  function notifyWarning(alertMessage) {
+    alertStore.add({
+      type: 'success',
+      message: alertMessage,
+      dismissible: true
     });
   }
 
-  function notifySuccess(message) {
-    toast.push(message, {
-      theme: themes.successTheme(toastCoords),
+  function notifySuccess(alertMessage) {
+    alertStore.add({
+      type: 'success',
+      message: alertMessage,
+      dismissible: true
     });
   }
 
