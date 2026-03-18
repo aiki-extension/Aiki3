@@ -64,10 +64,9 @@
   }
 
   function clearSessionLocally() {
-    storage.uid.set("");
+    storage.jwt.set(null);
     user = "";
     userIsRegistered = false;
-    port?.postMessage("Update: user");
   }
 
   async function authenticateWithBackend({ mode, email, plainTextPassword }) {
