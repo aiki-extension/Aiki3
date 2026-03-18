@@ -10,6 +10,8 @@ It processes different message types, such as timer requests, learning session m
 The handler ensures that messages are valid and performs the appropriate actions based on the message type.
 */
 
+// Input: apiCall result { ok, message, data }
+// Output: { ok: boolean, message: string, token: string | null }
 function validateResult(result) {
   if (!result.ok) {
     return { ok: false, message: result.message, token: null };

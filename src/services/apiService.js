@@ -12,7 +12,13 @@ import storage from "../util/storage";
 
 const API_BASE_URL = "http://localhost:3000/api/"; // This is the base URL for the backend server. Adjust as needed.
 
-// Template for API call functions
+
+/**
+ * Returns: { ok: boolean, message: string, data: any }
+ * - ok: true if the request succeeded (HTTP 2xx)
+ * - message: error message if ok is false, empty string otherwise
+ * - data: parsed JSON response body, or null on failure
+ */
 async function apiCall(endpoint, method = "GET", data = null, token = storage.jwt.get()) {
   const url = `${API_BASE_URL}${endpoint}`;
   const options = {
