@@ -101,11 +101,3 @@ async function callYourEndpoint(payload) {
 ## For more detail
 
 Please inspect the current existing api calls for their functionality and how they integrate with each other
-
-
-
-
-
-### meta
-This log was created on 18-03-2026
-This log was update on: by: These changes where made:
