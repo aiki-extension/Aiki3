@@ -3,11 +3,20 @@ import timer from "../services/TimerManager";
 import browser from "webextension-polyfill";
 import { parseTime } from "../util/utilities";
 import { loginUser, registerUser} from "../services/apiService";
+import { func } from "svelte-check";
 /*
 This module handles incoming messages from content scripts and other parts of the extension. 
 It processes different message types, such as timer requests, learning session management, and blocker release commands. 
 The handler ensures that messages are valid and performs the appropriate actions based on the message type.
 */
+
+function validateResult(result) {
+  if (!result.ok) {
+    return { ok: false, message: result.message, token: null };
+  } else {
+    return { ok: true, message: "", token: result.token ?? null };
+  }
+}
 
 export async function handleMessage(message, sender) {
 
@@ -26,23 +35,13 @@ if (!message || typeof message !== "object") {
   }
   
   if (message.type === "auth:login") {
-    return (async () => {
       const result = await loginUser({ email: message.email, password: message.password });
-      if (result instanceof Error) {
-        return { ok: false, message: result.message, token: null };
-      }
-      return { ok: true, message: "", token: result.token ?? null };
-    })();
+      return validateResult(result);
   }
 
   if (message.type === "auth:register") {
-    return (async () => {
       const result = await registerUser({ email: message.email, password: message.password });
-      if (result instanceof Error) {
-        return { ok: false, message: result.message, token: null };
-      }
-      return { ok: true, message: "", token: result.token ?? null };
-    })();
+      return validateResult(result);
   }
 
 
