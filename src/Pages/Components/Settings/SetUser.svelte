@@ -55,13 +55,12 @@
 
   function persistSessionLocally(nextUser, token) {
     storage.uid.set(nextUser);
-    // TODO(api): Save the JWT returned from the backend in storage, fx: storage.token.set(token);
-    
-    void token; // Temporary: keep `token` referenced until backend JWT storage is implemented.
-    
+    if (token) {
+      storage.jwt.set(token);
+    }
     user = nextUser;
     userIsRegistered = true;
-    port?.postMessage("Update: user");
+    
   }
 
   function clearSessionLocally() {
@@ -79,8 +78,8 @@
         email,
         password: plainTextPassword,
       });
-     if (!result || result instanceof Error) {
-       return { ok: false, message: "Server error. Please try again.", token: null };
+     if (!result || !result.ok) {
+       return { ok: false, message: result?.message || "Server error. Please try again.", token: null };
      }
      return result;
     } catch (error) {
