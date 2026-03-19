@@ -68,7 +68,7 @@
   }
 
   async function authenticateWithBackend({ mode, email, plainTextPassword }) {
-   const type = mode === "register" ? "auth:register" : "auth:login";
+   const type = mode === "register" ? "api:register" : "api:login";
    try {
      const result = await browser.runtime.sendMessage({
         type,
