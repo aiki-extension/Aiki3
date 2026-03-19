@@ -3,7 +3,7 @@ import timer from "../services/TimerManager";
 import browser from "webextension-polyfill";
 import { parseTime } from "../util/utilities";
 import { loginUser, registerUser} from "../services/apiService";
-import { func } from "svelte-check";
+
 /*
 This module handles incoming messages from content scripts and other parts of the extension. 
 It processes different message types, such as timer requests, learning session management, and blocker release commands. 

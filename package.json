@@ -32,7 +32,6 @@
     "chart.js": "^3.2.1",
     "chartjs": "^0.3.24",
     "sirv-cli": "^1.0.0",
-    "svelte-check": "^1.5.2",
     "svelte-fa": "^2.2.0",
     "svelte-moveable": "^0.16.5"
   }
