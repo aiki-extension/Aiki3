@@ -10,7 +10,7 @@ The background script will then call the appropriate function from this apiServi
 
 import storage from "../util/storage";
 
-const API_BASE_URL = "http://localhost:3000/api/"; // This is the base URL for the backend server. Adjust as needed.
+const API_BASE_URL = "http://localhost:3000"; // This is the base URL for the backend server. Adjust as needed.
 
 
 /**
