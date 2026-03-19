@@ -2,7 +2,7 @@ import storage from "../util/storage";
 import timer from "../services/TimerManager";
 import browser from "webextension-polyfill";
 import { parseTime } from "../util/utilities";
-import { loginUser, registerUser} from "../services/apiService";
+import { loginUser, registerUser, getUserSettings} from "../services/apiService";
 
 /*
 This module handles incoming messages from content scripts and other parts of the extension. 
@@ -38,7 +38,23 @@ if (!message || typeof message !== "object") {
   
   if (message.type === "auth:login") {
       const result = await loginUser({ email: message.email, password: message.password });
-      return validateResult(result);
+      const validated = validateResult(result);
+
+      if (validated.ok) {
+        // Fetch user settings from DB after login
+        const userSettings = await getUserSettings();
+        if (userSettings.ok) {
+          const db = userSettings.data;
+          // Does the writing in parallel instead of sequentally
+          await Promise.all([
+            storage.timeSettings.sessionMinutes.set(db.sessionDurationMinutes),
+            storage.timeSettings.rewardMinutes.set(db.rewardTimeMinutes),
+            storage.timeSettings.learningTime.set({ min: db.dailyLearningGoalMinutes, sec: 0}),
+            storage.operatingHours.from.set({ hrs: Math.floor(db.operatingStartMinutes / 60), min: db.operatingStartMinutes % 60 }),
+            storage.operatingHours.to.set({ hrs: Math.floor(db.operatingEndMinutes / 60), min: db.operatingEndMinutes % 60 }),
+          ])
+        }
+      }
   }
 
   if (message.type === "auth:register") {
@@ -46,6 +62,13 @@ if (!message || typeof message !== "object") {
       return validateResult(result);
   }
 
+  if (message.type === "settings:getUser") {
+      const result = await getUserSettings();
+      if (!result.ok) {
+        return { ok: false, message: result.message, data: null};
+      }
+      return { ok: true, data: result.data};
+  }
 
   if (message.type === "learning:autoStart") {
     return (async () => {

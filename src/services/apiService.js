@@ -64,5 +64,8 @@ export async function loginUser(credentials) {
   return await apiCall("auth/login", "POST", credentials);
 }
 
+export async function getUserSettings() {
+  return await apiCall("users/settings");
+}
 
 
