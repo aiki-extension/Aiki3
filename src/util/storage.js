@@ -123,6 +123,16 @@ async function getUid() {
   return result.uid;
 }
 
+// Add these two functions alongside the uid ones:
+function setJwt(token) {
+  storage.set({ jwt: token ?? "" });
+}
+
+async function getJwt() {
+  const result = await storage.get("jwt");
+  return result.jwt || "";
+}
+
 /**
  * @function
  * @param {object} origin
@@ -633,6 +643,7 @@ export default {
   learningUri: { get: getLearningUri, set: setLearningUri },
   list: { set: setList, get: getList }, // this is list of time-wasting sites defined by the user
   uid: { set: setUid, get: getUid },
+  jwt: { set: setJwt, get: getJwt },
   redirection: { toggle: toggleRedirection, get: getRedirectionToggled },
   stats: {
     storeSession: storeSession,
