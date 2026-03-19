@@ -9,6 +9,7 @@
   import Fa from "svelte-fa";
   import { faUserSlash, faUserPlus } from "@fortawesome/free-solid-svg-icons";
   import { alertStore } from "../../../services/alertService";
+  import browser from "webextension-polyfill";
 
   export let user = "";
   export let userIsRegistered;
@@ -54,38 +55,35 @@
 
   function persistSessionLocally(nextUser, token) {
     storage.uid.set(nextUser);
-    // TODO(api): Save the JWT returned from the backend in storage, fx: storage.token.set(token);
-    
-    void token; // Temporary: keep `token` referenced until backend JWT storage is implemented.
-    
+    if (token) {
+      storage.jwt.set(token);
+    }
     user = nextUser;
     userIsRegistered = true;
-    port?.postMessage("Update: user");
+    
   }
 
   function clearSessionLocally() {
-    storage.uid.set("");
+    storage.jwt.set(null);
     user = "";
     userIsRegistered = false;
-    port?.postMessage("Update: user");
   }
 
   async function authenticateWithBackend({ mode, email, plainTextPassword }) {
-    // TODO(api): Use a real auth call when backend integration has been set up.
-    // If auth mode is login:
-    if (authMode === "login") {
-      // call login function with login endpoint
-    } else if (authMode === "register") {
-      // call register function with register endpoint
+   const type = mode === "register" ? "auth:register" : "auth:login";
+   try {
+     const result = await browser.runtime.sendMessage({
+        type,
+        email,
+        password: plainTextPassword,
+      });
+     if (!result || !result.ok) {
+       return { ok: false, message: result?.message || "Server error. Please try again.", token: null };
+     }
+     return result;
+    } catch (error) {
+      return { ok: false, message: "Could not reach the server.", token: null };
     }
-    
-    
-    // Temporary: these placeholders prevent unused-parameter warnings until
-    // login/register backend requests are implemented.
-    void email;
-    void plainTextPassword;
-    void mode;
-    return { ok: true, message: "", token: null };
   }
 
   function isAuthFormValid() {
