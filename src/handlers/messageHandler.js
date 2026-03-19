@@ -67,8 +67,8 @@ if (!message || typeof message !== "object") {
         }
         
         // Get session duration from settings (minutes + seconds)
-        const sessionMinutes = await storage.sessionSettings.sessionMinutes.get();
-        const sessionSeconds = await storage.sessionSettings.sessionSeconds.get();
+        const sessionMinutes = await storage.timeSettings.sessionMinutes.get();
+        const sessionSeconds = await storage.timeSettings.sessionSeconds.get();
         const sessionDuration = (sessionMinutes * 60 * 1000) + (sessionSeconds * 1000);
         
         // Check if session is already active
@@ -152,8 +152,8 @@ if (!message || typeof message !== "object") {
         }
         
         // Get reward duration from settings
-        const rewardMinutes = await storage.sessionSettings.rewardMinutes.get();
-        const rewardSeconds = await storage.sessionSettings.rewardSeconds.get();
+        const rewardMinutes = await storage.timeSettings.rewardMinutes.get();
+        const rewardSeconds = await storage.timeSettings.rewardSeconds.get();
         const rewardDuration = (rewardMinutes * 60 * 1000) + (rewardSeconds * 1000);
         
         // This prevents the redirect prompt from showing immediately
@@ -238,8 +238,8 @@ if (!message || typeof message !== "object") {
                 // Also trigger learning:autoStart to begin a new session
                 // This will start the session timer and show the learning overlay
                 await (async () => {
-                  const sessionMinutes = await storage.sessionSettings.sessionMinutes.get();
-                  const sessionSeconds = await storage.sessionSettings.sessionSeconds.get();
+                  const sessionMinutes = await storage.timeSettings.sessionMinutes.get();
+                  const sessionSeconds = await storage.timeSettings.sessionSeconds.get();
                   const sessionDuration = (sessionMinutes * 60 * 1000) + (sessionSeconds * 1000);
                   
                   await timer.startSessionTimer(sessionDuration, () => {
