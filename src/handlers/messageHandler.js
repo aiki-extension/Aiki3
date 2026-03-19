@@ -16,7 +16,8 @@ function validateResult(result) {
   if (!result.ok) {
     return { ok: false, message: result.message, token: null };
   } else {
-    return { ok: true, message: "", token: result.token ?? null };
+    const token = result?.data?.token ?? result?.token ?? null;
+    return { ok: true, message: "", token };
   }
 }
 
