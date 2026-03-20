@@ -23,6 +23,7 @@
   import { onMount } from "svelte";
   import { fetchAndSyncIfChanged } from "../services/settingsService";
   import { alertStore } from "../services/alertService";
+    import storage from "../util/storage";
 
   let user = "";
   let userIsRegistered = false;
@@ -32,21 +33,25 @@
   });
 
   onMount(async () => {
-    console.log("TRIGGERED onMount IN SETTINGS")
-    // Helper function to check if local storage needs to get updated with DB data instead
-    const result = await fetchAndSyncIfChanged();
-    if (!result.ok) {
-      alertStore.add({
-        type: 'warning',
-        message: "Could not fetch latest settings from server. Using local settings.",
-        dismissible: true,
-      });
-    } else if (result.changed) {
-      alertStore.add({
-        type: 'success',
-        message: "Settings updated from server.",
-        dismissible: true,
-      });
+    // Token is used to check if the user is not logged or is in guest mode
+    // Either way the user should not try to fetch data from API. Only if they are logged in
+    const token = await storage.jwt.get();
+    if (token) {
+      // Helper function to check if local storage needs to get updated with DB data instead
+      const result = await fetchAndSyncIfChanged();
+      if (!result.ok) {
+        alertStore.add({
+          type: 'warning',
+          message: "Could not fetch latest settings from server. Using local settings.",
+          dismissible: true,
+        });
+      } else if (result.changed) {
+        alertStore.add({
+          type: 'success',
+          message: "Settings updated from server.",
+          dismissible: true,
+        });
+      }
     }
   });
 </script>
