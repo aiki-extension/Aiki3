@@ -1,79 +1,59 @@
 <!-- 
-  Time settings for learning goals.
-  For controlled variant, shows session-based learning and reward time.
-  Used in / Parent components: /src/Pages/Settings.svelte
+  Time settings for Daily learning goals.
  -->
 <script>
   import { onMount } from "svelte";
   import storage from "../../../util/storage";
-  import { AIKI_VARIANT } from "../../../util/variant";
+  import { SESSION_DURATION_OPTIONS } from '../../../values/defaultSettingValues';
 
-  let minuteOptions = Array.from({ length: 121 }, (_, i) => i); // 0 - 120 minutes
-  let secondsOptions = Array.from({ length: 60 }, (_, i) => i); // 
-  
-  // Minimum learning time for experimental variant: 2 minutes
-  const MIN_LEARNING_MINUTES_EXP = 2;
   export let settings;
   export let update;
 
   let { min: learnMin, sec: learnSec } = settings.learningTime;
-  
-  // Controlled variant detection using imported config
-  const isControlledVariant = AIKI_VARIANT === "controlled";
-  let controlledLearningMinutes = 5;
-  let controlledLearningSeconds = 0;
-  let controlledRewardMinutes = 2;
-  let controlledRewardSeconds = 0;
+  let sessionMinutes;
+  let rewardMinutes;
+  let minLearningMinutes;
 
+  // Load session and reward settings from storage on mount
   onMount(async () => {
-    if (isControlledVariant) {
-      controlledLearningMinutes = await storage.controlledTimerSettings.learningMinutes.get();
-      controlledLearningSeconds = await storage.controlledTimerSettings.learningSeconds.get();
-      controlledRewardMinutes = await storage.controlledTimerSettings.rewardMinutes.get();
-      controlledRewardSeconds = await storage.controlledTimerSettings.rewardSeconds.get();
-    }
+    sessionMinutes = await storage.timeSettings.sessionMinutes.get();
+    rewardMinutes = await storage.timeSettings.rewardMinutes.get();
+    minLearningMinutes = await storage.timeSettings.learningTime.get();
   });
 
-  function parseNumberToTime(number) {
-    return number < 10 ? `0${number}` : number;
-  }
-
+  // Ensures that the learning time meets the minimum threshold. If the user tries to set a value below the minimum, it will automatically adjust it to the minimum allowed value. This function is called before saving the settings to ensure data integrity.
   function ensureMinThreshold() {
-    // Enforce 2-minute minimum for experimental variant
-    if (learnMin < MIN_LEARNING_MINUTES_EXP) {
-      learnMin = MIN_LEARNING_MINUTES_EXP;
+    // Enforce 5-minute minimum for learning time
+    if (learnMin < MIN_LEARNING_MINUTES) {
+      learnMin = MIN_LEARNING_MINUTES;
       learnSec = 0;
     }
   }
-
+  // This function saves the learning time settings to storage
   async function setLearningTime() {
     ensureMinThreshold();
     const learningTime = { min: learnMin, sec: learnSec };
     storage.timeSettings.learningTime.set(learningTime);
     update();
   }
-  
-  async function setControlledLearningTime() {
-    const oldMinutes = await storage.controlledTimerSettings.learningMinutes.get();
-    const oldSeconds = await storage.controlledTimerSettings.learningSeconds.get();
-    await storage.controlledTimerSettings.learningMinutes.set(controlledLearningMinutes);
-    await storage.controlledTimerSettings.learningSeconds.set(controlledLearningSeconds);
-    
+
+  // Save session duration to storage
+  async function setSessionTime() {
+    await storage.timeSettings.sessionMinutes.set(sessionMinutes);
+    await storage.timeSettings.sessionSeconds.set(0); 
     update();
   }
-  
-  async function setControlledRewardTime() {
-    const oldMinutes = await storage.controlledTimerSettings.rewardMinutes.get();
-    const oldSeconds = await storage.controlledTimerSettings.rewardSeconds.get();
-    await storage.controlledTimerSettings.rewardMinutes.set(controlledRewardMinutes);
-    await storage.controlledTimerSettings.rewardSeconds.set(controlledRewardSeconds);
-    
+
+  // Save reward time to storage
+  async function setRewardMinutes() {
+    await storage.timeSettings.rewardMinutes.set(rewardMinutes);
+    await storage.timeSettings.rewardSeconds.set(0); 
     update();
   }
 </script>
 
-{#if !isControlledVariant}
-<!-- Experimental variant: Daily learning goal -->
+
+<!-- Daily learning goal -->
 <div class="row">
   <div class="col-sm">
     <p>Daily learning goal:</p>
@@ -102,41 +82,33 @@
     </div>
   </div>
 </div>
-{:else}
-<!-- Controlled variant: Session-based timers -->
-<div class="row">
+
+<!-- Session duration -->
+<div class="row" style="margin-top: 1rem;">
   <div class="col-sm">
-    <p>Session learning time:</p>
+    <p>Session duration:</p>
   </div>
   <div class="col-sm" />
   <div class="col-sm">
     <div class="wrapper">
+      <input class="form-control form-control-sm inline placeholder" disabled />
+      <p class="placeholder">:</p>
       <!-- svelte-ignore a11y-no-onchange -->
       <select
-        bind:value={controlledLearningMinutes}
-        on:change={setControlledLearningTime}
+        bind:value={sessionMinutes}
+        on:change={setSessionTime}
         class="custom-select custom-select-sm inline"
       >
-        {#each minuteOptions.slice(1, 61) as value}
-          <option {value}>{parseNumberToTime(value)}</option>
+        {#each SESSION_DURATION_OPTIONS as value}
+          <option {value}>{value}</option>
         {/each}
       </select>
-      <p>:</p>
-      <!-- svelte-ignore a11y-no-onchange -->
-      <select
-        bind:value={controlledLearningSeconds}
-        on:change={setControlledLearningTime}
-        class="custom-select custom-select-sm inline"
-      >
-        {#each secondsOptions as value}
-          <option {value}>{parseNumberToTime(value)}</option>
-        {/each}
-      </select>
-      <p><small>{"Min/Sec"}</small></p>
+      <p><small>Min&nbsp;&nbsp;&nbsp;&nbsp;</small></p>
     </div>
   </div>
 </div>
 
+<!-- Reward time -->
 <div class="row" style="margin-top: 1rem;">
   <div class="col-sm">
     <p>Reward time:</p>
@@ -144,32 +116,25 @@
   <div class="col-sm" />
   <div class="col-sm">
     <div class="wrapper">
-      <!-- svelte-ignore a11y-no-onchange -->
-      <select
-        bind:value={controlledRewardMinutes}
-        on:change={setControlledRewardTime}
-        class="custom-select custom-select-sm inline"
-      >
-        {#each minuteOptions.slice(1, 61) as value}
-          <option {value}>{parseNumberToTime(value)}</option>
-        {/each}
-      </select>
-      <p>:</p>
-      <!-- svelte-ignore a11y-no-onchange -->
-      <select
-        bind:value={controlledRewardSeconds}
-        on:change={setControlledRewardTime}
-        class="custom-select custom-select-sm inline"
-      >
-        {#each secondsOptions as value}
-          <option {value}>{parseNumberToTime(value)}</option>
-        {/each}
-      </select>
-      <p><small>{"Min/Sec"}</small></p>
+      <input class="form-control form-control-sm inline placeholder" disabled />
+      <p class="placeholder">:</p>
+      <input
+        type="number"
+        id="reward-mins"
+        min="1"
+        max="60"
+        title="Enter a value between 1 and 60"
+        bind:value={rewardMinutes}
+        on:change={() => {
+          rewardMinutes = Math.max(1, Math.min(60, parseInt(rewardMinutes) || 1));
+          setRewardMinutes();
+        }}
+        class="form-control form-control-sm inline"
+      />
+      <p><small>Min&nbsp;&nbsp;&nbsp;&nbsp;</small></p>
     </div>
   </div>
 </div>
-{/if}
 
 <style>
   .inline {

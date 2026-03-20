@@ -19,19 +19,19 @@ class TimerManager {
     this.bonusTime = 0;
     this.bonusTimeIntervalRef = undefined;
 
-    // Controlled variant timers
-    this.controlledLearningRemaining = 0;
-    this.controlledLearningIntervalRef = undefined;
-    this.controlledLearningGoal = 0;
-    this.controlledLearningElapsed = 0;
-    this.controlledLearningCompleted = false;
-    this.controlledLearningOnComplete = null;
+    // Session duration timers
+    this.sessionRemaining = 0;
+    this.sessionIntervalRef = undefined;
+    this.sessionGoal = 0;
+    this.sessionElapsed = 0;
+    this.sessionCompleted = false;
+    this.sessionOnComplete = null;
 
-    this.controlledRewardRemaining = 0;
-    this.controlledRewardIntervalRef = undefined;
-    this.controlledRewardGoal = 0;
-    this.controlledRewardElapsed = 0;
-    this.controlledRewardOnComplete = null;
+    this.sessionRewardRemaining = 0;
+    this.sessionRewardIntervalRef = undefined;
+    this.sessionRewardGoal = 0;
+    this.sessionRewardElapsed = 0;
+    this.sessionRewardOnComplete = null;
   }
 
   computeProgressPercent() {
@@ -268,182 +268,148 @@ class TimerManager {
     this.dailyProgress = 0;
   }
 
-  // Controlled timers
-  async decrementControlledLearning() {
-    if (await this.checkActive()) {
-      this.controlledLearningElapsed += 1000;
 
-      if (this.controlledLearningRemaining > 0) {
-        this.controlledLearningRemaining -= 1000;
-        if (this.controlledLearningRemaining <= 0) {
-          this.controlledLearningRemaining = 0;
-          this.controlledLearningCompleted = true;
-          if (typeof this.controlledLearningOnComplete === "function") {
-            this.controlledLearningOnComplete();
-            this.controlledLearningOnComplete = null;
+  // Get session durations and reward durations from storage
+  async getSessionAndRewardDurations() {
+    const sessionMin = await storage.timeSettings.sessionMinutes.get();
+    const sessionSec = await storage.timeSettings.sessionSeconds.get();
+    const rewardMin = await storage.timeSettings.rewardMinutes.get();
+    const rewardSec = await storage.timeSettings.rewardSeconds.get();
+    return {
+      sessionMs: (sessionMin * 60 + sessionSec) * 1000,
+      rewardMs: (rewardMin * 60 + rewardSec) * 1000,
+    };
+  }
+
+  // Decrement session timer
+  async decrementSession() {
+    if (await this.checkActive()) {
+      this.sessionElapsed += 1000;
+      
+      if (this.sessionRemaining > 0) {
+        this.sessionRemaining -= 1000;
+        this.dailyProgress += 1000;
+        await storage.dailyProgress.set(this.dailyProgress);
+        
+        if (this.sessionRemaining <= 0) {
+          this.sessionRemaining = 0;
+          
+          if (!this.sessionCompleted) {
+            this.sessionCompleted = true;
+            
+            // Add 1-second buffer to compensate for checkActive() timing drift
+            this.dailyProgress += 1000;
+            await storage.dailyProgress.set(this.dailyProgress);
+            console.log("[Session] Added 1s timing buffer to daily progress");
+            
+            if (typeof this.sessionOnComplete === "function") {
+              this.sessionOnComplete();
+              this.sessionOnComplete = null;
+            }
           }
         }
       }
     }
   }
 
-  startControlledLearningSession(learningMs, onComplete) {
-    this.stopControlledLearningSession();
-    this.stopControlledRewardSession();
-
-    this.controlledLearningGoal = learningMs;
-    this.controlledLearningRemaining = learningMs;
-    this.controlledLearningElapsed = 0;
-    this.controlledLearningCompleted = false;
-    this.controlledLearningOnComplete = onComplete;
-
-    if (this.controlledLearningRemaining > 0) {
-      this.controlledLearningIntervalRef = setInterval(() => {
-        this.decrementControlledLearning().catch(() => { });
+  // Start a learning session timer
+  async startSessionTimer(durationMs, onComplete) {
+    this.stopSessionTimer();
+    this.stopSessionRewardTimer();
+    
+    // Sync daily goal progress from storage before starting
+    const goal = parseTime.toSystem(await storage.timeSettings.learningTime.get());
+    const progress = await storage.dailyProgress.get();
+    this.dailyGoal = goal;
+    this.dailyProgress = progress;
+    
+    this.sessionGoal = durationMs;
+    this.sessionRemaining = durationMs;
+    this.sessionElapsed = 0;
+    this.sessionCompleted = false;
+    this.sessionOnComplete = onComplete;
+    
+    if (this.sessionRemaining > 0) {
+      this.sessionIntervalRef = setInterval(() => {
+        this.decrementSession().catch(() => {});
       }, 1000);
     } else if (typeof onComplete === "function") {
       onComplete();
     }
   }
 
-  stopControlledLearningSession() {
-    if (this.controlledLearningIntervalRef) {
-      clearInterval(this.controlledLearningIntervalRef);
-      this.controlledLearningIntervalRef = undefined;
+  // Stop session timer
+  stopSessionTimer() {
+    if (this.sessionIntervalRef) {
+      clearInterval(this.sessionIntervalRef);
+      this.sessionIntervalRef = undefined;
     }
-    this.controlledLearningRemaining = 0;
-    this.controlledLearningGoal = 0;
-    this.controlledLearningElapsed = 0;
-    this.controlledLearningCompleted = false;
-    this.controlledLearningOnComplete = null;
+    this.sessionRemaining = 0;
+    this.sessionGoal = 0;
+    this.sessionElapsed = 0;
+    this.sessionCompleted = false;
+    this.sessionOnComplete = null;
   }
 
-  isControlledLearningActive() {
-    return Boolean(this.controlledLearningIntervalRef);
+  // Check if session timer is running
+  isSessionActive() {
+    return Boolean(this.sessionIntervalRef);
   }
 
-  async decrementControlledReward() {
-    this.controlledRewardElapsed += 1000;
-
-    if (this.controlledRewardRemaining > 0) {
-      this.controlledRewardRemaining -= 1000;
-      if (this.controlledRewardRemaining <= 0) {
-        this.controlledRewardRemaining = 0;
-        clearInterval(this.controlledRewardIntervalRef);
-        this.controlledRewardIntervalRef = undefined;
-        if (typeof this.controlledRewardOnComplete === "function") {
-          this.controlledRewardOnComplete();
+  // Decrement session reward timer
+  async decrementSessionReward() {
+    this.sessionRewardElapsed += 1000;
+    
+    if (this.sessionRewardRemaining > 0) {
+      this.sessionRewardRemaining -= 1000;
+      if (this.sessionRewardRemaining <= 0) {
+        this.sessionRewardRemaining = 0;
+        clearInterval(this.sessionRewardIntervalRef);
+        this.sessionRewardIntervalRef = undefined;
+        if (typeof this.sessionRewardOnComplete === "function") {
+          this.sessionRewardOnComplete();
         }
       }
     }
   }
 
-  startControlledRewardSession(rewardMs, onComplete) {
-    this.stopControlledLearningSession();
-    this.stopControlledRewardSession();
-
-    this.controlledRewardGoal = rewardMs;
-    this.controlledRewardRemaining = rewardMs;
-    this.controlledRewardElapsed = 0;
-    this.controlledRewardOnComplete = onComplete;
-
-    if (this.controlledRewardRemaining > 0) {
-      this.controlledRewardIntervalRef = setInterval(() => {
-        this.decrementControlledReward().catch(() => { });
+  // Start session reward timer
+  startSessionRewardTimer(durationMs, onComplete) {
+    this.stopSessionTimer();
+    this.stopSessionRewardTimer();
+    
+    this.sessionRewardGoal = durationMs;
+    this.sessionRewardRemaining = durationMs;
+    this.sessionRewardElapsed = 0;
+    this.sessionRewardOnComplete = onComplete;
+    
+    if (this.sessionRewardRemaining > 0) {
+      this.sessionRewardIntervalRef = setInterval(() => {
+        this.decrementSessionReward().catch(() => {});
       }, 1000);
     } else if (typeof onComplete === "function") {
       onComplete();
     }
   }
 
-  stopControlledRewardSession() {
-    if (this.controlledRewardIntervalRef) {
-      clearInterval(this.controlledRewardIntervalRef);
-      this.controlledRewardIntervalRef = undefined;
+
+  // Stop session reward timer
+  stopSessionRewardTimer() {
+    if (this.sessionRewardIntervalRef) {
+      clearInterval(this.sessionRewardIntervalRef);
+      this.sessionRewardIntervalRef = undefined;
     }
-    this.controlledRewardRemaining = 0;
-    this.controlledRewardGoal = 0;
-    this.controlledRewardOnComplete = null;
+    this.sessionRewardRemaining = 0;
+    this.sessionRewardGoal = 0;
+    this.sessionRewardElapsed = 0;
+    this.sessionRewardOnComplete = null;
   }
 
-  isControlledRewardActive() {
-    return Boolean(this.controlledRewardIntervalRef);
+  // Check if session reward timer is running
+  isSessionRewardActive() {
+    return Boolean(this.sessionRewardIntervalRef);
   }
 
-  getControlledSessionState() {
-    return {
-      learningRemaining: this.controlledLearningRemaining,
-      learningGoal: this.controlledLearningGoal,
-      learningElapsed: this.controlledLearningElapsed,
-      learningCompleted: this.controlledLearningCompleted,
-      rewardRemaining: this.controlledRewardRemaining,
-      rewardGoal: this.controlledRewardGoal,
-      rewardElapsed: this.controlledRewardElapsed,
-      isLearning: this.isControlledLearningActive(),
-      isReward: this.isControlledRewardActive(),
-    };
-  }
-
-  killControlledTimers() {
-    this.stopControlledLearningSession();
-    this.stopControlledRewardSession();
-  }
-
-  async getControlledDurations() {
-    const learningMinutes =
-      (await storage.controlledTimerSettings?.learningMinutes?.get?.()) || 5;
-    const learningSeconds =
-      (await storage.controlledTimerSettings?.learningSeconds?.get?.()) || 0;
-    const rewardMinutes =
-      (await storage.controlledTimerSettings?.rewardMinutes?.get?.()) || 15;
-    const rewardSeconds =
-      (await storage.controlledTimerSettings?.rewardSeconds?.get?.()) || 0;
-    return {
-      learningMs: (learningMinutes * 60 + learningSeconds) * 1000,
-      rewardMs: (rewardMinutes * 60 + rewardSeconds) * 1000,
-    };
-  }
-
-  stopAllTimers() {
-    this.killControlledTimers();
-  }
-
-  startTimer(type, durationMs, onComplete) {
-    if (type === "learning") {
-      this.startControlledLearningSession(durationMs, onComplete);
-    } else if (type === "reward") {
-      this.startControlledRewardSession(durationMs, onComplete);
-    }
-  }
-
-  getTimerState(type) {
-    if (type === "learning") {
-      return {
-        remaining: this.controlledLearningRemaining,
-        goal: this.controlledLearningGoal,
-        active: this.isControlledLearningActive(),
-        elapsed: this.controlledLearningElapsed,
-        completed: this.controlledLearningCompleted,
-      };
-    } else if (type === "reward") {
-      return {
-        remaining: this.controlledRewardRemaining,
-        goal: this.controlledRewardGoal,
-        active: this.isControlledRewardActive(),
-        elapsed: this.controlledRewardElapsed,
-        completed: this.controlledRewardRemaining <= 0 && this.controlledRewardGoal > 0,
-      };
-    }
-    return { remaining: 0, goal: 0, active: false, elapsed: 0, completed: false };
-  }
-
-  extendTimer(type, durationMs) {
-    if (type === "reward" && this.isControlledRewardActive()) {
-      this.controlledRewardRemaining += durationMs;
-      this.controlledRewardGoal += durationMs;
-      console.log(`[Timer] Extended reward timer by ${durationMs / 1000}s`);
-    }
-  }
 
   getTime() {
     return {
@@ -453,10 +419,13 @@ class TimerManager {
       dailyGoal: this.dailyGoal,
       dailyProgress: this.dailyProgress,
       rewardUnlockAt: this.rewardUnlockAt,
-      controlledLearningRemaining: this.controlledLearningRemaining,
-      controlledLearningGoal: this.controlledLearningGoal,
-      controlledRewardRemaining: this.controlledRewardRemaining,
-      controlledRewardGoal: this.controlledRewardGoal,
+      // Session Duration and Reward relevant code
+      sessionRemaining: this.sessionRemaining,
+      sessionGoal: this.sessionGoal,
+      sessionElapsed: this.sessionElapsed,
+      sessionCompleted: this.sessionCompleted,
+      sessionRewardRemaining: this.sessionRewardRemaining,
+      sessionRewardGoal: this.sessionRewardGoal,
     };
   }
 }

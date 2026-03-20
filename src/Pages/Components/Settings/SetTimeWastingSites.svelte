@@ -14,13 +14,11 @@
     faTimes,
     faPlusCircle
   } from "@fortawesome/free-solid-svg-icons";
-  import { toast } from "@zerodevx/svelte-toast";
-  import * as themes from "./util/toastThemes";
+  import { alertStore } from '../../../services/alertService'; 
 
   export let port;
   $: list = [];
 
-  let toastCoords = { y: "add-button", x: "site-input-container" };
   let learningUri = ""; 
 
   async function setup() {
@@ -68,37 +66,43 @@
     list = newList;
     storage.list.set(list);
     port.postMessage(`Update: list`);
-    toast.pop();
-    toast.push("Website removed!", {
-      theme: themes.successTheme(toastCoords),
-    });
+
+    alertStore.add({
+        type: 'success',
+        message: 'Website removed!',
+        dismissible: true
+      })
   }
 
   async function addItem() {
-    learningUri = parseUrl(await storage.learningUri.get())
-    let site = parseUrl(addItemValue);
-
     if (addItemValue === "") {
-      toast.pop();
-      toast.push("Input cannot be empty.", {
-        theme: themes.infoTheme(toastCoords),
-      });
+      alertStore.add({
+        type: 'warning',
+        message: 'Input cannot be empty!',
+        dismissible: true
+      })
       return;
     }
+
+    learningUri = parseUrl(await storage.learningUri.get())
+    let site = parseUrl(addItemValue);
+    
     
     if (learningUri.name === site.name) {
-      toast.pop();
-      toast.push("This site is set in your redirection!", {
-        theme: themes.infoTheme(toastCoords),
-      });
+      alertStore.add({
+        type: 'warning',
+        message: 'This site is set as your redirection!',
+        dismissible: true
+      })
       return;
     }
 
     if (list.find((item) => item.name == site.name)) {
-      toast.pop();
-      toast.push("Website already in list.", {
-        theme: themes.infoTheme(toastCoords),
-      });
+      alertStore.add({
+        type: 'warning',
+        message: 'Website already among your time wasters!',
+        dismissible: true
+      })
       return;
     }
 
@@ -110,10 +114,11 @@
       storage.list.set(list);
       port.postMessage(`Update: list`);
       addItemValue = "";
-      toast.pop();
-      toast.push("New Website Added!", {
-        theme: themes.successTheme(toastCoords),
-      });
+      alertStore.add({
+        type: 'success',
+        message: 'New Website Added!',
+        dismissible: true
+      })
     }
   }
 
@@ -216,7 +221,6 @@
       </tbody>
     </table>
   {/if}
-  <!-- Add pagination for more than 10 sites? -->
 </Container>
 
 <style>

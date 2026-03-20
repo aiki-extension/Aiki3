@@ -2,25 +2,26 @@ import storage from "./util/storage";
 import browser from "webextension-polyfill";
 import timer from "./services/TimerManager";
 import { parseUrl, makeDate, parseTime } from "./util/utilities";
-import { isControlled } from "./util/variantConfig";
-import controlledMode from "./controlledMode";
 import SessionService from "./services/SessionService";
 import NavigationGuards from "./services/NavigationGuards";
-import ControlledStrategy from "./util/ControlledStrategy";
-import ExperimentalStrategy from "./util/ExperimentalStrategy";
 import PromptCoordinator from "./services/PromptCoordinator";
 
 const l = console.log;
 
-const strategy = isControlled() ? new ControlledStrategy() : new ExperimentalStrategy();
 
-const navigationGuards = new NavigationGuards(strategy);
+const navigationGuards = new NavigationGuards(false); // Pass false to disable debug logs in NavigationGuards
 const promptCoordinator = new PromptCoordinator({
   applyPreemptiveHide: (tabId) => navigationGuards.applyPreemptiveHide(tabId),
   removePreemptiveHide: (tabId) => navigationGuards.removePreemptiveHide(tabId),
   showImmediatePrompt,
   hideImmediatePrompt: (tabId) => navigationGuards.hideImmediatePrompt(tabId),
 });
+// Was previously used to select between different redirection strategies (e.g. controlled vs experimental variants). 
+// todo: Refactor to not support multiple strategies in the same codebase, as this adds unnecessary complexity and indirection. If we want to run experiments, we can use feature flags and conditionals within a single strategy implementation.
+const strategy = {
+  handleNavigation: async () => false,
+  onLearningSiteNavigation: async () => { },
+};
 
 let shouldShowWelcome = true;
 const PROMPT_SUPPRESS_DURATION = 10 * 60 * 1000; // 10 minutes - global cooldown across all tabs
@@ -216,14 +217,7 @@ async function redirect(details) {
           }
         }
 
-        if (isOriginValid) {
-          l(details);
-          // Only show blocker for experimental variant
-          // Controlled variant handles blocking via direct redirect in controlledMode
-          if (!isControlled()) {
-            addProcsiteLoadedListener();
-          }
-        } else {
+        if (!origin || isOriginValid) {
           const learningUri = await storage.learningUri.get();
           if (!learningUri) return; // skip redirection if no learning URL configured
           
@@ -331,7 +325,6 @@ async function addLearningSiteLoadedListener() {
  * This enables direct learning session start when user navigates to learning site.
  */
 async function addControlledLearningSiteListener() {
-  if (!isControlled()) return;
 
   const currentLearning = await storage.learningUri.get();
   if (!currentLearning) return;
@@ -501,24 +494,7 @@ async function gotoOrigin(event, sourceContext = {}) {
   const normalizedEvent = event === "injected" ? "continue" : event;
 
   // Handle controlled variant continue bypass via controlledMode
-  if (isControlled() && normalizedEvent === "continue") {
-    const origin = await storage.origin.get();
-    const targetTabId = sourceContext?.tabId || origin?.tabId;
-
-    if (targetTabId) {
-      await controlledMode.handleContinue(targetTabId);
-    } else {
-      // Fallback: just cleanup
-      controlledMode.cleanup();
-    }
-
-    // Clear origin after continue
-    await storage.origin.remove();
-
-    l("[Controlled] Continue handled by controlledMode");
-    return; // Don't execute experimental continue logic
-  }
-
+  
   const statsHandler = storage.stats[normalizedEvent];
   if (typeof statsHandler === "function") {
     await statsHandler();
@@ -558,13 +534,8 @@ async function gotoOrigin(event, sourceContext = {}) {
 
   const sessionTabId = targetTabId !== undefined ? targetTabId : origin?.tabId;
   if (sessionTabId !== undefined) {
-    // Skip for controlled variant - handleContinue already logs the learning session
-    if (isControlled()) {
-      console.log("[Aiki Debug] Controlled variant - skipping finalizeSession (handled by controlledMode)");
-    } else {
       console.log("[Aiki Debug] Finalizing learning session for tab:", sessionTabId);
       await SessionService.finalizeSession(sessionTabId, "learning", normalizedEvent);
-    }
   } else {
     console.log("[Aiki Debug] No session to finalize - sessionTabId is undefined");
   }
@@ -662,16 +633,19 @@ async function gotoOrigin(event, sourceContext = {}) {
 
   const redirectionToggled = await storage.redirection.get();
   if (redirectionToggled && !hasRemainingLearningTabs) {
-    const rewardSetting = await storage.timeSettings.rewardTime.get();
-    let rewardTime = parseTime.toSystem(rewardSetting);
+    const [rewardMinutes, rewardSeconds] = await Promise.all([
+      storage.timeSettings.rewardMinutes.get(),
+      storage.timeSettings.rewardSeconds.get(),
+    ]);
+    let rewardDuration = (rewardMinutes * 60 * 1000) + (rewardSeconds * 1000);
 
-    if (rewardTime <= 0) {
+    if (rewardDuration <= 0) {
       // Provide a short grace period so the skip/continue action actually unlocks the site.
-      rewardTime = 60 * 1000;
+      rewardDuration = 60 * 1000;
     }
 
     await storage.shouldRedirect.set(false);
-    await timer.startProcrastinationSession(checkActiveTab, rewardTime);
+    await timer.startProcrastinationSession(checkActiveTab, rewardDuration);
   } else if (hasRemainingLearningTabs) {
     await storage.shouldRedirect.set(true);
   }
@@ -699,7 +673,7 @@ async function promptRedirect(tabId, url, originUrl) {
       addOriginUpdatedListener(tabId);
 
       // Clears the global prompt lock when user accepts
-      await storage.promptLocks.remove();
+      await storage.globalPromptLock.remove();
       try {
         scheduleRevealOnLoad(tabId);
         await browser.tabs.update(tabId, {
