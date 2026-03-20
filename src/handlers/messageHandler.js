@@ -2,28 +2,23 @@ import storage from "../util/storage";
 import timer from "../services/TimerManager";
 import browser from "webextension-polyfill";
 import { parseTime } from "../util/utilities";
-import { loginUser, registerUser} from "../services/apiService";
+import { handleApiMessage } from "./apiHandler";
 
 /*
-This module handles incoming messages from content scripts and other parts of the extension. 
-It processes different message types, such as timer requests, learning session management, and blocker release commands. 
-The handler ensures that messages are valid and performs the appropriate actions based on the message type.
+This module handles incoming messages from content scripts and other parts of the extension.
+It processes different message types, such as timer requests, learning session management, and blocker release commands.
+Auth messages are delegated to apiHandler.
 */
-
-// Input: apiCall result { ok, message, data }
-// Output: { ok: boolean, message: string, token: string | null }
-function validateResult(result) {
-  if (!result.ok) {
-    return { ok: false, message: result.message, token: null };
-  } else {
-    return { ok: true, message: "", token: result.token ?? null };
-  }
-}
 
 export async function handleMessage(message, sender) {
 
 if (!message || typeof message !== "object") {
     return;
+  }
+
+  // Delegate all api:* messages to apiHandler
+  if (message.type?.startsWith("api:")) {
+    return handleApiMessage(message);
   }
 
   if (message.type === "timer:get") {
@@ -35,17 +30,6 @@ if (!message || typeof message !== "object") {
       return timeData;
     })();
   }
-  
-  if (message.type === "auth:login") {
-      const result = await loginUser({ email: message.email, password: message.password });
-      return validateResult(result);
-  }
-
-  if (message.type === "auth:register") {
-      const result = await registerUser({ email: message.email, password: message.password });
-      return validateResult(result);
-  }
-
 
   if (message.type === "learning:autoStart") {
     return (async () => {
