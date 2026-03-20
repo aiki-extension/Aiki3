@@ -4,21 +4,21 @@
 <script>
   import { onMount } from "svelte";
   import storage from "../../../util/storage";
+  import { SESSION_DURATION_OPTIONS } from '../../../values/defaultSettingValues';
 
-  // Minimum learning time in minutes to ensure users set a reasonable goal. This is enforced both in the UI and in the logic.
-  const MIN_LEARNING_MINUTES = 5;
-  const SESSION_DURATION_OPTIONS = [5, 10, 15, 20, 25, 30];
   export let settings;
   export let update;
 
   let { min: learnMin, sec: learnSec } = settings.learningTime;
-  let sessionMinutes = 5;
-  let rewardMinutes = 2;
+  let sessionMinutes;
+  let rewardMinutes;
+  let minLearningMinutes;
 
   // Load session and reward settings from storage on mount
   onMount(async () => {
-    sessionMinutes = await storage.sessionSettings.sessionMinutes.get();
-    rewardMinutes = await storage.sessionSettings.rewardMinutes.get();
+    sessionMinutes = await storage.timeSettings.sessionMinutes.get();
+    rewardMinutes = await storage.timeSettings.rewardMinutes.get();
+    minLearningMinutes = await storage.timeSettings.learningTime.get();
   });
 
   // Ensures that the learning time meets the minimum threshold. If the user tries to set a value below the minimum, it will automatically adjust it to the minimum allowed value. This function is called before saving the settings to ensure data integrity.
@@ -39,15 +39,15 @@
 
   // Save session duration to storage
   async function setSessionTime() {
-    await storage.sessionSettings.sessionMinutes.set(sessionMinutes);
-    await storage.sessionSettings.sessionSeconds.set(0); 
+    await storage.timeSettings.sessionMinutes.set(sessionMinutes);
+    await storage.timeSettings.sessionSeconds.set(0); 
     update();
   }
 
   // Save reward time to storage
-  async function setRewardTime() {
-    await storage.sessionSettings.rewardMinutes.set(rewardMinutes);
-    await storage.sessionSettings.rewardSeconds.set(0); 
+  async function setRewardMinutes() {
+    await storage.timeSettings.rewardMinutes.set(rewardMinutes);
+    await storage.timeSettings.rewardSeconds.set(0); 
     update();
   }
 </script>
@@ -127,7 +127,7 @@
         bind:value={rewardMinutes}
         on:change={() => {
           rewardMinutes = Math.max(1, Math.min(60, parseInt(rewardMinutes) || 1));
-          setRewardTime();
+          setRewardMinutes();
         }}
         class="form-control form-control-sm inline"
       />
