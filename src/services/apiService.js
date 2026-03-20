@@ -59,10 +59,3 @@ export async function loginUser(credentials) {
 export async function updateUserSettings(patch) {
   return await authApiCall("users/settings", "PATCH", patch);
 }
-
-// patch /api/users/settings
-// export async function updateOperatingHoursStart(from) {
-//   const operatingStartMinutes = from.hrs * 60 + from.min;
-
-//   return await authApiCall("users/settings", "PATCH", { operatingStartMinutes });
-// }
