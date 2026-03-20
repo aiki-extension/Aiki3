@@ -45,7 +45,7 @@ async function apiCall(endpoint, method, data = null, token = null) {
 }
 
 async function authApiCall(endpoint, method, data = null) {
-  return apiCall(endpoint, method, data, storage.jwt.get());
+  return await apiCall(endpoint, method, data, await storage.jwt.get());
 }
 
 // API functions
@@ -53,8 +53,16 @@ export async function registerUser(credentials) {
   return await apiCall("users/", "POST", credentials);
 }
 export async function loginUser(credentials) {
-  return await authApiCall("auth/login", "POST", credentials);
+  return await apiCall("auth/login", "POST", credentials);
 }
 
+export async function updateUserSettings(patch) {
+  return await authApiCall("users/settings", "PATCH", patch);
+}
 
+// patch /api/users/settings
+// export async function updateOperatingHoursStart(from) {
+//   const operatingStartMinutes = from.hrs * 60 + from.min;
 
+//   return await authApiCall("users/settings", "PATCH", { operatingStartMinutes });
+// }
