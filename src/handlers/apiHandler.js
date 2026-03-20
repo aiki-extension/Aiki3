@@ -1,6 +1,5 @@
 import { loginUser, registerUser, getUserSettings } from "../services/apiService";
 import { fetchAndSyncIfChanged, fetchAndSyncSettings } from "../services/settingsService";
-import storage from "../util/storage";
 
 function toTokenResult(result) {
   if (!result.ok) {
@@ -13,12 +12,17 @@ export async function handleApiMessage(message) {
   if (message.type === "api:login") {
     const result = await loginUser({ email: message.email, password: message.password });
     const validated = toTokenResult(result);
-    
-    // Helper function to store settings from DB into local storage on Login (if there is a difference)
-    if (validated.ok) {
-      await fetchAndSyncIfChanged();
-    }
 
+    if (validated.ok) {
+      try {
+        const syncResult = await fetchAndSyncSettings();
+        if (!syncResult.ok) {
+          console.warn("[Settings] Could not sync settings on login:", syncResult.message);
+        }
+      } catch (e) {
+        console.warn("[Settings] fetchAndSyncSettings crashed: ", e);
+      }
+    }
     return validated;
   }
 
@@ -27,11 +31,11 @@ export async function handleApiMessage(message) {
     return toTokenResult(result);
   }
 
-  if (message.type === "settings:getUserSettings") {
+  if (message.type === "api:getUserSettings") {
         const result = await getUserSettings();
         if (!result.ok) {
           return { ok: false, message: result.message, data: null};
         }
-        return { ok: true, data: result.data};
+        return { ok: true, data: result};
     }
 }

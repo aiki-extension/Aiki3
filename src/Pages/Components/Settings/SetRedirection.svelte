@@ -32,9 +32,6 @@
     }
     hasSaved = !!learningUri;
     isEditing = !hasSaved;
-
-    // Helper function to check if local storage needs to get updated with DB data instead
-    await fetchAndSyncIfChanged();
   });
 
   function normalize(url) {

@@ -19,11 +19,35 @@
   import AikiDescription from "./Components/Settings/AikiDescription.svelte";
   import Alerts from "./Components/Alerts/AlertContainer.svelte";
 
+  // Data Sync related imports
+  import { onMount } from "svelte";
+  import { fetchAndSyncIfChanged } from "../services/settingsService";
+  import { alertStore } from "../services/alertService";
+
   let user = "";
   let userIsRegistered = false;
 
   const port = browser.runtime.connect({
   name: "Settings Communication"
+  });
+
+  onMount(async () => {
+    console.log("TRIGGERED onMount IN SETTINGS")
+    // Helper function to check if local storage needs to get updated with DB data instead
+    const result = await fetchAndSyncIfChanged();
+    if (!result.ok) {
+      alertStore.add({
+        type: 'warning',
+        message: "Could not fetch latest settings from server. Using local settings.",
+        dismissible: true,
+      });
+    } else if (result.changed) {
+      alertStore.add({
+        type: 'success',
+        message: "Settings updated from server.",
+        dismissible: true,
+      });
+    }
   });
 </script>
 
