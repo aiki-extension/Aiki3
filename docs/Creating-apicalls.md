@@ -28,12 +28,12 @@ All frontend-to-backend communication goes through `browser.runtime.sendMessage`
 ## Step 1 — Add a Function in `apiService.js`
 
 Use the `apiCall` helper. It handles headers, JSON serialization, and error normalization automatically.
-
+For requests that require authentication, use `authApiCall` which automatically includes the JWT.
 
 ### `apiCall` Signature
 
 ```javascript
-apiCall(endpoint, method = "GET", data = null, token = storage.jwt.get())
+apiCall(endpoint, method, data = null, token = null)
 ```
 What do the Parameters mean?
 
@@ -45,22 +45,35 @@ What do the Parameters mean?
 | `token`    | `string` | JWT for Authorization header (auto-read from storage)    |
 
 
-## Step 2 — Add a Handler in `messageHandler.js`
-
-Add a new `if` block inside `handleMessage`. Follow the existing pattern: check `message.type`, call your `apiService` function, and return the result.
+### `authApiCall` Signature
 
 ```javascript
-if (message.type === "your:messageType") {
+authApiCall(endpoint, method, data = null)
+```
+What do the parameters mean?
+| Parameter  | Type     | Description                                              |
+|------------|----------|----------------------------------------------------------|
+| `endpoint` | `string` | Path appended to `API_BASE_URL` (e.g. `"auth/login"`)    |
+| `method`   | `string` | HTTP method: `"GET"`, `"POST"`, `"PUT"`, `"DELETE"`      |
+| `data`     | `object` | Request body (optional, dont add for GET requests)       |
+
+## Step 2 — Add a Handler in `apiHandler.js`
+
+Add a new `if` block inside `handleApiMessage`. Follow the existing pattern, by checking the `message.type`. Then call your `apiService` function, and return the result.
+
+```javascript
+if (message.type === "api:<yourMessageType>") {
   const result = await yourApiFunction({ field: message.field });
   return validateResult(result);
 }
 ```
 
-### Using `validateResult`
+### Using `toTokenResult` for Auth Calls
 
-`validateResult` Is a helper function to validate the result of the auth calls.
+`toTokenResult` is a helper that shapes the result of auth calls into a consistent format. It checks if the response contains a valid token and returns an object with `ok`, `message`, and `token` fields.
 
-Use `validateResult` for **auth-related calls** that return a token. For calls that return other data, return the result directly or shape it manually.
+
+Use `toTokenResult` for **auth-related calls** that return a token. For calls that return other data, return the result directly or shape it manually.
 
 ### Returning Custom Data
 
