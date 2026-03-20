@@ -1,4 +1,3 @@
-// alertService.js
 import { writable } from 'svelte/store';
 
 function createAlertStore() {

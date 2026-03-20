@@ -17,51 +17,43 @@ const API_BASE_URL = "http://localhost:3000/api/"; // This is the base URL for t
  * Returns: { ok: boolean, message: string, data: any }
  * - ok: true if the request succeeded (HTTP 2xx)
  * - message: error message if ok is false, empty string otherwise
- * - data: parsed JSON response body, or null on failure
+ * - parsed JSON response body, or null on failure
  */
-async function apiCall(endpoint, method = "GET", data = null, token = storage.jwt.get()) {
+async function apiCall(endpoint, method, data = null, token = null) {
   const url = `${API_BASE_URL}${endpoint}`;
-  const options = {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": token ? `Bearer ${token}` : "",
-    },
-  };
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`; // Include JWT token if available/needed
+
+  const options = { method, headers };
+
   if (data) {
     options.body = JSON.stringify(data);
   }
 
   try {
     const response = await fetch(url, options);
-    const json = await response.json();
+    const response_json = await response.json();
 
     if (!response.ok) {
-      return { ok: false, message: json.message ?? response.statusText, data: null };
+      return { ok: false, message: response_json?.message ?? response.statusText };
     }
-    return { ok: true, message: "", data: json };
+    return { ok: true, message: "", ...response_json };
   } catch (error) {
     console.error("API call error:", error);
-    return { ok: false, message: error.message, data: null };
+    return { ok: false, message: error.message };
   }
 }
-/*
-Example API functions that can be called from the messageHandler.
-export async function getUserData() {
-  return await apiCall("user/data");
+
+async function authApiCall(endpoint, method, data = null) {
+  return apiCall(endpoint, method, data, storage.jwt.get());
 }
 
-export else it cant be used in the messageHandler.js
-Apicall calls the function apiCall with the appropriate endpoint, method, and data.
-
-*/
-
-// Example API functions
+// API functions
 export async function registerUser(credentials) {
   return await apiCall("users/", "POST", credentials);
 }
 export async function loginUser(credentials) {
-  return await apiCall("auth/login", "POST", credentials);
+  return await authApiCall("auth/login", "POST", credentials);
 }
 
 export async function getUserSettings() {

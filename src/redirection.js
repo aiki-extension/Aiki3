@@ -633,16 +633,19 @@ async function gotoOrigin(event, sourceContext = {}) {
 
   const redirectionToggled = await storage.redirection.get();
   if (redirectionToggled && !hasRemainingLearningTabs) {
-    const rewardSetting = await storage.timeSettings.rewardTime.get();
-    let rewardTime = parseTime.toSystem(rewardSetting);
+    const [rewardMinutes, rewardSeconds] = await Promise.all([
+      storage.timeSettings.rewardMinutes.get(),
+      storage.timeSettings.rewardSeconds.get(),
+    ]);
+    let rewardDuration = (rewardMinutes * 60 * 1000) + (rewardSeconds * 1000);
 
-    if (rewardTime <= 0) {
+    if (rewardDuration <= 0) {
       // Provide a short grace period so the skip/continue action actually unlocks the site.
-      rewardTime = 60 * 1000;
+      rewardDuration = 60 * 1000;
     }
 
     await storage.shouldRedirect.set(false);
-    await timer.startProcrastinationSession(checkActiveTab, rewardTime);
+    await timer.startProcrastinationSession(checkActiveTab, rewardDuration);
   } else if (hasRemainingLearningTabs) {
     await storage.shouldRedirect.set(true);
   }

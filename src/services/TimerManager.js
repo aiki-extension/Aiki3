@@ -271,10 +271,10 @@ class TimerManager {
 
   // Get session durations and reward durations from storage
   async getSessionAndRewardDurations() {
-    const sessionMin = await storage.sessionSettings.sessionMinutes.get();
-    const sessionSec = await storage.sessionSettings.sessionSeconds.get();
-    const rewardMin = await storage.sessionSettings.rewardMinutes.get();
-    const rewardSec = await storage.sessionSettings.rewardSeconds.get();
+    const sessionMin = await storage.timeSettings.sessionMinutes.get();
+    const sessionSec = await storage.timeSettings.sessionSeconds.get();
+    const rewardMin = await storage.timeSettings.rewardMinutes.get();
+    const rewardSec = await storage.timeSettings.rewardSeconds.get();
     return {
       sessionMs: (sessionMin * 60 + sessionSec) * 1000,
       rewardMs: (rewardMin * 60 + rewardSec) * 1000,

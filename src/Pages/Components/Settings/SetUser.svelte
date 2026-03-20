@@ -53,24 +53,22 @@
     });
   }
 
-  function persistSessionLocally(nextUser, token) {
-    storage.uid.set(nextUser);
-    if (token) {
-      storage.jwt.set(token);
-    }
+  async function persistSessionLocally(nextUser, token) {
+    await storage.uid.set(nextUser);
+    await storage.jwt.set(token ?? "");
     user = nextUser;
     userIsRegistered = true;
-    
   }
 
-  function clearSessionLocally() {
-    storage.jwt.set(null);
+  async function clearSessionLocally() {
+    await storage.jwt.set("");
+    await storage.uid.set("");
     user = "";
     userIsRegistered = false;
   }
 
   async function authenticateWithBackend({ mode, email, plainTextPassword }) {
-   const type = mode === "register" ? "auth:register" : "auth:login";
+   const type = mode === "register" ? "api:register" : "api:login";
    try {
      const result = await browser.runtime.sendMessage({
         type,
@@ -120,8 +118,9 @@
     return true;
   }
 
-  function setup() {
-    user = normalizeUser(storage.uid.get());
+  async function setup() {
+    const storedUid = await storage.uid.get();
+    user = typeof storedUid === "string" ? storedUid.trim() : "";
     userIsRegistered = user !== "";
   }
 
@@ -154,14 +153,9 @@
     }
   }
 
-  function resetUid() {
-    if (!confirm("Are you sure you want to sign out?")) {
-      return;
-    }
-
-    // Sign-out is local-only. Clear the stored session (uid + JWT).
-    // TODO(api): Also clear JWT when token is implemented.
-    clearSessionLocally();
+  async function resetUid() {
+    if (!confirm("Are you sure you want to sign out?")) return;
+    await clearSessionLocally();
     resetFormFields();
     authMode = "login";
     notifySuccess("You have been signed out.");
@@ -273,8 +267,8 @@
             <a
               href="#guest"
               class="auth-switch-link"
-              on:click|preventDefault={() => {
-                persistSessionLocally("guest", null);
+              on:click|preventDefault={async () => {
+                await persistSessionLocally("guest", null);
                 notifySuccess("You are now signed in as a guest.");
               }}
             >

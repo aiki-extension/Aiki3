@@ -2,28 +2,23 @@ import storage from "../util/storage";
 import timer from "../services/TimerManager";
 import browser from "webextension-polyfill";
 import { parseTime } from "../util/utilities";
-import { loginUser, registerUser, getUserSettings} from "../services/apiService";
+import { handleApiMessage } from "./apiHandler";
 
 /*
-This module handles incoming messages from content scripts and other parts of the extension. 
-It processes different message types, such as timer requests, learning session management, and blocker release commands. 
-The handler ensures that messages are valid and performs the appropriate actions based on the message type.
+This module handles incoming messages from content scripts and other parts of the extension.
+It processes different message types, such as timer requests, learning session management, and blocker release commands.
+Auth messages are delegated to apiHandler.
 */
-
-// Input: apiCall result { ok, message, data }
-// Output: { ok: boolean, message: string, token: string | null }
-function validateResult(result) {
-  if (!result.ok) {
-    return { ok: false, message: result.message, token: null };
-  } else {
-    return { ok: true, message: "", token: result.token ?? null };
-  }
-}
 
 export async function handleMessage(message, sender) {
 
 if (!message || typeof message !== "object") {
     return;
+  }
+
+  // Delegate all api:* messages to apiHandler
+  if (message.type?.startsWith("api:")) {
+    return handleApiMessage(message);
   }
 
   if (message.type === "timer:get") {
@@ -34,40 +29,6 @@ if (!message || typeof message !== "object") {
       const timeData = timer.getTime();
       return timeData;
     })();
-  }
-  
-  if (message.type === "auth:login") {
-      const result = await loginUser({ email: message.email, password: message.password });
-      const validated = validateResult(result);
-
-      if (validated.ok) {
-        // Fetch user settings from DB after login
-        const userSettings = await getUserSettings();
-        if (userSettings.ok) {
-          const db = userSettings.data;
-          // Does the writing in parallel instead of sequentally
-          await Promise.all([
-            storage.timeSettings.sessionMinutes.set(db.sessionDurationMinutes),
-            storage.timeSettings.rewardMinutes.set(db.rewardTimeMinutes),
-            storage.timeSettings.learningTime.set({ min: db.dailyLearningGoalMinutes, sec: 0}),
-            storage.operatingHours.from.set({ hrs: Math.floor(db.operatingStartMinutes / 60), min: db.operatingStartMinutes % 60 }),
-            storage.operatingHours.to.set({ hrs: Math.floor(db.operatingEndMinutes / 60), min: db.operatingEndMinutes % 60 }),
-          ])
-        }
-      }
-  }
-
-  if (message.type === "auth:register") {
-      const result = await registerUser({ email: message.email, password: message.password });
-      return validateResult(result);
-  }
-
-  if (message.type === "settings:getUser") {
-      const result = await getUserSettings();
-      if (!result.ok) {
-        return { ok: false, message: result.message, data: null};
-      }
-      return { ok: true, data: result.data};
   }
 
   if (message.type === "learning:autoStart") {
@@ -90,8 +51,8 @@ if (!message || typeof message !== "object") {
         }
         
         // Get session duration from settings (minutes + seconds)
-        const sessionMinutes = await storage.sessionSettings.sessionMinutes.get();
-        const sessionSeconds = await storage.sessionSettings.sessionSeconds.get();
+        const sessionMinutes = await storage.timeSettings.sessionMinutes.get();
+        const sessionSeconds = await storage.timeSettings.sessionSeconds.get();
         const sessionDuration = (sessionMinutes * 60 * 1000) + (sessionSeconds * 1000);
         
         // Check if session is already active
@@ -175,8 +136,8 @@ if (!message || typeof message !== "object") {
         }
         
         // Get reward duration from settings
-        const rewardMinutes = await storage.sessionSettings.rewardMinutes.get();
-        const rewardSeconds = await storage.sessionSettings.rewardSeconds.get();
+        const rewardMinutes = await storage.timeSettings.rewardMinutes.get();
+        const rewardSeconds = await storage.timeSettings.rewardSeconds.get();
         const rewardDuration = (rewardMinutes * 60 * 1000) + (rewardSeconds * 1000);
         
         // This prevents the redirect prompt from showing immediately
@@ -261,8 +222,8 @@ if (!message || typeof message !== "object") {
                 // Also trigger learning:autoStart to begin a new session
                 // This will start the session timer and show the learning overlay
                 await (async () => {
-                  const sessionMinutes = await storage.sessionSettings.sessionMinutes.get();
-                  const sessionSeconds = await storage.sessionSettings.sessionSeconds.get();
+                  const sessionMinutes = await storage.timeSettings.sessionMinutes.get();
+                  const sessionSeconds = await storage.timeSettings.sessionSeconds.get();
                   const sessionDuration = (sessionMinutes * 60 * 1000) + (sessionSeconds * 1000);
                   
                   await timer.startSessionTimer(sessionDuration, () => {
