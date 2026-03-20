@@ -1,4 +1,5 @@
 import { loginUser, registerUser, getUserSettings } from "../services/apiService";
+import { fetchAndSyncIfChanged, fetchAndSyncSettings } from "../services/settingsService";
 import storage from "../util/storage";
 
 function toTokenResult(result) {
@@ -13,21 +14,12 @@ export async function handleApiMessage(message) {
     const result = await loginUser({ email: message.email, password: message.password });
     const validated = toTokenResult(result);
     
-          if (validated.ok) {
-            // Fetch user settings from DB after login
-            const userSettings = await getUserSettings();
-            if (userSettings.ok) {
-              const db = userSettings.data;
-              // Does the writing in parallel instead of sequentally
-              await Promise.all([
-                storage.timeSettings.sessionMinutes.set(db.sessionDurationMinutes),
-                storage.timeSettings.rewardMinutes.set(db.rewardTimeMinutes),
-                storage.timeSettings.learningTime.set({ min: db.dailyLearningGoalMinutes, sec: 0}),
-                storage.operatingHours.from.set({ hrs: Math.floor(db.operatingStartMinutes / 60), min: db.operatingStartMinutes % 60 }),
-                storage.operatingHours.to.set({ hrs: Math.floor(db.operatingEndMinutes / 60), min: db.operatingEndMinutes % 60 }),
-              ])
-            }
-          }
+    // Helper function to store settings from DB into local storage on Login (if there is a difference)
+    if (validated.ok) {
+      await fetchAndSyncIfChanged();
+    }
+
+    return validated;
   }
 
   if (message.type === "api:register") {
@@ -35,7 +27,7 @@ export async function handleApiMessage(message) {
     return toTokenResult(result);
   }
 
-  if (message.type === "settings:getUser") {
+  if (message.type === "settings:getUserSettings") {
         const result = await getUserSettings();
         if (!result.ok) {
           return { ok: false, message: result.message, data: null};

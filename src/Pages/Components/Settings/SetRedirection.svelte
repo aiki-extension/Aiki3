@@ -7,7 +7,8 @@
   import storage from "../../../util/storage";
   import { onMount, tick } from "svelte";
   import { parseUrl } from "../../../util/utilities";
-  import { alertStore } from '../../../services/alertService'; 
+  import { alertStore } from '../../../services/alertService';
+  import { fetchAndSyncIfChanged } from "../../../services/settingsService"; 
 
   // Component imports
   import Container from "./Container.svelte";
@@ -31,6 +32,9 @@
     }
     hasSaved = !!learningUri;
     isEditing = !hasSaved;
+
+    // Helper function to check if local storage needs to get updated with DB data instead
+    await fetchAndSyncIfChanged();
   });
 
   function normalize(url) {
