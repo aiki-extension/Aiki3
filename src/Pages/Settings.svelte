@@ -21,7 +21,7 @@
 
   // Data Sync related imports
   import { onMount } from "svelte";
-  import { fetchAndSyncIfChanged } from "../services/settingsService";
+  import { fetchAndSyncSettings } from "../services/settingsService";
   import { alertStore } from "../services/alertService";
   import storage from "../util/storage";
 
@@ -34,16 +34,16 @@
   });
 
   // Triggered by SetUser.svelte after a successfull login or a register
-  // Fetches latest settings from DB and syncs to local storage if anything has changed.
+  // Fetches latest settings from DB and syncs to local storage
   async function handleAuthenticated() {
-    const result = await fetchAndSyncIfChanged();
+    const result = await fetchAndSyncSettings();
     if (!result.ok) {
       alertStore.add({
         type: 'warning',
         message: "Could not fetch latest settings from server. Using local settings.",
         dismissible: true,
       });
-    } else if (result.changed) {
+    } else {
       settingsKey++; // settingsKey++ forces SetRedirection and its children to remount (thus refreshing values shown on the page)
       alertStore.add({
         type: 'success',

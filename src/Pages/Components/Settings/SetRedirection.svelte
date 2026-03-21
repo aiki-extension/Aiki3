@@ -8,7 +8,6 @@
   import { onMount, tick } from "svelte";
   import { parseUrl } from "../../../util/utilities";
   import { alertStore } from '../../../services/alertService';
-  import { fetchAndSyncIfChanged } from "../../../services/settingsService"; 
 
   // Component imports
   import Container from "./Container.svelte";

@@ -1,5 +1,5 @@
 import { loginUser, registerUser, getUserSettings } from "../services/apiService";
-import { fetchAndSyncIfChanged, fetchAndSyncSettings } from "../services/settingsService";
+import { fetchAndSyncSettings } from "../services/settingsService";
 
 function toTokenResult(result) {
   if (!result.ok) {
