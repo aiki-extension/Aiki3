@@ -7,7 +7,7 @@
   import storage from "../../../util/storage";
   import { onMount, tick } from "svelte";
   import { parseUrl } from "../../../util/utilities";
-  import { alertStore } from '../../../services/alertService'; 
+  import { alertStore } from '../../../services/alertService';
 
   // Component imports
   import Container from "./Container.svelte";

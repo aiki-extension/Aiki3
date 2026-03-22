@@ -19,11 +19,47 @@
   import AikiDescription from "./Components/Settings/AikiDescription.svelte";
   import Alerts from "./Components/Alerts/AlertContainer.svelte";
 
+  // Data Sync related imports
+  import { onMount } from "svelte";
+  import { fetchAndSyncSettings } from "../services/settingsService";
+  import { alertStore } from "../services/alertService";
+  import storage from "../util/storage";
+
   let user = "";
   let userIsRegistered = false;
+  let settingsKey = 0;
 
   const port = browser.runtime.connect({
   name: "Settings Communication"
+  });
+
+  // Triggered by SetUser.svelte after a successfull login or a register
+  // Fetches latest settings from DB and syncs to local storage
+  async function handleAuthenticated() {
+    const result = await fetchAndSyncSettings();
+    if (!result.ok) {
+      alertStore.add({
+        type: 'warning',
+        message: "Could not fetch latest settings from server. Using local settings.",
+        dismissible: true,
+      });
+    } else {
+      settingsKey++; // settingsKey++ forces SetRedirection and its children to remount (thus refreshing values shown on the page)
+      alertStore.add({
+        type: 'success',
+        message: "Settings updated from server.",
+        dismissible: true,
+      });
+    }
+  }
+
+  onMount(async () => {
+    // Token is used to check if the user is not logged or is in guest mode
+    // Either way the user should not try to fetch data from API. Only if they are logged in
+    const token = await storage.jwt.get();
+    if (token) {
+      await handleAuthenticated();
+    }
   });
 </script>
 
@@ -37,7 +73,8 @@
       </div>
     {/if}
     <div class="container">
-      <SetUser bind:user bind:userIsRegistered {port} />
+      <!-- Listens for the "authenticated" event in SetUser.svelte. Thus triggering the function to trigger, to refresh values on the page-->
+      <SetUser bind:user bind:userIsRegistered {port} on:authenticated={handleAuthenticated} />
     </div>
     {#if userIsRegistered}
       <div class="container">
@@ -46,9 +83,11 @@
       <div class="container">
         <SetWebsites {user} {port} />
       </div>
-      <div class="container">
-        <SetRedirection {user} />
-      </div>
+      {#key settingsKey} <!-- increments after a successful sync. Forcing this block to remount to re-read local storage values (thus showing correct values on the page)-->
+        <div class="container">
+          <SetRedirection {user} />
+        </div>
+      {/key}
       <div class="container">
         <Statistics />
       </div>
