@@ -42,7 +42,7 @@
       const result = await browser.runtime.sendMessage({ type: "api:updateLearningTime", learningTimeMinutes: learnMin});
       alertStore.add({
         type: 'success',
-        message: "Daily learnin goal updated.",
+        message: "Daily learning goal updated.",
       });
     } catch {
       alertStore.add({ type: 'warning', message: "Could not reach the server, so your change has not been saved in the cloud ☁️.", dismissible: true});
