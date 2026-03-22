@@ -10,6 +10,7 @@
   import { faUserSlash, faUserPlus } from "@fortawesome/free-solid-svg-icons";
   import { alertStore } from "../../../services/alertService";
   import browser from "webextension-polyfill";
+  import {createEventDispatcher } from "svelte";
 
   export let user = "";
   export let userIsRegistered;
@@ -19,6 +20,7 @@
   let confirmPassword = "";
   let isSubmitting = false;
   const basicEmailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const dispatch = createEventDispatcher();
 
   // Trimming whitespace and converting to lowercase.
   function normalizeUser(value) {
@@ -146,6 +148,10 @@
       }
 
       persistSessionLocally(normalizedUser, authResult.token);
+
+      // After successful login/register, notify parent (Settings.svelte) 
+      // so it can sync DB settings to local storage and re-render child components
+      dispatch("authenticated");
       resetFormFields({ keepUser: true });
       notifySuccess(authMode === "register" ? "Registration successful!" : "Login successful!");
     } finally {
