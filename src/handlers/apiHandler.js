@@ -1,4 +1,4 @@
-import { loginUser, registerUser, getUserSettings } from "../services/apiService";
+import { loginUser, registerUser, updateOperatingHoursStart, updateUserSettings, getUserSettings } from "../services/apiService";
 import { fetchAndSyncSettings } from "../services/settingsService";
 
 function toTokenResult(result) {
@@ -37,5 +37,17 @@ export async function handleApiMessage(message) {
           return { ok: false, message: result.message, data: null};
         }
         return { ok: true, data: result};
-    }
+  }
+  
+  if (message.type === "api:updateOperatingHoursStart") {
+    const operatingStartMinutes = message.from.hrs * 60 + message.from.min;
+    const result = await updateUserSettings({ operatingStartMinutes });
+    return { ok: result.ok, message: result.message };
+  }
+
+  if (message.type === "api:updateOperatingHoursEnd") {
+    const operatingEndMinutes = message.to.hrs * 60 + message.to.min;
+    const result = await updateUserSettings( { operatingEndMinutes });
+    return { ok: result.ok, message: result.message };
+  }
 }

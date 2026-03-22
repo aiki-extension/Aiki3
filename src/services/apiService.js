@@ -60,4 +60,6 @@ export async function getUserSettings() {
   return await authApiCall("users/settings", "GET");
 }
 
-
+export async function updateUserSettings(patch) {
+  return await authApiCall("users/settings", "PATCH", patch);
+}
