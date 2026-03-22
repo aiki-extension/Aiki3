@@ -1,4 +1,4 @@
-import { loginUser, registerUser, updateOperatingHoursStart, updateUserSettings } from "../services/apiService";
+import { loginUser, registerUser, updateUserSettings } from "../services/apiService";
 
 function toTokenResult(result) {
   if (!result.ok) {
