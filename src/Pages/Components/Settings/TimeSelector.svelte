@@ -50,10 +50,9 @@
       alertStore.add({
         type: result?.ok ? 'success' : 'error',
         message: result?.ok ? "Session duration updated." : "Failed to update session duration.",
-        dismissible: true,
       });
     } catch {
-      alertStore.add({ type: 'warning', message: "Could not reach the server.", dismissible: true});
+      alertStore.add({ type: 'warning', message: "Could not reach the server."});
     }
     update();
   }
@@ -68,10 +67,9 @@
       alertStore.add({
         type: result?.ok ? 'success' : 'error',
         message: result?.ok ? "Reward time updated." : "Failed to update reward time.",
-        dismissible: true,
       })
     } catch {
-      alertStore.add({ type: 'warning', message: "Could not reach the server.", dismissible: true });
+      alertStore.add({ type: 'warning', message: "Could not reach the server." });
     }
     update();
   }

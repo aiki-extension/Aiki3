@@ -41,14 +41,12 @@
       alertStore.add({
         type: 'warning',
         message: "Could not fetch latest settings from server. Using local settings.",
-        dismissible: true,
       });
     } else {
       settingsKey++; // settingsKey++ forces SetRedirection and its children to remount (thus refreshing values shown on the page)
       alertStore.add({
         type: 'success',
         message: "Settings updated from server.",
-        dismissible: true,
       });
     }
   }
