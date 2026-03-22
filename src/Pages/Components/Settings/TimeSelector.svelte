@@ -26,16 +26,28 @@
   // Ensures that the learning time meets the minimum threshold. If the user tries to set a value below the minimum, it will automatically adjust it to the minimum allowed value. This function is called before saving the settings to ensure data integrity.
   function ensureMinThreshold() {
     // Enforce 5-minute minimum for learning time
-    if (learnMin < MIN_LEARNING_MINUTES) {
-      learnMin = MIN_LEARNING_MINUTES;
+    if (learnMin < minLearningMinutes) {
+      learnMin = minLearningMinutes;
       learnSec = 0;
     }
   }
+
   // This function saves the learning time settings to storage
   async function setLearningTime() {
     ensureMinThreshold();
     const learningTime = { min: learnMin, sec: learnSec };
     storage.timeSettings.learningTime.set(learningTime);
+
+    try {
+      const result = await browser.runtime.sendMessage({ type: "api:updateLearningTime", learningTimeMinutes: learnMin});
+      alertStore.add({
+        type: 'success',
+        message: "Session duration updated.",
+      });
+    } catch {
+      alertStore.add({ type: 'warning', message: "Could not reach the server, so your change has not been saved in the cloud ☁️.", dismissible: true});
+    }
+
     update();
   }
 
