@@ -1,4 +1,4 @@
-import { loginUser, registerUser, updateOperatingHoursStart, updateUserSettings, getUserSettings } from "../services/apiService";
+import { loginUser, registerUser, updateUserSettings, getUserSettings } from "../services/apiService";
 import { fetchAndSyncSettings } from "../services/settingsService";
 
 function toTokenResult(result) {
@@ -38,7 +38,7 @@ export async function handleApiMessage(message) {
         }
         return { ok: true, data: result};
   }
-  
+
   if (message.type === "api:updateOperatingHoursStart") {
     const operatingStartMinutes = message.from.hrs * 60 + message.from.min;
     const result = await updateUserSettings({ operatingStartMinutes });
