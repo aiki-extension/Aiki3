@@ -43,7 +43,6 @@
     alertStore.add({
       type: 'error',
       message: alertMessage,
-      dismissible: true
     });
   }
 
@@ -51,7 +50,6 @@
     alertStore.add({
       type: 'success',
       message: alertMessage,
-      dismissible: true
     });
   }
 
