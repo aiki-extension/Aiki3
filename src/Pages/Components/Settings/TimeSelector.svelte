@@ -5,6 +5,8 @@
   import { onMount } from "svelte";
   import storage from "../../../util/storage";
   import { SESSION_DURATION_OPTIONS } from '../../../values/defaultSettingValues';
+  import browser from "webextension-polyfill";
+  import { alertStore } from "../../../services/alertService";
 
   export let settings;
   export let update;
@@ -37,17 +39,38 @@
     update();
   }
 
-  // Save session duration to storage
+  // Save session duration to storage and backend
   async function setSessionTime() {
     await storage.timeSettings.sessionMinutes.set(sessionMinutes);
     await storage.timeSettings.sessionSeconds.set(0); 
+
+    // Calls API to send the updated session duration to the backend
+    try {
+      const result = await browser.runtime.sendMessage({ type: "api:updateSessionDuration", sessionDurationMinutes: sessionMinutes});
+      alertStore.add({
+        type: result?.ok ? 'success' : 'error',
+        message: result?.ok ? "Session duration updated." : "Failed to update session duration.",
+      });
+    } catch {
+      alertStore.add({ type: 'warning', message: "Could not reach the server."});
+    }
     update();
   }
 
-  // Save reward time to storage
+  // Save reward time to storage and backend
   async function setRewardMinutes() {
     await storage.timeSettings.rewardMinutes.set(rewardMinutes);
     await storage.timeSettings.rewardSeconds.set(0); 
+
+    try {
+      const result = await browser.runtime.sendMessage({ type: "api:updateRewardTime", rewardTimeMinutes: rewardMinutes });
+      alertStore.add({
+        type: result?.ok ? 'success' : 'error',
+        message: result?.ok ? "Reward time updated." : "Failed to update reward time.",
+      })
+    } catch {
+      alertStore.add({ type: 'warning', message: "Could not reach the server." });
+    }
     update();
   }
 </script>

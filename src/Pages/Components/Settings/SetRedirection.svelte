@@ -53,7 +53,6 @@
       alertStore.add({
         type: 'warning',
         message: 'Your learning site cant be the same as a time wasting site',
-        dismissible: true
       })
       return;    
     }
@@ -66,7 +65,6 @@
       alertStore.add({
         type: 'success',
         message: 'Learning platform cleared.',
-        dismissible: true
       })
       return;
     }
@@ -80,7 +78,6 @@
     alertStore.add({
         type: 'success',
         message: 'Learning platform saved!',
-        dismissible: true
       })
   }
 
@@ -99,7 +96,6 @@
     alertStore.add({
       type: 'info',
       message: 'Changes cancelled.',
-      dismissible: true
     })
   }
 

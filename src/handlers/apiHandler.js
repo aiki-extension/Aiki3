@@ -50,4 +50,14 @@ export async function handleApiMessage(message) {
     const result = await updateUserSettings( { operatingEndMinutes });
     return { ok: result.ok, message: result.message };
   }
+
+  if (message.type === "api:updateSessionDuration") {
+  const result = await updateUserSettings({ sessionDurationMinutes: message.sessionDurationMinutes });
+  return { ok: result.ok, message: result.message };
+  }
+
+  if (message.type === "api:updateRewardTime") {
+    const result = await updateUserSettings({ rewardTimeMinutes: message.rewardTimeMinutes });
+    return { ok: result.ok, message: result.message };
+  }
 }

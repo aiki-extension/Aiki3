@@ -38,13 +38,11 @@
         message: ok
           ? "Operating hours updated successfully."
           : "Failed to update to the server. Please try again.",
-        dismissible: true,
       });
     } catch {
       alertStore.add({
         type: 'warning',
         message: "Failed to update to the server. Please try again.",
-        dismissible: true,
       });
     }
     update();
@@ -78,13 +76,11 @@
         message: ok
           ? "Operating hours updated successfully."
           : "Failed to update to the server. Please try again.",
-        dismissible: true,
       });
     } catch {
       alertStore.add({
         type: 'warning',
         message: "Failed to update to the server. Please try again.",
-        dismissible: true,
       });
     }
 
