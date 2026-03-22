@@ -45,7 +45,7 @@
         message: "Daily learning goal updated.",
       });
     } catch {
-      alertStore.add({ type: 'warning', message: "Could not reach the server, so your change has not been saved in the cloud ☁️.", dismissible: true});
+      alertStore.add({ type: 'warning', message: "Could not reach the server, so your change has not been saved in the cloud ☁️." });
     }
 
     update();
