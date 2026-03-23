@@ -4,6 +4,7 @@
  -->
 <script>
   import storage from "../../../util/storage";
+  import { alertStore } from "../../../services/alertService";
 
   export let settings;
   export let update;
@@ -17,15 +18,33 @@
     // Ensure "to" time is always after "from" time
     const fromTotal = hrsFrom * 60 + minFrom;
     let toTotal = hrsTo * 60 + minTo;
-
     if (toTotal <= fromTotal) {
-      toTotal = fromTotal + 1; 
+      toTotal = fromTotal + 1;
       hrsTo = Math.floor(toTotal / 60) % 24;
       minTo = toTotal % 60;
     }
 
     const setting = { hrs: hrsTo, min: minTo };
+    
+    // Update "to" time in local storage
     storage.operatingHours.to.set(setting);
+
+    // Update "to" time on the backend
+    try {
+      const result = await browser.runtime.sendMessage({ type: "api:updateOperatingHoursEnd", to: setting });
+      const ok = result?.ok;
+      alertStore.add({
+        type: ok ? 'success' : 'error',
+        message: ok
+          ? "Operating hours updated successfully."
+          : "Failed to update to the server. Please try again.",
+      });
+    } catch {
+      alertStore.add({
+        type: 'warning',
+        message: "Failed to update to the server. Please try again.",
+      });
+    }
     update();
   }
 
@@ -35,15 +54,36 @@
     const fromTotal = hrsFrom * 60 + minFrom;
     let toTotal = hrsTo * 60 + minTo;
 
+    // Auto-advance "to" if it would no longer be after "from"
     if (toTotal <= fromTotal) {
-      toTotal = fromTotal + 1; 
+      toTotal = fromTotal + 1;
       hrsTo = Math.floor(toTotal / 60) % 24;
       minTo = toTotal % 60;
       storage.operatingHours.to.set({ hrs: hrsTo, min: minTo });
     }
 
     const setting = { hrs: hrsFrom, min: minFrom };
+
+    // Update "from" time in local storage
     storage.operatingHours.from.set(setting);
+
+    // Update "from" time on the backend
+    try {
+      const result = await browser.runtime.sendMessage({ type: "api:updateOperatingHoursStart", from: setting });
+      const ok = result?.ok;
+      alertStore.add({
+        type: ok ? 'success' : 'error',
+        message: ok
+          ? "Operating hours updated successfully."
+          : "Failed to update to the server. Please try again.",
+      });
+    } catch {
+      alertStore.add({
+        type: 'warning',
+        message: "Failed to update to the server. Please try again.",
+      });
+    }
+
     update();
   }
 

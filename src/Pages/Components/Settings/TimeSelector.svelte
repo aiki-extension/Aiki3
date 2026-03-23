@@ -5,6 +5,8 @@
   import { onMount } from "svelte";
   import storage from "../../../util/storage";
   import { SESSION_DURATION_OPTIONS } from '../../../values/defaultSettingValues';
+  import browser from "webextension-polyfill";
+  import { alertStore } from "../../../services/alertService";
 
   export let settings;
   export let update;
@@ -24,30 +26,63 @@
   // Ensures that the learning time meets the minimum threshold. If the user tries to set a value below the minimum, it will automatically adjust it to the minimum allowed value. This function is called before saving the settings to ensure data integrity.
   function ensureMinThreshold() {
     // Enforce 5-minute minimum for learning time
-    if (learnMin < MIN_LEARNING_MINUTES) {
-      learnMin = MIN_LEARNING_MINUTES;
+    if (learnMin < minLearningMinutes) {
+      learnMin = minLearningMinutes;
       learnSec = 0;
     }
   }
+
   // This function saves the learning time settings to storage
   async function setLearningTime() {
     ensureMinThreshold();
     const learningTime = { min: learnMin, sec: learnSec };
     storage.timeSettings.learningTime.set(learningTime);
+
+    try {
+      const result = await browser.runtime.sendMessage({ type: "api:updateLearningTime", learningTimeMinutes: learnMin});
+      alertStore.add({
+        type: 'success',
+        message: "Daily learning goal updated.",
+      });
+    } catch {
+      alertStore.add({ type: 'warning', message: "Could not reach the server, so your change has not been saved in the cloud ☁️." });
+    }
+
     update();
   }
 
-  // Save session duration to storage
+  // Save session duration to storage and backend
   async function setSessionTime() {
     await storage.timeSettings.sessionMinutes.set(sessionMinutes);
     await storage.timeSettings.sessionSeconds.set(0); 
+
+    // Calls API to send the updated session duration to the backend
+    try {
+      const result = await browser.runtime.sendMessage({ type: "api:updateSessionDuration", sessionDurationMinutes: sessionMinutes});
+      alertStore.add({
+        type: result?.ok ? 'success' : 'error',
+        message: result?.ok ? "Session duration updated." : "Failed to update session duration.",
+      });
+    } catch {
+      alertStore.add({ type: 'warning', message: "Could not reach the server."});
+    }
     update();
   }
 
-  // Save reward time to storage
+  // Save reward time to storage and backend
   async function setRewardMinutes() {
     await storage.timeSettings.rewardMinutes.set(rewardMinutes);
     await storage.timeSettings.rewardSeconds.set(0); 
+
+    try {
+      const result = await browser.runtime.sendMessage({ type: "api:updateRewardTime", rewardTimeMinutes: rewardMinutes });
+      alertStore.add({
+        type: result?.ok ? 'success' : 'error',
+        message: result?.ok ? "Reward time updated." : "Failed to update reward time.",
+      })
+    } catch {
+      alertStore.add({ type: 'warning', message: "Could not reach the server." });
+    }
     update();
   }
 </script>
