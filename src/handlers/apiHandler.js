@@ -60,4 +60,9 @@ export async function handleApiMessage(message) {
     const result = await updateUserSettings({ rewardTimeMinutes: message.rewardTimeMinutes });
     return { ok: result.ok, message: result.message };
   }
+
+  if (message.type === "api:updateLearningTime") {
+    const result = await updateUserSettings( { dailyLearningGoalMinutes: message.learningTimeMinutes });
+    return { ok: result.ok, message: result.message };
+  }
 }
