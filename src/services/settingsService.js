@@ -1,6 +1,6 @@
 import browser from "webextension-polyfill";
 import storage from "../util/storage";
-import MESSAGE_API_GET_USER_SETTINGS from "../values/messageTypeValues";
+import { MESSAGE_API_GET_USER_SETTINGS } from "../values/messageTypeValues";
 
 async function syncDBSettingsToLocalStorage(db) {
     await Promise.all([
