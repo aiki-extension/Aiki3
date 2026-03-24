@@ -9,8 +9,8 @@ const publicDir = path.join(__dirname, '..', 'public');
 const firefoxManifest = path.join(publicDir, 'manifest.firefox.json');
 const targetManifest = path.join(publicDir, 'manifest.json');
 const chromeManifest = path.join(publicDir, 'manifest.chrome.json');
+const version = require('../package.json').version;
 
-// Backup original Chrome manifest if not already backed up
 if (!fs.existsSync(chromeManifest)) {
     if (fs.existsSync(targetManifest)) {
         fs.copyFileSync(targetManifest, chromeManifest);
@@ -18,7 +18,6 @@ if (!fs.existsSync(chromeManifest)) {
     }
 }
 
-// Copy Firefox manifest to manifest.json
 if (fs.existsSync(firefoxManifest)) {
     fs.copyFileSync(firefoxManifest, targetManifest);
     console.log('✓ Copied Firefox manifest to manifest.json');
@@ -27,4 +26,10 @@ if (fs.existsSync(firefoxManifest)) {
     process.exit(1);
 }
 
+const manifest = JSON.parse(fs.readFileSync(targetManifest, 'utf8'));
+manifest.version = version;
+
+fs.writeFileSync(targetManifest, JSON.stringify(manifest, null, 2));
+
+console.log(`✓ Injected version ${version}`);
 console.log('✓ Ready for Firefox build');
