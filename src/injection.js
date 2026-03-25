@@ -566,15 +566,12 @@ function renderRedirectPrompt(originUrl) {
     const formatDomain = (h) => h.replace(/^www\./, "");
     const updateDescription = (h) => {
       description.innerHTML = "";
-      if (h) {
         description.appendChild(document.createTextNode("You're visiting "));
         const strong = document.createElement("strong");
         strong.textContent = formatDomain(h);
         description.appendChild(strong);
-        description.appendChild(document.createTextNode(". Switch to your learning platform?"));
-      } else {
-        description.textContent = "You've reached a focus site. Do you want to jump to your learning platform?";
-      }
+        description.appendChild(document.createTextNode(" Redirect to your learning platform?"));
+      
     };
 
     updateDescription(host);
