@@ -78,12 +78,6 @@ export default [
       // If we're building for production (npm run build
       // instead of npm run dev), minify
       production && terser(),
-      replace({
-        preventAssignment: true,
-        values: {
-          __API_BASE_URL__: JSON.stringify(env.PUBLIC_API_BASE_URL || 'http://localhost:3000'), //Fallback value if .env is undefined
-        }
-      }),
     ],
     watch: {
       clearScreen: false,
