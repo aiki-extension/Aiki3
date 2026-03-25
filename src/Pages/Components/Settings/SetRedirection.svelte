@@ -104,7 +104,7 @@
   }
 
   async function enableEditing() {
-    if (isEditing) return;https://f
+    if (isEditing) return;
     previousUri = learningUri;
     isEditing = true;
     await tick();
