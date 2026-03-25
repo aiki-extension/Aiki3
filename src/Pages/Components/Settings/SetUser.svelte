@@ -11,6 +11,10 @@
   import { alertStore } from "../../../services/alertService";
   import browser from "webextension-polyfill";
   import {createEventDispatcher } from "svelte";
+  import {
+    MESSAGE_API_LOGIN,
+    MESSAGE_API_REGISTER
+  } from "../../../values/messageTypeValues";
 
   export let user = "";
   export let userIsRegistered;
@@ -68,7 +72,7 @@
   }
 
   async function authenticateWithBackend({ mode, email, plainTextPassword }) {
-   const type = mode === "register" ? "api:register" : "api:login";
+   const type = mode === "register" ? MESSAGE_API_REGISTER : MESSAGE_API_LOGIN;
    try {
      const result = await browser.runtime.sendMessage({
         type,

@@ -1,6 +1,16 @@
 import { loginUser, registerUser, updateUserSettings, getUserSettings } from "../services/apiService";
 import { fetchAndSyncSettings } from "../services/settingsService";
-
+import { REWARD_TIME_MINUTES } from "../values/defaultSettingValues";
+import { 
+  MESSAGE_API_LOGIN,
+  MESSAGE_API_REGISTER,
+  MESSAGE_API_GET_USER_SETTINGS,
+  MESSAGE_API_UPDATE_OPERATING_HOURS_START,
+  MESSAGE_API_UPDATE_OPERATING_HOURS_END,
+  MESSAGE_API_UPDATE_SESSION_DURATION,
+  MESSAGE_API_UPDATE_REWARD_TIME,
+  MESSAGE_API_UPDATE_LEARNING_TIME
+} from "../values/messageTypeValues";
 function toTokenResult(result) {
   if (!result.ok) {
     return { ok: false, message: result.message, token: null };
@@ -9,7 +19,7 @@ function toTokenResult(result) {
 }
 
 export async function handleApiMessage(message) {
-  if (message.type === "api:login") {
+  if (message.type === MESSAGE_API_LOGIN) {
     const result = await loginUser({ email: message.email, password: message.password });
     const validated = toTokenResult(result);
 
@@ -26,12 +36,12 @@ export async function handleApiMessage(message) {
     return validated;
   }
 
-  if (message.type === "api:register") {
+  if (message.type === MESSAGE_API_REGISTER) {
     const result = await registerUser({ email: message.email, password: message.password });
     return toTokenResult(result);
   }
 
-  if (message.type === "api:getUserSettings") {
+  if (message.type === MESSAGE_API_GET_USER_SETTINGS) {
         const result = await getUserSettings();
         if (!result.ok) {
           return { ok: false, message: result.message, data: null};
@@ -39,29 +49,29 @@ export async function handleApiMessage(message) {
         return { ok: true, data: result};
   }
 
-  if (message.type === "api:updateOperatingHoursStart") {
+  if (message.type === MESSAGE_API_UPDATE_OPERATING_HOURS_START) {
     const operatingStartMinutes = message.from.hrs * 60 + message.from.min;
     const result = await updateUserSettings({ operatingStartMinutes });
     return { ok: result.ok, message: result.message };
   }
 
-  if (message.type === "api:updateOperatingHoursEnd") {
+  if (message.type === MESSAGE_API_UPDATE_OPERATING_HOURS_END) {
     const operatingEndMinutes = message.to.hrs * 60 + message.to.min;
     const result = await updateUserSettings( { operatingEndMinutes });
     return { ok: result.ok, message: result.message };
   }
 
-  if (message.type === "api:updateSessionDuration") {
+  if (message.type === MESSAGE_API_UPDATE_SESSION_DURATION) {
   const result = await updateUserSettings({ sessionDurationMinutes: message.sessionDurationMinutes });
   return { ok: result.ok, message: result.message };
   }
 
-  if (message.type === "api:updateRewardTime") {
+  if (message.type === MESSAGE_API_UPDATE_REWARD_TIME) {
     const result = await updateUserSettings({ rewardTimeMinutes: message.rewardTimeMinutes });
     return { ok: result.ok, message: result.message };
   }
 
-  if (message.type === "api:updateLearningTime") {
+  if (message.type === MESSAGE_API_UPDATE_LEARNING_TIME) {
     const result = await updateUserSettings( { dailyLearningGoalMinutes: message.learningTimeMinutes });
     return { ok: result.ok, message: result.message };
   }

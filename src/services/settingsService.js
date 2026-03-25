@@ -1,5 +1,6 @@
 import browser from "webextension-polyfill";
 import storage from "../util/storage";
+import { MESSAGE_API_GET_USER_SETTINGS } from "../values/messageTypeValues";
 
 async function syncDBSettingsToLocalStorage(db) {
     await Promise.all([
@@ -13,7 +14,7 @@ async function syncDBSettingsToLocalStorage(db) {
 
 // Fetches and syncs without checking (used when logging in)
 export async function fetchAndSyncSettings() {
-    const result = await browser.runtime.sendMessage({ type: "api:getUserSettings" });
+    const result = await browser.runtime.sendMessage({ type: MESSAGE_API_GET_USER_SETTINGS });
     if (!result.ok) return { ok: false, message: result.message };
 
     await syncDBSettingsToLocalStorage(result.data);
