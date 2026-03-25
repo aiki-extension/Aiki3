@@ -105,6 +105,7 @@
   <h5>Your Redirection Platform:</h5>
   <div class="container">
     <div class="full" id="learning-url-container">
+    <form on:submit|preventDefault={saveUri}>
       <input
         class="form-control form-control-lg url-input"
         type="text"
@@ -145,6 +146,7 @@
           </button>
         {/if}
       </div>
+    </form>
     </div>
   </div>
   <hr />
