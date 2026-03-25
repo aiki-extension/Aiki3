@@ -41,6 +41,20 @@
     return `https://${trimmed}`;
   }
 
+  const HOSTNAME_RE =
+  /^(?=.{1,253}$)(?!-)(?:[a-zA-Z0-9-]{1,63}\.)+[a-zA-Z]{2,63}$/;
+
+  function isValidWebsiteUrl(url) {
+  try {
+    const u = new URL(url);
+    const host = u.hostname.replace(/^www\./i, "");
+    return ["http:", "https:"].includes(u.protocol) && HOSTNAME_RE.test(host);
+  } catch {
+    return false;
+  }
+}
+
+
   async function saveUri() {
     if (!isEditing) return;
 
@@ -55,6 +69,14 @@
         message: 'Your learning site cant be the same as a time wasting site',
       })
       return;    
+    }
+
+    if (uri && !isValidWebsiteUrl(uri)) {
+      alertStore.add({
+        type: 'warning',
+        message: 'Please enter a valid URL.',
+      })
+      return;
     }
 
     if (!uri) {
@@ -82,7 +104,7 @@
   }
 
   async function enableEditing() {
-    if (isEditing) return;
+    if (isEditing) return;https://f
     previousUri = learningUri;
     isEditing = true;
     await tick();
