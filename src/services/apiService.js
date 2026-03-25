@@ -10,8 +10,8 @@ The background script will then call the appropriate function from this apiServi
 
 import storage from "../util/storage";
 
-const API_BASE_URL = "http://localhost:3000/api/"; // This is the base URL for the backend server. Adjust as needed.
-
+// This is the base URL for the backend server. 
+const API_BASE_URL = __API_BASE_URL__; // Rollup replace will insert the actual value from env at __API_BASE_URL__
 
 /**
  * Returns: { ok: boolean, message: string, data: any }
