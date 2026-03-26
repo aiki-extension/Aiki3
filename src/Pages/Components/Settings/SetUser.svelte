@@ -69,6 +69,7 @@
   async function clearSessionLocally() {
     await storage.jwt.set("");
     await storage.uid.set("");
+    await storage.inviteCode.set("");
     user = "";
     userIsRegistered = false;
   }
