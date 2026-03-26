@@ -12,9 +12,12 @@
     faGlobe,
     faKeyboard,
     faTimes,
-    faPlusCircle
+    faPlusCircle,
+
   } from "@fortawesome/free-solid-svg-icons";
-  import { alertStore } from '../../../services/alertService'; 
+  import { alertStore } from '../../../services/alertService';
+  import browser from "webextension-polyfill";
+  import { MESSAGE_API_UPDATE_TIME_WASTING_SITE } from "../../../values/messageTypeValues";
 
   export let port;
   $: list = [];
@@ -114,6 +117,18 @@
         type: 'success',
         message: 'New Website Added!',
       })
+
+      const result = await browser.runtime.sendMessage({
+        type: MESSAGE_API_UPDATE_TIME_WASTING_SITE,
+        site: site
+      })
+
+      if (!result?.ok) {
+        alertStore.add({
+          type: 'warning',
+          message: "Could not reach the server"
+        });
+      }
     }
   }
 

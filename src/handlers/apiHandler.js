@@ -9,7 +9,8 @@ import {
   MESSAGE_API_UPDATE_OPERATING_HOURS_END,
   MESSAGE_API_UPDATE_SESSION_DURATION,
   MESSAGE_API_UPDATE_REWARD_TIME,
-  MESSAGE_API_UPDATE_LEARNING_TIME
+  MESSAGE_API_UPDATE_LEARNING_TIME,
+  MESSAGE_API_UPDATE_TIME_WASTING_SITE
 } from "../values/messageTypeValues";
 function toTokenResult(result) {
   if (!result.ok) {
@@ -75,4 +76,11 @@ export async function handleApiMessage(message) {
     const result = await updateUserSettings( { dailyLearningGoalMinutes: message.learningTimeMinutes });
     return { ok: result.ok, message: result.message };
   }
+
+  if (message.type === MESSAGE_API_UPDATE_TIME_WASTING_SITE) {
+    const result = await updateUserSettings({ timeWastingSite: message.site.host });
+    return { ok: result.ok, message: result.message };
+  }
+
+
 }
