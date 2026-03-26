@@ -63,3 +63,7 @@ export async function getUserSettings() {
 export async function updateUserSettings(patch) {
   return await authApiCall("users/settings", "PATCH", patch);
 }
+
+export async function deleteTimeWastingSite(domain) {
+  return await authApiCall(`users/settings/time-wasting-sites/${domain}`, "DELETE", {});
+}

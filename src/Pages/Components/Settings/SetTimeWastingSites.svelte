@@ -17,7 +17,10 @@
   } from "@fortawesome/free-solid-svg-icons";
   import { alertStore } from '../../../services/alertService';
   import browser from "webextension-polyfill";
-  import { MESSAGE_API_UPDATE_TIME_WASTING_SITE } from "../../../values/messageTypeValues";
+  import { 
+    MESSAGE_API_UPDATE_TIME_WASTING_SITE, 
+    MESSAGE_API_REMOVE_TIME_WASTING_SITE 
+  } from "../../../values/messageTypeValues";
 
   export let port;
   $: list = [];
@@ -64,16 +67,36 @@
   ];
 
   async function removeItem(index) {
+    const domain = list[index].host;
+
     let newList = [...list];
     newList.splice(index, 1);
     list = newList;
     storage.list.set(list);
-    port.postMessage(`Update: list`);
 
     alertStore.add({
         type: 'success',
         message: 'Website removed!',
       })
+
+    try {
+      const result = await browser.runtime.sendMessage({
+        type: MESSAGE_API_REMOVE_TIME_WASTING_SITE,
+        domain: domain
+      });
+      console.log("result:", result);
+    } catch(e) {
+      console.error("sendMessage failed:", e);
+    }
+
+    port.postMessage(`Update: list`);
+
+    if (!result?.ok) {
+      alertStore.add({
+        type: 'warning',
+        message: "Could not reach the server"
+      });
+    }
   }
 
   async function addItem() {

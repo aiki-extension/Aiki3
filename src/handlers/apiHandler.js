@@ -1,4 +1,4 @@
-import { loginUser, registerUser, updateUserSettings, getUserSettings } from "../services/apiService";
+import { loginUser, registerUser, updateUserSettings, getUserSettings, deleteTimeWastingSite } from "../services/apiService";
 import { fetchAndSyncSettings } from "../services/settingsService";
 import { REWARD_TIME_MINUTES } from "../values/defaultSettingValues";
 import { 
@@ -10,7 +10,8 @@ import {
   MESSAGE_API_UPDATE_SESSION_DURATION,
   MESSAGE_API_UPDATE_REWARD_TIME,
   MESSAGE_API_UPDATE_LEARNING_TIME,
-  MESSAGE_API_UPDATE_TIME_WASTING_SITE
+  MESSAGE_API_UPDATE_TIME_WASTING_SITE,
+  MESSAGE_API_REMOVE_TIME_WASTING_SITE
 } from "../values/messageTypeValues";
 function toTokenResult(result) {
   if (!result.ok) {
@@ -82,5 +83,8 @@ export async function handleApiMessage(message) {
     return { ok: result.ok, message: result.message };
   }
 
-
+  if (message.type === MESSAGE_API_REMOVE_TIME_WASTING_SITE) {
+    const result = await deleteTimeWastingSite(message.domain);
+    return { ok: result.ok, message: result.message };
+  }
 }
