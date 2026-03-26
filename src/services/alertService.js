@@ -35,7 +35,7 @@ function createAlertStore() {
         // Push the new alert to the store
         update(alerts => {
             // Ensure that no more than 2 alerts are displayed at once
-            if (alerts.length >= 2 ) {
+            if (alerts.length >= 5 ) {
                 alerts = alerts.slice(1);
             }
 
