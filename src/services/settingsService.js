@@ -9,7 +9,7 @@ async function syncDBSettingsToLocalStorage(db) {
     }
     
     await Promise.all([
-        storage.inviteCode.set(db.inviteCode.code),
+        storage.inviteCode.set(db.inviteCode?.code),
         storage.timeSettings.sessionMinutes.set(db.sessionDurationMinutes),
         storage.timeSettings.rewardMinutes.set(db.rewardTimeMinutes),
         storage.timeSettings.learningTime.set({ min: db.dailyLearningGoalMinutes, sec: 0}),
