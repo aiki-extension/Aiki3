@@ -2,17 +2,24 @@
   "manifest_version": 3,
   "name": "Aiki³",
   "description": "Aiki³ browser extension",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "aiki3@extension.local",
+      "strict_min_version": "109.0"
+    }
+  },
   "icons": {
     "128": "images/AikiLogo.png"
   },
   "permissions": [
     "storage",
     "tabs",
-    "windows",
     "webNavigation"
   ],
   "background": {
-    "service_worker": "build/background.js"
+    "scripts": [
+      "build/background.js"
+    ]
   },
   "action": {
     "default_title": "Aiki",
@@ -44,5 +51,5 @@
     "extension_pages": "script-src 'self'; object-src 'self';"
   },
   "options_page": "index.html?page=settings",
-  "version": "1.2.3"
+  "version": "3.2.0"
 }

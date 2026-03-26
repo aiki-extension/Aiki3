@@ -22,6 +22,7 @@
   let authMode = "login";
   let password = "";
   let confirmPassword = "";
+  let inviteCode = "";
   let isSubmitting = false;
   const basicEmailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const dispatch = createEventDispatcher();
@@ -37,6 +38,7 @@
     }
     password = "";
     confirmPassword = "";
+    inviteCode = "";
   }
   
   function isValidEmail(value) {
@@ -71,13 +73,14 @@
     userIsRegistered = false;
   }
 
-  async function authenticateWithBackend({ mode, email, plainTextPassword }) {
+  async function authenticateWithBackend({ mode, email, plainTextPassword, inviteCode }) {
    const type = mode === "register" ? MESSAGE_API_REGISTER : MESSAGE_API_LOGIN;
    try {
      const result = await browser.runtime.sendMessage({
         type,
         email,
         password: plainTextPassword,
+        ...(mode === "register" && inviteCode ? { inviteCode } : {}) // Only include inviteCode if we're in register mode and it's provided
       });
      if (!result || !result.ok) {
        return { ok: false, message: result?.message || "Server error. Please try again.", token: null };
@@ -142,6 +145,7 @@
         mode: authMode,
         email: normalizedUser,
         plainTextPassword: password,
+        inviteCode
       });
 
       if (!authResult?.ok) {
@@ -234,6 +238,14 @@
             placeholder="Re-enter your password..."
             autocomplete="new-password"
           />
+
+          <input
+            bind:value={inviteCode}
+            type="text"
+            class="form-control auth-input"
+            placeholder="Enter your invite code (optional)..."
+          />
+
         {/if}
 
         <button class="btn btn-primary submit-button" type="submit" disabled={isSubmitting}>
