@@ -38,7 +38,7 @@ export async function handleApiMessage(message) {
   }
 
   if (message.type === MESSAGE_API_REGISTER) {
-    const result = await registerUser({ email: message.email, password: message.password });
+    const result = await registerUser({ email: message.email, password: message.password, inviteCode: message.inviteCode });
     return toTokenResult(result);
   }
 
