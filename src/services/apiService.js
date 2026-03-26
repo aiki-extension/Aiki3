@@ -35,7 +35,7 @@ async function apiCall(endpoint, method, data = null, token = null) {
     const response_json = await response.json();
 
     if (!response.ok) {
-      return { ok: false, message: response_json?.message ?? response.statusText };
+      return { ok: false, message: response_json?.message ?? response_json?.error ?? response.statusText };
     }
     return { ok: true, message: "", ...response_json };
   } catch (error) {
