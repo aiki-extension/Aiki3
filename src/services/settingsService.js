@@ -4,7 +4,7 @@ import { MESSAGE_API_GET_USER_SETTINGS } from "../values/messageTypeValues";
 import { alertStore } from "../services/alertService";
 
 async function syncDBSettingsToLocalStorage(db) {
-    if (!db.inviteCode?.isActive) {
+    if (db.inviteCode && !db.inviteCode?.isActive) {
         alertStore.add({ message: "Your invite code is no longer active", type: "warning" });
     }
     
