@@ -5,19 +5,28 @@
   import { MESSAGE_API_UPDATE_INVITE_CODE } from "../../../values/messageTypeValues";
 
   let inviteCode = "";
+  let savedInviteCode = "";
 
   onMount(async () => {
     inviteCode = (await storage.inviteCode.get()) ?? "";
+    savedInviteCode = inviteCode;
   });
 
   async function saveInviteCode() {
-    storage.inviteCode.set(inviteCode);
     try {
       const result = await browser.runtime.sendMessage({
         type: MESSAGE_API_UPDATE_INVITE_CODE,
         inviteCode,
       });
       const ok = result?.ok;
+
+      if (ok) {
+        storage.inviteCode.set(inviteCode);
+        savedInviteCode = inviteCode; // update the saved value on success
+      } else {
+        inviteCode = savedInviteCode; // revert the input
+      }
+
       alertStore.add({
         type: ok ? "success" : "error",
         message: ok
@@ -26,6 +35,7 @@
       });
     } catch (error) {
       console.error("Error updating invite code:", error);
+      inviteCode = savedInviteCode; // revert the input on error too
       alertStore.add({
         type: "warning",
         message: "Failed to update to the server. Please try again.",
