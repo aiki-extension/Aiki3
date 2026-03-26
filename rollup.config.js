@@ -3,10 +3,14 @@ import commonjs from "@rollup/plugin-commonjs";
 import resolve from "@rollup/plugin-node-resolve";
 import { terser } from "rollup-plugin-terser";
 import css from "rollup-plugin-css-only";
+import replace from '@rollup/plugin-replace';
+import dotenv from 'dotenv';
 
 const production = !process.env.ROLLUP_WATCH;
 // Live reload is not compatible with extension pages (CSP + file scheme)
 const enableLiveReload = false;
+const env = dotenv.config().parsed || {};
+
 
 function serve() {
   let server;
@@ -86,7 +90,16 @@ export default [
       format: "iife",
       file: "public/build/background.js",
     },
-    plugins: [resolve(), commonjs()],
+    plugins: [
+      resolve(), 
+      commonjs(),
+      replace({
+        preventAssignment: true,
+        values: {
+          __API_BASE_URL__: JSON.stringify(env.PUBLIC_API_BASE_URL || 'http://localhost:3000/api/'), //Fallback value if .env is undefined
+        }
+      }),
+    ],
     watch: {
       clearScreen: false,
     },
