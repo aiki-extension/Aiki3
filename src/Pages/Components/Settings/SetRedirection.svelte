@@ -13,6 +13,7 @@
   import Container from "./Container.svelte";
   import ThemeSelector from "./ThemeSelector.svelte";
   import OperatingHoursSettings from "./OperatingHoursSettings.svelte";
+  import InviteCodeSettings from "./InviteCodeSettings.svelte";
   import TimeSettings from "./TimeSettings.svelte";
 
   export let user = "";
@@ -151,7 +152,8 @@
   <TimeSettings {user} />
   <hr />
   <OperatingHoursSettings {user} />
-
+  <hr />
+  <InviteCodeSettings />
   <hr />
   <h5>Other Settings:</h5>
   <div>
