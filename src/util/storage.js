@@ -139,6 +139,15 @@ async function getJwt() {
   return result.jwt || "";
 }
 
+function setInviteCode(inviteCode) {
+  storage.set({ inviteCode: inviteCode ?? "" });
+}
+
+async function getInviteCode() {
+  const result = await storage.get("inviteCode");
+  return result.inviteCode || "";
+}
+
 /**
  * @function
  * @param {object} origin
@@ -632,6 +641,7 @@ export default {
   list: { set: setList, get: getList }, // this is list of time-wasting sites defined by the user
   uid: { set: setUid, get: getUid },
   jwt: { set: setJwt, get: getJwt },
+  inviteCode: { get: getInviteCode, set: setInviteCode },
   redirection: { toggle: toggleRedirection, get: getRedirectionToggled },
   stats: {
     storeSession: storeSession,

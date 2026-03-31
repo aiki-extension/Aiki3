@@ -11,7 +11,8 @@ import {
   MESSAGE_API_UPDATE_REWARD_TIME,
   MESSAGE_API_UPDATE_LEARNING_TIME,
   MESSAGE_API_UPDATE_TIME_WASTING_SITE,
-  MESSAGE_API_REMOVE_TIME_WASTING_SITE
+  MESSAGE_API_REMOVE_TIME_WASTING_SITE,
+  MESSAGE_API_UPDATE_INVITE_CODE
 } from "../values/messageTypeValues";
 function toTokenResult(result) {
   if (!result.ok) {
@@ -39,7 +40,7 @@ export async function handleApiMessage(message) {
   }
 
   if (message.type === MESSAGE_API_REGISTER) {
-    const result = await registerUser({ email: message.email, password: message.password });
+    const result = await registerUser({ email: message.email, password: message.password, inviteCode: message.inviteCode });
     return toTokenResult(result);
   }
 
@@ -49,6 +50,11 @@ export async function handleApiMessage(message) {
           return { ok: false, message: result.message, data: null};
         }
         return { ok: true, data: result};
+  }
+
+  if (message.type === MESSAGE_API_UPDATE_INVITE_CODE) {
+    const result = await updateUserSettings({ inviteCode: message.inviteCode });
+    return { ok: result.ok, message: result.message };
   }
 
   if (message.type === MESSAGE_API_UPDATE_OPERATING_HOURS_START) {

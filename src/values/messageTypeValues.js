@@ -7,6 +7,7 @@ export const MESSAGE_API_REGISTER = "api:register"
 
 export const MESSAGE_API_GET_USER_SETTINGS = "api:getUserSettings"
 
+export const MESSAGE_API_UPDATE_INVITE_CODE = "api:updateInviteCode"
 export const MESSAGE_API_UPDATE_OPERATING_HOURS_START = "api:updateOperatingHoursStart"
 export const MESSAGE_API_UPDATE_OPERATING_HOURS_END = "api:updateOperatingHoursEnd"
 export const MESSAGE_API_UPDATE_SESSION_DURATION = "api:updateSessionDuration"

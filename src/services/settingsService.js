@@ -2,9 +2,15 @@ import browser from "webextension-polyfill";
 import storage from "../util/storage";
 import { MESSAGE_API_GET_USER_SETTINGS } from "../values/messageTypeValues";
 import { parseUrl } from "../util/utilities";
+import { alertStore } from "../services/alertService";
 
 async function syncDBSettingsToLocalStorage(db) {
+    if (db.inviteCode && !db.inviteCode?.isActive) {
+        alertStore.add({ message: "Your invite code is no longer active", type: "warning" });
+    }
+    
     await Promise.all([
+        storage.inviteCode.set(db.inviteCode?.code),
         storage.timeSettings.sessionMinutes.set(db.sessionDurationMinutes),
         storage.timeSettings.rewardMinutes.set(db.rewardTimeMinutes),
         storage.timeSettings.learningTime.set({ min: db.dailyLearningGoalMinutes, sec: 0}),
