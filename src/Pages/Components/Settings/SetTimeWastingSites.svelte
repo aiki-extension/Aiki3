@@ -25,7 +25,8 @@
   export let port;
   $: list = [];
 
-  let learningUri = ""; 
+  let learningUri = "";
+  const wwwPattern = /^www\./i; 
 
   async function setup() {
     const storedList = (await storage.list.get()) || [];
@@ -104,6 +105,14 @@
       alertStore.add({
         type: 'warning',
         message: 'Input cannot be empty!',
+      })
+      return;
+    }
+
+    if (!wwwPattern.test(addItemValue)) {
+      alertStore.add({
+        type: 'warning',
+        message: 'Website must start with "www." (e.g., www.youtube.com)',
       })
       return;
     }
