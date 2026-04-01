@@ -5,6 +5,7 @@ import { parseUrl, makeDate, parseTime } from "./util/utilities";
 import SessionService from "./services/SessionService";
 import NavigationGuards from "./services/NavigationGuards";
 import PromptCoordinator from "./services/PromptCoordinator";
+import { PROMPT_SUPPRESS_DURATION } from "../src/values/defaultSettingValues"
 
 const l = console.log;
 
@@ -24,7 +25,6 @@ const strategy = {
 };
 
 let shouldShowWelcome = true;
-const PROMPT_SUPPRESS_DURATION = 10 * 60 * 1000; // 10 minutes - global cooldown across all tabs
 const PREPROMPT_ID = "__aiki-preprompt";
 
 function buildProcrastinationUrlFilters(list = []) {
@@ -233,7 +233,7 @@ async function redirect(details) {
             return; // We are in global cooldown period - Don't show prompt
           }
 
-          // Experimental variant: show consent prompt
+          // show consent prompt
           promptRedirect(details.tabId, learningUri, details.url);
         }
       }
@@ -441,8 +441,9 @@ async function checkActiveTab() {
         );
         if (handled) return;
 
-        // EXPERIMENTAL VARIANT: Show redirect prompt
+        // Show redirect prompt
         promptRedirect(tab.id, learningUri, tab.url);
+        console.log("Prompt called from checkActiveTab()") // FLAG for further research, as i do not think this is ever called
       }
     }
   } catch (error) {
@@ -659,6 +660,7 @@ async function promptRedirect(tabId, url, originUrl) {
       await storage.globalPromptLock.set({  
         timestamp: Date.now(),
       });
+      console.log("Lock engaged");
 
       // Start tracking procastination session
       navigationGuards.install();
