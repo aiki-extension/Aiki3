@@ -643,7 +643,6 @@ function renderRedirectPrompt(originUrl) {
     overlay.cleanup = () => {
       if (done) return;
       done = true;
-      resolve({ action: "continue" });
       if (hostWatchInterval) {
         clearInterval(hostWatchInterval);
         hostWatchInterval = null;
