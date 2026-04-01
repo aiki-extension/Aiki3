@@ -10,7 +10,8 @@ import {
   MESSAGE_API_UPDATE_SESSION_DURATION,
   MESSAGE_API_UPDATE_REWARD_TIME,
   MESSAGE_API_UPDATE_LEARNING_TIME,
-  MESSAGE_API_UPDATE_INVITE_CODE
+  MESSAGE_API_UPDATE_INVITE_CODE,
+  MESSAGE_API_UPDATE_LEARNING_URI
 } from "../values/messageTypeValues";
 function toTokenResult(result) {
   if (!result.ok) {
@@ -79,6 +80,10 @@ export async function handleApiMessage(message) {
 
   if (message.type === MESSAGE_API_UPDATE_LEARNING_TIME) {
     const result = await updateUserSettings( { dailyLearningGoalMinutes: message.learningTimeMinutes });
+    return { ok: result.ok, message: result.message };
+  }
+  if (message.type === MESSAGE_API_UPDATE_LEARNING_URI) {
+    const result = await updateUserSettings( { learningSiteDomain: message.learningUri });
     return { ok: result.ok, message: result.message };
   }
 }

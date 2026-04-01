@@ -8,6 +8,8 @@
   import { onMount, tick } from "svelte";
   import { parseUrl } from "../../../util/utilities";
   import { alertStore } from '../../../services/alertService';
+  import browser from "webextension-polyfill";
+  import { MESSAGE_API_UPDATE_LEARNING_URI } from '../../../values/messageTypeValues';
 
   // Component imports
   import Container from "./Container.svelte";
@@ -58,8 +60,12 @@
       return;    
     }
 
+    const backendResult = await browser.runtime.sendMessage({
+      type: MESSAGE_API_UPDATE_LEARNING_URI,
+      learningUri: uri,
+    });
+
     if (!uri) {
-      learningUri = "";
       await storage.learningUri.set("");
       hasSaved = false;
       isEditing = true;
@@ -70,7 +76,6 @@
       return;
     }
 
-    learningUri = uri;
     await storage.learningUri.set(uri);
 
     hasSaved = true;
