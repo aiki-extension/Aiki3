@@ -5,12 +5,15 @@
   "version": "3.0.0",
   "browser_specific_settings": {
     "gecko": {
-      "id": "aiki3@extension.local",
-      "strict_min_version": "109.0"
+      "id": "aiki1@extension.local",
+      "strict_min_version": "109.0",
+      "data_collection_permissions": {
+        "required": ["browsingActivity", "websiteActivity"]
+      }
     }
   },
   "icons": {
-    "128": "images/AikiLogo.png"
+    "128": "images/AikiLogo-128.png"
   },
   "permissions": ["storage", "tabs", "webNavigation"],
   "background": {
@@ -19,7 +22,7 @@
   "action": {
     "default_title": "Aiki",
     "default_popup": "index.html?page=popup",
-    "default_icon": "images/AikiLogo.png"
+    "default_icon": "images/AikiLogo-128.png"
   },
   "content_scripts": [
     {

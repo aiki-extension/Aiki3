@@ -5,6 +5,7 @@
     "prebuild": "node scripts/generateBack4AppConfig.js",
     "predev": "node scripts/generateBack4AppConfig.js",
     "build": "rollup -c",
+    "build:addon": "node scripts/buildAddon.js",
     "dev": "rollup -c -w",
     "start": "sirv public",
     "build:firefox": "node scripts/buildFirefox.js && npm run build",

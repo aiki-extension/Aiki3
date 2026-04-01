@@ -4,7 +4,7 @@
   "description": "Aiki³ browser extension",
   "version": "3.0.0",
   "icons": {
-    "128": "images/AikiLogo.png"
+    "128": "images/AikiLogo-128.png"
   },
   "permissions": ["storage", "tabs", "windows", "webNavigation"],
   "background": {
@@ -13,7 +13,7 @@
   "action": {
     "default_title": "Aiki",
     "default_popup": "index.html?page=popup",
-    "default_icon": "images/AikiLogo.png"
+    "default_icon": "images/AikiLogo-128.png"
   },
   "content_scripts": [
     {
