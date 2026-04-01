@@ -26,7 +26,6 @@
   $: list = [];
 
   let learningUri = "";
-  const wwwPattern = /^www\./i; 
 
   async function setup() {
     const storedList = (await storage.list.get()) || [];
@@ -109,13 +108,23 @@
       return;
     }
 
-    if (!wwwPattern.test(addItemValue)) {
+    // Used to normalize input to always be www.domain.tld
+    let rawInput = addItemValue.trim();
+    rawInput = new URL(rawInput.startsWith("http") ? rawInput : `https://${rawInput}`).hostname ?? rawInput;
+
+    const urlPattern = /(?:https?:\/\/)?(?:www\.)?([a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,})(?:[/?#].*)?$/;
+    const match = rawInput.match(urlPattern);
+
+    if (!match) {
       alertStore.add({
         type: 'warning',
-        message: 'Website must start with "www." (e.g., www.youtube.com)',
+        message: 'Invalid URL format!',
       })
       return;
     }
+
+    // The site that has been normalized, now becomes "www.x.x" and stored in addItemvalue
+    addItemValue = `www.${match[1]}`;
 
     learningUri = parseUrl(await storage.learningUri.get())
     let site = parseUrl(addItemValue);
