@@ -100,13 +100,6 @@ const makeDraggable = (element) => {
     return { x, y, corner };
   };
 
-  const applyRawPosition = (x, y) => {
-    element.style.left = `${x}px`;
-    element.style.top = `${y}px`;
-    element.style.right = '';
-    element.style.bottom = '';
-  }
-
   // Apply position using corner anchors
   const applyPosition = (x, y) => {
     // Clear all position properties first
@@ -150,9 +143,8 @@ const makeDraggable = (element) => {
     
     dragState.currentX = x;
     dragState.currentY = y;
-    
-    const corner = getNearestCorner();
-    applyRawPosition(x, y, corner);
+
+    applyPosition(x, y);
   };
 
   const syncIntendedPosition = () => {
