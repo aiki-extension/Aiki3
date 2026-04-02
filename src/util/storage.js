@@ -51,6 +51,12 @@ function createKeyedStore(storageKey) {
     },
     clear() {
       return storage.remove(storageKey);
+    },
+    async getAll() {
+      const data = await storage.get(storageKey);
+      return data[storageKey] && typeof data[storageKey] === "object"
+        ? data[storageKey]
+        : {};
     }
   };
 }
@@ -676,6 +682,7 @@ export default {
     get: getGlobalPromptLock, // Gets global lock
     set: setGlobalPromptLock, // Sets global lock
     remove: removeGlobalPromptLock, // Removes the global lock
+    getAll: promptLocksStore.getAll, // Gets all per-tab locks
   },
   participantRecord: {
     get: getParticipantRecord,

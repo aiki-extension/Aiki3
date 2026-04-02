@@ -16,6 +16,15 @@ class PromptCoordinator {
     // Validate tab still exists and is on the intended time wasting site before retrying
     if (attempt > 0) {
       try {
+        // If another tab's "Stay" set the global cooldown, abort silently
+        const globalLock = await storage.globalPromptLock.get();
+        if (globalLock && Date.now() - globalLock.timestamp < 10 * 60 * 1000) {
+          await storage.promptLocks.remove(tabId);
+          await this.hideImmediatePrompt(tabId).catch(() => {});
+          await this.removePreemptiveHide(tabId).catch(() => {});
+          return;
+        }
+
         const tab = await browser.tabs.get(tabId);
         if (!tab || !tab.url) {
           // Tab closed mid-prompt then clear the global cooldown so future visits still get prompted

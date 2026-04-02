@@ -594,7 +594,7 @@ async function gotoOrigin(event, sourceContext = {}) {
     try {
       await browser.tabs.update(origin.tabId, { url: origin.url });
       destinationUrl = origin.url;
-      if (normalizedEvent === "continue") await setPromptCooldown(origin.tabId, origin.url); // ✅
+      if (normalizedEvent === "continue") await setPromptCooldown(origin.tabId, origin.url);
       restoredTabIds.add(origin.tabId);
     } catch (error) { l(error); }
   }
@@ -657,6 +657,20 @@ async function promptRedirect(tabId, url, originUrl) {
       // Set global prompt lock now that user has explicitly clicked Stay
       // This prevents the prompt from appearing again for 10 minutes (across all tabs)
       await storage.globalPromptLock.set({ timestamp: Date.now() });
+
+      // Dismiss prompts on all other tabs that are currently showing one
+      const allLocks = await storage.promptLocks.getAll();
+      await Promise.allSettled(
+        Object.keys(allLocks)
+          .map(Number)
+          .filter(id => id !== tabId)
+          .map(async (otherTabId) => {
+            await storage.promptLocks.remove(otherTabId);
+            try {
+              await browser.tabs.sendMessage(otherTabId, { action: "dismiss: redirectPrompt" });
+            } catch (_) {} // tab may have closed
+          })
+      );
 
       // Start tracking procastination session
       navigationGuards.install();
