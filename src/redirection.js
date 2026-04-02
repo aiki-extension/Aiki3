@@ -233,7 +233,13 @@ async function redirect(details) {
             return; // We are in global cooldown period - Don't show prompt
           }
 
-          // Experimental variant: show consent prompt
+          // Check if this specific tab already has a prompt pending
+          const existingLock = await storage.promptLocks.get(details.tabId);
+          if (existingLock) {
+            l("Skipping prompt — prompt already active for this tab");
+            return;
+          }
+
           promptRedirect(details.tabId, learningUri, details.url);
         }
       }

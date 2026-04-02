@@ -18,20 +18,27 @@ class PromptCoordinator {
       try {
         const tab = await browser.tabs.get(tabId);
         if (!tab || !tab.url) {
-          return; // Tab closed or no URL
+          // Tab closed mid-prompt then clear the global cooldown so future visits still get prompted
+          await storage.globalPromptLock.remove();
+          return;
         }
         const currentHost = new URL(tab.url).hostname.replace(/^www\./, "");
         const intendedHost = new URL(originUrl).hostname.replace(/^www\./, "");
         if (currentHost !== intendedHost) {
-          // Tab navigated away from the time wasting site, abort retries
-          await this.hideImmediatePrompt(tabId).catch(() => { });
-          await this.removePreemptiveHide(tabId).catch(() => { });
+          await this.hideImmediatePrompt(tabId).catch(() => {});
+          await this.removePreemptiveHide(tabId).catch(() => {});
+          await storage.globalPromptLock.remove(); // navigated away without answering
           return;
         }
       } catch (_) {
-        return; // Tab closed or invalid
+        await storage.globalPromptLock.remove(); // tab closed or invalid
+        return;
       }
     }
+
+    // Set a per-tab prompt lock so other tabs see this prompt is already active
+    await storage.promptLocks.set(tabId, true);
+    await storage.globalPromptLock.set({ timestamp: Date.now() });
 
     try {
       await this.applyPreemptiveHide(tabId);
@@ -46,16 +53,15 @@ class PromptCoordinator {
         throw new Error("No response from content script");
       }
 
-      if (result && result.action === "continue") {
-        if (typeof onContinue === "function") {
-          await onContinue();
-        }
+      // Prompt was answered, so clear the per-tab lock either way
+      await storage.promptLocks.remove(tabId);
+
+      if (result.action === "continue") {
+        if (typeof onContinue === "function") await onContinue();
         await this.hideImmediatePrompt(tabId);
         await this.removePreemptiveHide(tabId);
-      } else if (result && result.action === "redirect") {
-        if (typeof onAccept === "function") {
-          await onAccept();
-        }
+      } else if (result.action === "redirect") {
+        if (typeof onAccept === "function") await onAccept();
       }
     } catch (error) {
       if (attempt < 20) {
@@ -63,8 +69,11 @@ class PromptCoordinator {
           this.promptRedirect(tabId, learningUrl, originUrl, callbacks, attempt + 1);
         }, 100);
       } else {
-        await this.hideImmediatePrompt(tabId);
-        await this.removePreemptiveHide(tabId);
+        // Exhausted retries should be treated as abandoned and clear everything
+        await storage.promptLocks.remove(tabId);
+        await storage.globalPromptLock.remove();
+        await this.hideImmediatePrompt(tabId).catch(() => {});
+        await this.removePreemptiveHide(tabId).catch(() => {});
       }
     }
   }
