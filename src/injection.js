@@ -108,29 +108,12 @@ const makeDraggable = (element) => {
   }
 
   // Apply position using corner anchors
-  const applyPosition = (x, y, corner) => {
-    const rect = element.getBoundingClientRect();
-    
+  const applyPosition = (x, y) => {
     // Clear all position properties first
-    element.style.left = '';
     element.style.right = '';
-    element.style.top = '';
     element.style.bottom = '';
-    
-    // Apply appropriate corner anchors
-    if (corner.horizontal === 'right') {
-      const rightOffset = window.innerWidth - x - rect.width;
-      element.style.right = `${rightOffset}px`;
-    } else {
-      element.style.left = `${x}px`;
-    }
-    
-    if (corner.vertical === 'bottom') {
-      const bottomOffset = window.innerHeight - y - rect.height;
-      element.style.bottom = `${bottomOffset}px`;
-    } else {
-      element.style.top = `${y}px`;
-    }
+    element.style.left = `${x}px`;
+    element.style.top = `${y}px`;
   };
 
   const initializePosition = () => {
@@ -144,12 +127,12 @@ const makeDraggable = (element) => {
     element.style.transform = 'none';
     
     // Snap to nearest corner on init
-    const { x, y, corner } = snapToCorner();
+    const { x, y } = snapToCorner();
     dragState.currentX = x;
     dragState.currentY = y;
     dragState.intendedX = x;
     dragState.intendedY = y;
-    applyPosition(x, y, corner);
+    applyPosition(x, y);
   };
 
   const updatePosition = (intendedX, intendedY) => {
@@ -174,22 +157,22 @@ const makeDraggable = (element) => {
 
   const syncIntendedPosition = () => {
     // Snap to nearest corner when size changes
-    const { x, y, corner } = snapToCorner();
+    const { x, y } = snapToCorner();
     dragState.intendedX = x;
     dragState.intendedY = y;
     dragState.currentX = x;
     dragState.currentY = y;
-    applyPosition(x, y, corner);
+    applyPosition(x, y);
   };
 
   const onResize = () => {
     // Snap to corner on resize
-    const { x, y, corner } = snapToCorner();
+    const { x, y } = snapToCorner();
     dragState.intendedX = x;
     dragState.intendedY = y;
     dragState.currentX = x;
     dragState.currentY = y;
-    applyPosition(x, y, corner);
+    applyPosition(x, y);
   };
 
   const onPointerDown = (event) => {
@@ -239,12 +222,12 @@ const makeDraggable = (element) => {
     element.style.cursor = "grab";
     
     // Snap to nearest corner when drag ends
-    const { x, y, corner } = snapToCorner();
+    const { x, y } = snapToCorner();
     dragState.intendedX = x;
     dragState.intendedY = y;
     dragState.currentX = x;
     dragState.currentY = y;
-    applyPosition(x, y, corner);
+    applyPosition(x, y);
     
     if (event.pointerId !== undefined) {
       element.releasePointerCapture(event.pointerId);
