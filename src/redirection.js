@@ -480,12 +480,7 @@ async function checkTab(tab) {
   const procList = await storage.list.get();
   const procListNames = procList.map((site) => site.name);
   if (procListNames.includes(tabSiteName)) {
-    const origin = await storage.origin.get();
-    if (origin) {
-      renderContentBlocker({ tabId: tab.id, frameId: 0, url: tab.url });
-    } else {
-      redirect({ frameId: 0, url: tab.url, tabId: tab.id });
-    }
+    redirect({ frameId: 0, url: tab.url, tabId: tab.id });
   }
 }
 
@@ -688,9 +683,7 @@ async function promptRedirect(tabId, url, originUrl) {
       await storage.globalPromptLock.remove();
       try {
         scheduleRevealOnLoad(tabId);
-        await browser.tabs.update(tabId, {
-          url: url,
-        });
+        await browser.tabs.update(tabId, { url: url });
         setTimeout(() => triggerLearningOverlay(tabId), 1500);
       } catch (error) {
         l(error);

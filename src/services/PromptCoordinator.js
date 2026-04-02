@@ -8,10 +8,22 @@ class PromptCoordinator {
     this.showImmediatePrompt = showImmediatePrompt;
     this.hideImmediatePrompt = hideImmediatePrompt;
     this.boundRenderContentBlocker = this.renderContentBlocker.bind(this);
+    this._promptGenerations = new Map();
   }
 
   async promptRedirect(tabId, learningUrl, originUrl, callbacks = {}, attempt = 0) {
     const { onAccept, onContinue } = callbacks;
+
+    if (attempt === 0) {
+      const gen = (this._promptGenerations.get(tabId) || 0) + 1;
+      this._promptGenerations.set(tabId, gen);
+    }
+    const myGeneration = this._promptGenerations.get(tabId);
+
+    // Return if this retry is stale
+    if (attempt > 0 && this._promptGenerations.get(tabId) !== myGeneration) {
+      return;
+    }
 
     // Validate tab still exists and is on the intended time wasting site before retrying
     if (attempt > 0) {
@@ -31,8 +43,10 @@ class PromptCoordinator {
           await storage.globalPromptLock.remove();
           return;
         }
+
         const currentHost = new URL(tab.url).hostname.replace(/^www\./, "");
         const intendedHost = new URL(originUrl).hostname.replace(/^www\./, "");
+
         if (currentHost !== intendedHost) {
           await this.hideImmediatePrompt(tabId).catch(() => {});
           await this.removePreemptiveHide(tabId).catch(() => {});
@@ -51,6 +65,7 @@ class PromptCoordinator {
     try {
       await this.applyPreemptiveHide(tabId);
       await this.showImmediatePrompt(tabId);
+
       const result = await browser.tabs.sendMessage(tabId, {
         action: "display: redirectPrompt",
         url: learningUrl,
@@ -74,7 +89,15 @@ class PromptCoordinator {
     } catch (error) {
       if (attempt < 20) {
         setTimeout(() => {
-          this.promptRedirect(tabId, learningUrl, originUrl, callbacks, attempt + 1);
+          if (this._promptGenerations.get(tabId) === myGeneration) {
+            this.promptRedirect(
+              tabId,
+              learningUrl,
+              originUrl,
+              callbacks,
+              attempt + 1
+            );
+          }
         }, 100);
       } else {
         // Exhausted retries should be treated as abandoned and clear everything

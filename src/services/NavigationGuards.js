@@ -191,6 +191,9 @@ class NavigationGuards {
 
     this.onCommittedHandler = async (details) => {
       if (details.frameId !== 0) return;
+      if (details.transitionType === "reload") {
+        await storage.promptLocks.remove(details.tabId);
+      }
       await PreemptiveHide.revealIfPending(details.tabId, this.hideImmediatePrompt.bind(this));
       if (this.strategy?.onLearningSiteNavigation && details.url) {
         await this.strategy.onLearningSiteNavigation(details);

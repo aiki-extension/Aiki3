@@ -677,12 +677,12 @@ export default {
     get: promptLocksStore.get,
     remove: promptLocksStore.remove,
     clear: promptLocksStore.clear,
+    getAll: promptLocksStore.getAll, // Gets all per-tab locks
   },
   globalPromptLock: {  // Global prompts
     get: getGlobalPromptLock, // Gets global lock
     set: setGlobalPromptLock, // Sets global lock
     remove: removeGlobalPromptLock, // Removes the global lock
-    getAll: promptLocksStore.getAll, // Gets all per-tab locks
   },
   participantRecord: {
     get: getParticipantRecord,
