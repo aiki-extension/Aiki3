@@ -100,9 +100,8 @@ const makeDraggable = (element) => {
     return { x, y, corner };
   };
 
-  // Apply position using corner anchors
+  // Apply position
   const applyPosition = (x, y) => {
-    // Clear all position properties first
     element.style.right = '';
     element.style.bottom = '';
     element.style.left = `${x}px`;
