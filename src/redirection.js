@@ -574,7 +574,7 @@ async function gotoOrigin(event, sourceContext = {}) {
     try {
       await browser.tabs.update(origin.tabId, { url: origin.url });
       destinationUrl = origin.url;
-      if (normalizedEvent === "continue") await setPromptCooldown(origin.tabId, origin.url); // ✅
+      if (normalizedEvent === "continue") await setPromptCooldown(origin.tabId, origin.url);
       restoredTabIds.add(origin.tabId);
     } catch (error) { l(error); }
   } else if (targetTabId !== undefined) {
@@ -584,7 +584,7 @@ async function gotoOrigin(event, sourceContext = {}) {
       try {
         await browser.tabs.update(targetTabId, { url: blockedOrigin });
         destinationUrl = blockedOrigin;
-        if (normalizedEvent === "continue") await setPromptCooldown(targetTabId, blockedOrigin); // ✅
+        if (normalizedEvent === "continue") await setPromptCooldown(targetTabId, blockedOrigin);
         restoredTabIds.add(targetTabId);
       } catch (error) { l(error); }
     }
