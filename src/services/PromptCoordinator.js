@@ -38,7 +38,6 @@ class PromptCoordinator {
 
     // Set a per-tab prompt lock so other tabs see this prompt is already active
     await storage.promptLocks.set(tabId, true);
-    await storage.globalPromptLock.set({ timestamp: Date.now() });
 
     try {
       await this.applyPreemptiveHide(tabId);
