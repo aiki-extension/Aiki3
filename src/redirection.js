@@ -221,6 +221,13 @@ async function redirect(details) {
           const learningUri = await storage.learningUri.get();
           if (!learningUri) return; // skip redirection if no learning URL configured
           
+          // Check if this specific tab already has a prompt pending
+          const existingLock = await storage.promptLocks.get(details.tabId);
+          if (existingLock) {
+            l("Skipping prompt — prompt already active for this tab");
+            return;
+          }
+
           // Check global prompt lock (applies to all tabs)
           const globalPromptLock = await storage.globalPromptLock.get();  // ← GLOBAL CHECK
           const now = Date.now();
@@ -231,13 +238,6 @@ async function redirect(details) {
           ) {
             l("Skipping prompt due to global cooldown (10 minutes)");
             return; // We are in global cooldown period - Don't show prompt
-          }
-
-          // Check if this specific tab already has a prompt pending
-          const existingLock = await storage.promptLocks.get(details.tabId);
-          if (existingLock) {
-            l("Skipping prompt — prompt already active for this tab");
-            return;
           }
 
           promptRedirect(details.tabId, learningUri, details.url);
@@ -574,11 +574,9 @@ async function gotoOrigin(event, sourceContext = {}) {
     try {
       await browser.tabs.update(origin.tabId, { url: origin.url });
       destinationUrl = origin.url;
-      await setPromptCooldown(origin.tabId, origin.url);
+      if (normalizedEvent === "continue") await setPromptCooldown(origin.tabId, origin.url); // ✅
       restoredTabIds.add(origin.tabId);
-    } catch (error) {
-      l(error);
-    }
+    } catch (error) { l(error); }
   } else if (targetTabId !== undefined) {
     const blockedOrigin = await storage.blockedOrigins.get(targetTabId);
     if (blockedOrigin) {
@@ -586,11 +584,9 @@ async function gotoOrigin(event, sourceContext = {}) {
       try {
         await browser.tabs.update(targetTabId, { url: blockedOrigin });
         destinationUrl = blockedOrigin;
-        await setPromptCooldown(targetTabId, blockedOrigin);
+        if (normalizedEvent === "continue") await setPromptCooldown(targetTabId, blockedOrigin); // ✅
         restoredTabIds.add(targetTabId);
-      } catch (error) {
-        l(error);
-      }
+      } catch (error) { l(error); }
     }
   }
 
@@ -598,11 +594,9 @@ async function gotoOrigin(event, sourceContext = {}) {
     try {
       await browser.tabs.update(origin.tabId, { url: origin.url });
       destinationUrl = origin.url;
-      await setPromptCooldown(origin.tabId, origin.url);
+      if (normalizedEvent === "continue") await setPromptCooldown(origin.tabId, origin.url); // ✅
       restoredTabIds.add(origin.tabId);
-    } catch (error) {
-      l(error);
-    }
+    } catch (error) { l(error); }
   }
 
   if (shouldRestoreAllTabs && blockedTabIds.length > 0) {
@@ -662,9 +656,7 @@ async function promptRedirect(tabId, url, originUrl) {
     onContinue: async () => {
       // Set global prompt lock now that user has explicitly clicked Stay
       // This prevents the prompt from appearing again for 10 minutes (across all tabs)
-      await storage.globalPromptLock.set({  
-        timestamp: Date.now(),
-      });
+      await storage.globalPromptLock.set({ timestamp: Date.now() });
 
       // Start tracking procastination session
       navigationGuards.install();
