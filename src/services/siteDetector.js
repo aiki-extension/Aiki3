@@ -58,7 +58,8 @@ export async function getProcrastinationHosts() {
  */
 export async function getLearningUrl() {
   const url = await storage.learningUri.get();
-  return url || null;
+  if (!url) return null;
+  return `https://${url}`; // "https://www.example.com" - only for navigation
 }
 
 /**
