@@ -1,6 +1,7 @@
 import { loginUser, registerUser, updateUserSettings, getUserSettings, deleteTimeWastingSite } from "../services/apiService";
 import { fetchAndSyncSettings } from "../services/settingsService";
 import { REWARD_TIME_MINUTES } from "../values/defaultSettingValues";
+import redirection from "../redirection";
 import { 
   MESSAGE_API_LOGIN,
   MESSAGE_API_REGISTER,
@@ -36,6 +37,9 @@ export async function handleApiMessage(message) {
       } catch (e) {
         console.warn("[Settings] fetchAndSyncSettings crashed: ", e);
       }
+      // Has to restart listener, as when the user logs in, they will have an empty list of timewasting sites.
+      // Without this, it would never restart and actually check on the sites the user has added. It would check on the "old" list, which most likely was empty
+      await redirection.navigationListener.restart();
     }
     return validated;
   }
