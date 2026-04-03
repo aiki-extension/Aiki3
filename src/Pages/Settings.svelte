@@ -78,9 +78,11 @@
       <div class="container">
         <AikiDescription {user} {port} />
       </div>
-      <div class="container">
-        <SetWebsites {user} {port} />
-      </div>
+      {#key settingsKey}
+        <div class="container">
+          <SetWebsites {user} {port} />
+        </div>
+      {/key}
       {#key settingsKey} <!-- increments after a successful sync. Forcing this block to remount to re-read local storage values (thus showing correct values on the page)-->
         <div class="container">
           <SetRedirection {user} />

@@ -1,4 +1,4 @@
-import { loginUser, registerUser, updateUserSettings, getUserSettings } from "../services/apiService";
+import { loginUser, registerUser, updateUserSettings, getUserSettings, deleteTimeWastingSite } from "../services/apiService";
 import { fetchAndSyncSettings } from "../services/settingsService";
 import { REWARD_TIME_MINUTES } from "../values/defaultSettingValues";
 import { 
@@ -10,6 +10,8 @@ import {
   MESSAGE_API_UPDATE_SESSION_DURATION,
   MESSAGE_API_UPDATE_REWARD_TIME,
   MESSAGE_API_UPDATE_LEARNING_TIME,
+  MESSAGE_API_UPDATE_TIME_WASTING_SITE,
+  MESSAGE_API_REMOVE_TIME_WASTING_SITE,
   MESSAGE_API_UPDATE_INVITE_CODE
 } from "../values/messageTypeValues";
 function toTokenResult(result) {
@@ -79,6 +81,16 @@ export async function handleApiMessage(message) {
 
   if (message.type === MESSAGE_API_UPDATE_LEARNING_TIME) {
     const result = await updateUserSettings( { dailyLearningGoalMinutes: message.learningTimeMinutes });
+    return { ok: result.ok, message: result.message };
+  }
+
+  if (message.type === MESSAGE_API_UPDATE_TIME_WASTING_SITE) {
+    const result = await updateUserSettings({ timeWastingSite: message.site.host });
+    return { ok: result.ok, message: result.message };
+  }
+
+  if (message.type === MESSAGE_API_REMOVE_TIME_WASTING_SITE) {
+    const result = await deleteTimeWastingSite(message.domain);
     return { ok: result.ok, message: result.message };
   }
 }

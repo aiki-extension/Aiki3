@@ -1,6 +1,7 @@
 import browser from "webextension-polyfill";
 import storage from "../util/storage";
 import { MESSAGE_API_GET_USER_SETTINGS } from "../values/messageTypeValues";
+import { parseUrl } from "../util/utilities";
 import { alertStore } from "../services/alertService";
 
 async function syncDBSettingsToLocalStorage(db) {
@@ -15,6 +16,7 @@ async function syncDBSettingsToLocalStorage(db) {
         storage.timeSettings.learningTime.set({ min: db.dailyLearningGoalMinutes, sec: 0}),
         storage.operatingHours.from.set({ hrs: Math.floor(db.operatingStartMinutes / 60), min: db.operatingStartMinutes % 60 }),
         storage.operatingHours.to.set({ hrs: Math.floor(db.operatingEndMinutes / 60), min: db.operatingEndMinutes % 60 }),
+        storage.list.set((db.timeWastingSites || []).map(domain => parseUrl(domain))), // Stores time-wasting sites into local storage
     ])
 }
 

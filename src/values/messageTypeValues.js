@@ -13,3 +13,6 @@ export const MESSAGE_API_UPDATE_OPERATING_HOURS_END = "api:updateOperatingHoursE
 export const MESSAGE_API_UPDATE_SESSION_DURATION = "api:updateSessionDuration"
 export const MESSAGE_API_UPDATE_REWARD_TIME = "api:updateRewardTime"
 export const MESSAGE_API_UPDATE_LEARNING_TIME = "api:updateLearningTime"
+export const MESSAGE_API_UPDATE_TIME_WASTING_SITE = "api:addTimeWastingSite"
+
+export const MESSAGE_API_REMOVE_TIME_WASTING_SITE = "api:removeTimeWastingSite"
