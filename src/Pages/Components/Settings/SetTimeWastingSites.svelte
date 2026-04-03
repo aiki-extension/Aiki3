@@ -5,7 +5,7 @@
 <script>
   import Container from "./Container.svelte";
   import storage from "../../../util/storage";
-  import { parseUrl } from "../../../util/utilities";
+  import { parseUrl, normalizeUrl } from "../../../util/utilities";
   import Fa from "svelte-fa";
   import {
     faTrashAlt,
@@ -108,23 +108,18 @@
       return;
     }
 
-    // Used to normalize input to always be www.domain.tld
-    let rawInput = addItemValue.trim();
-    rawInput = new URL(rawInput.startsWith("http") ? rawInput : `https://${rawInput}`).hostname ?? rawInput;
+    const normalized = normalizeUrl(addItemValue);
 
-    const urlPattern = /(?:https?:\/\/)?(?:www\.)?([a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,})(?:[/?#].*)?$/;
-    const match = rawInput.match(urlPattern);
-
-    if (!match) {
+    if (!normalized) {
       alertStore.add({
         type: 'warning',
-        message: 'Invalid URL format!',
+        message: 'Invalid URL format!'
       })
       return;
     }
 
-    // The site that has been normalized, now becomes "www.x.x" and stored in addItemvalue
-    addItemValue = `www.${match[1]}`;
+    // The site that has been normalized, now becomes "www.example.com" and stored in addItemvalue
+    addItemValue = normalized;
 
     learningUri = parseUrl(await storage.learningUri.get())
     let site = parseUrl(addItemValue);
