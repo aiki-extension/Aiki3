@@ -36,14 +36,6 @@
     isEditing = !hasSaved;
   });
 
-  function normalize(url) {
-    if (!url) return "";
-    const trimmed = url.trim();
-    if (!trimmed) return "";
-    if (/^https?:\/\//i.test(trimmed)) return trimmed;
-    return `https://${trimmed}`;
-  }
-
   async function saveUri() {
     if (!isEditing) return;
 
@@ -114,7 +106,7 @@
       <input
         class="form-control form-control-lg url-input"
         type="text"
-        placeholder="https://example.com"
+        placeholder="www.example.com"
         bind:value={learningUri}
         bind:this={urlInputRef}
         readonly={!isEditing}
