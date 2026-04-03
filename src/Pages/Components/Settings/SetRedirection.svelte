@@ -62,11 +62,6 @@
       return;    
     }
 
-    const backendResult = await browser.runtime.sendMessage({
-      type: MESSAGE_API_UPDATE_LEARNING_URI,
-      learningUri: wwwHost,
-    });
-
     await storage.learningUri.set(wwwHost);
     learningUri = wwwHost; // Used to display it correctly in the settings page
 
@@ -77,6 +72,12 @@
         type: 'success',
         message: 'Learning platform saved!',
       })
+    
+    // API Call at the end, to ensure it doesn't block for local storage (focused on guest mode especially)
+    const backendResult = await browser.runtime.sendMessage({
+      type: MESSAGE_API_UPDATE_LEARNING_URI,
+      learningUri: wwwHost,
+    });
   }
 
   async function enableEditing() {
