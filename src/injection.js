@@ -1,4 +1,5 @@
 import browser from "webextension-polyfill";
+import { getLearningUrl } from "./services/siteDetector";
 
 const l = console.log;
 
@@ -378,9 +379,7 @@ async function bootstrapLearningOverlayIfNeeded() {
   if (bootstrapAttemptPending) return;
   bootstrapAttemptPending = true;
   try {
-    const result = await browser.storage.local.get("learningUri");
-    const learningUri =
-      result && typeof result.learningUri === "string" ? result.learningUri.trim() : "";
+    const learningUri = await getLearningUrl();
     if (!learningUri || !matchesLearningHost(learningUri)) {
       bootstrapAttemptPending = false;
       return;
@@ -1080,8 +1079,8 @@ function renderContentBlocker() {
 
   button.addEventListener("click", async () => {
     try {
-      const result = await browser.storage.local.get("learningUri");
-      const uri = result && typeof result.learningUri === "string" ? result.learningUri.trim() : "";
+      const result = await getLearningUrl();
+      const uri = (typeof result === "string" ? result.trim() : "");
       if (uri) {
         cleanup();
         location.href = uri;
