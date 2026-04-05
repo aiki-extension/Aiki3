@@ -100,6 +100,28 @@ const makeDraggable = (element) => {
     return { x, y, corner };
   };
 
+  const applySnappedPosition = (x, y) => {
+    const rect = element.getBoundingClientRect();
+    const corner = getNearestCorner();
+    
+    element.style.left = '';
+    element.style.top = '';
+    
+    if (corner.horizontal === 'right') {
+      element.style.right = `${window.innerWidth - x - rect.width}px`;
+    } else {
+      element.style.left = `${x}px`;
+      element.style.right = '';
+    }
+    
+    if (corner.vertical === 'bottom') {
+      element.style.bottom = `${window.innerHeight - y - rect.height}px`;
+    } else {
+      element.style.top = `${y}px`;
+      element.style.bottom = '';
+    }
+  };
+
   // Apply position
   const applyPosition = (x, y) => {
     element.style.right = '';
@@ -124,7 +146,7 @@ const makeDraggable = (element) => {
     dragState.currentY = y;
     dragState.intendedX = x;
     dragState.intendedY = y;
-    applyPosition(x, y);
+    applySnappedPosition(x, y);
   };
 
   const updatePosition = (intendedX, intendedY) => {
@@ -153,7 +175,7 @@ const makeDraggable = (element) => {
     dragState.intendedY = y;
     dragState.currentX = x;
     dragState.currentY = y;
-    applyPosition(x, y);
+    applySnappedPosition(x, y);
   };
 
   const onResize = () => {
@@ -163,7 +185,7 @@ const makeDraggable = (element) => {
     dragState.intendedY = y;
     dragState.currentX = x;
     dragState.currentY = y;
-    applyPosition(x, y);
+    applySnappedPosition(x, y);
   };
 
   const onPointerDown = (event) => {
@@ -218,7 +240,7 @@ const makeDraggable = (element) => {
     dragState.intendedY = y;
     dragState.currentX = x;
     dragState.currentY = y;
-    applyPosition(x, y);
+    applySnappedPosition(x, y);
     
     if (event.pointerId !== undefined) {
       element.releasePointerCapture(event.pointerId);
