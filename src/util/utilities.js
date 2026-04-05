@@ -65,6 +65,16 @@ export function parseUrl(site) {
   return { host, name };
 }
 
+export function normalizeUrl(input) {
+  if (!input?.trim()) return null;
+  const { host } = parseUrl(input);
+  if (!host) return null;
+  const urlPattern = /(?:https?:\/\/)?(?:www\.)?([a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,})(?:[/?#].*)?$/;
+  const match = host.match(urlPattern);
+  if (!match) return null;
+  return host.startsWith("www.") ? host : `www.${host}`;
+}
+
 export function makeDate() {
   const options = {
     weekday: "long",

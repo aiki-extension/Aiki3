@@ -6,7 +6,7 @@
   // Functional and module imports
   import storage from "../../../util/storage";
   import { onMount, tick } from "svelte";
-  import { parseUrl } from "../../../util/utilities";
+  import { parseUrl, normalizeUrl } from "../../../util/utilities";
   import { alertStore } from '../../../services/alertService';
   import browser from "webextension-polyfill";
   import { MESSAGE_API_UPDATE_LEARNING_URI } from '../../../values/messageTypeValues';
@@ -36,23 +36,25 @@
     isEditing = !hasSaved;
   });
 
-  function normalize(url) {
-    if (!url) return "";
-    const trimmed = url.trim();
-    if (!trimmed) return "";
-    if (/^https?:\/\//i.test(trimmed)) return trimmed;
-    return `https://${trimmed}`;
-  }
-
   async function saveUri() {
     if (!isEditing) return;
 
-    const uri = normalize(learningUri);
+    const wwwHost = normalizeUrl(learningUri);
 
-    const hostToCompare = parseUrl(uri).host; // Get just the domain (e.g., "example.com")
+    if (!wwwHost) {
+      if (!learningUri.trim()){
+        await storage.learningUri.set("");
+        hasSaved = false;
+        isEditing = true;
+        alertStore.add({ type: 'success', message: 'Learning platform cleared.' });
+      } else {
+        alertStore.add({ type: 'warning', message: 'Invalid URL.' });
+      }
+      return;
+    }
 
     const timeWasteList = (await storage.list.get()) || [];
-    if (timeWasteList.some(item => item.host === hostToCompare)) {
+    if (timeWasteList.some(item => item.host === wwwHost)) {
       alertStore.add({
         type: 'warning',
         message: 'Your learning site cant be the same as a time wasting site',
@@ -60,23 +62,8 @@
       return;    
     }
 
-    const backendResult = await browser.runtime.sendMessage({
-      type: MESSAGE_API_UPDATE_LEARNING_URI,
-      learningUri: uri,
-    });
-
-    if (!uri) {
-      await storage.learningUri.set("");
-      hasSaved = false;
-      isEditing = true;
-      alertStore.add({
-        type: 'success',
-        message: 'Learning platform cleared.',
-      })
-      return;
-    }
-
-    await storage.learningUri.set(uri);
+    await storage.learningUri.set(wwwHost);
+    learningUri = wwwHost; // Used to display it correctly in the settings page
 
     hasSaved = true;
     isEditing = false;
@@ -85,6 +72,12 @@
         type: 'success',
         message: 'Learning platform saved!',
       })
+    
+    // API Call at the end, to ensure it doesn't block for local storage (focused on guest mode especially)
+    const backendResult = await browser.runtime.sendMessage({
+      type: MESSAGE_API_UPDATE_LEARNING_URI,
+      learningUri: wwwHost,
+    });
   }
 
   async function enableEditing() {
@@ -114,7 +107,7 @@
       <input
         class="form-control form-control-lg url-input"
         type="text"
-        placeholder="https://example.com"
+        placeholder="www.example.com"
         bind:value={learningUri}
         bind:this={urlInputRef}
         readonly={!isEditing}

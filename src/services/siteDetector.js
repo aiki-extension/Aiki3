@@ -58,7 +58,9 @@ export async function getProcrastinationHosts() {
  */
 export async function getLearningUrl() {
   const url = await storage.learningUri.get();
-  return url || null;
+  if (!url) return null;
+  // Only prepend http:// if the URL doesn't already have a protocol
+  return url.match(/^https?:\/\//) ? url : `http://${url}`;
 }
 
 /**
