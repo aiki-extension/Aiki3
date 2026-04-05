@@ -10,33 +10,34 @@ class PromptCoordinator {
     this.boundRenderContentBlocker = this.renderContentBlocker.bind(this);
   }
 
-  async promptRedirect(tabId, learningUrl, originUrl, callbacks = {}, attempt = 0) {
-    const { onAccept, onContinue } = callbacks;
+  async sendMesssageWithRetry(tabId, message, attempt = 0,) {
+    try {
+      const result = await browser.tabs.sendMessage(tabId, message);
+      console.log("Retrying message" + message);
 
-    // Validate tab still exists and is on the intended time wasting site before retrying
-    if (attempt > 0) {
-      try {
-        const tab = await browser.tabs.get(tabId);
-        if (!tab || !tab.url) {
-          return; // Tab closed or no URL
-        }
-        const currentHost = new URL(tab.url).hostname.replace(/^www\./, "");
-        const intendedHost = new URL(originUrl).hostname.replace(/^www\./, "");
-        if (currentHost !== intendedHost) {
-          // Tab navigated away from the time wasting site, abort retries
-          await this.hideImmediatePrompt(tabId).catch(() => { });
-          await this.removePreemptiveHide(tabId).catch(() => { });
-          return;
-        }
-      } catch (_) {
-        return; // Tab closed or invalid
+      if (!result) {
+        throw new Error("No response from content script");
+      } else {
+        return result
+      }
+    } catch (error) {
+      if (attempt < 20) {
+        return new Promise((resolve) => {
+          setTimeout(() => {
+            resolve(this.sendMesssageWithRetry(tabId, attempt + 1, message));
+          }, 100);
+        });
       }
     }
+  }
 
+  async promptRedirect(tabId, learningUrl, originUrl, callbacks = {}) {
+    const { onAccept, onContinue } = callbacks;
+    
     try {
       await this.applyPreemptiveHide(tabId);
       await this.showImmediatePrompt(tabId);
-      const result = await browser.tabs.sendMessage(tabId, {
+      const result = await this.sendMesssageWithRetry(tabId, {
         action: "display: redirectPrompt",
         url: learningUrl,
         originUrl: originUrl,
@@ -58,14 +59,8 @@ class PromptCoordinator {
         }
       }
     } catch (error) {
-      if (attempt < 20) {
-        setTimeout(() => {
-          this.promptRedirect(tabId, learningUrl, originUrl, callbacks, attempt + 1);
-        }, 100);
-      } else {
-        await this.hideImmediatePrompt(tabId);
-        await this.removePreemptiveHide(tabId);
-      }
+      await this.hideImmediatePrompt(tabId);
+      await this.removePreemptiveHide(tabId);
     }
   }
 
@@ -88,13 +83,11 @@ class PromptCoordinator {
       try {
         await this.applyPreemptiveHide(details.tabId);
         await this.showImmediatePrompt(details.tabId);
-        await browser.tabs.sendMessage(details.tabId, {
+        await this.sendMesssageWithRetry(details.tabId, {
           action: "inject blocker",
         });
-        setTimeout(() => {
-          this.hideImmediatePrompt(details.tabId).catch(() => { });
-          this.removePreemptiveHide(details.tabId).catch(() => { });
-        }, 150);
+        this.hideImmediatePrompt(details.tabId).catch(() => { });
+        this.removePreemptiveHide(details.tabId).catch(() => { });
       } catch (_) { }
     }
   }
