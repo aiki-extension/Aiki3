@@ -3,6 +3,7 @@ import timer from "../services/TimerManager";
 import browser from "webextension-polyfill";
 import { parseTime } from "../util/utilities";
 import { handleApiMessage } from "./apiHandler";
+import redirection from "../redirection";
 
 /*
 This module handles incoming messages from content scripts and other parts of the extension.
@@ -19,6 +20,12 @@ if (!message || typeof message !== "object") {
   // Delegate all api:* messages to apiHandler
   if (message.type?.startsWith("api:")) {
     return handleApiMessage(message);
+  }
+
+  
+  if (message.type === "contentScript:ready" && sender?.tab?.id !== undefined) {
+    redirection.onContentScriptReady(sender.tab.id);
+    return;
   }
 
   if (message.type === "timer:get") {

@@ -10,34 +10,13 @@ class PromptCoordinator {
     this.boundRenderContentBlocker = this.renderContentBlocker.bind(this);
   }
 
-  async sendMesssageWithRetry(tabId, message, attempt = 0,) {
-    try {
-      const result = await browser.tabs.sendMessage(tabId, message);
-      console.log("Retrying message" + message);
-
-      if (!result) {
-        throw new Error("No response from content script");
-      } else {
-        return result
-      }
-    } catch (error) {
-      if (attempt < 20) {
-        return new Promise((resolve) => {
-          setTimeout(() => {
-            resolve(this.sendMesssageWithRetry(tabId, attempt + 1, message));
-          }, 100);
-        });
-      }
-    }
-  }
-
   async promptRedirect(tabId, learningUrl, originUrl, callbacks = {}) {
     const { onAccept, onContinue } = callbacks;
-    
+
     try {
       await this.applyPreemptiveHide(tabId);
       await this.showImmediatePrompt(tabId);
-      const result = await this.sendMesssageWithRetry(tabId, {
+      const result = await browser.tabs.sendMessage(tabId, {
         action: "display: redirectPrompt",
         url: learningUrl,
         originUrl: originUrl,
@@ -47,13 +26,13 @@ class PromptCoordinator {
         throw new Error("No response from content script");
       }
 
-      if (result && result.action === "continue") {
+      if (result.action === "continue") {
         if (typeof onContinue === "function") {
           await onContinue();
         }
         await this.hideImmediatePrompt(tabId);
         await this.removePreemptiveHide(tabId);
-      } else if (result && result.action === "redirect") {
+      } else if (result.action === "redirect") {
         if (typeof onAccept === "function") {
           await onAccept();
         }
@@ -83,7 +62,7 @@ class PromptCoordinator {
       try {
         await this.applyPreemptiveHide(details.tabId);
         await this.showImmediatePrompt(details.tabId);
-        await this.sendMesssageWithRetry(details.tabId, {
+        await browser.tabs.sendMessage(details.tabId, {
           action: "inject blocker",
         });
         this.hideImmediatePrompt(details.tabId).catch(() => { });

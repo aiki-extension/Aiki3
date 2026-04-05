@@ -11,6 +11,11 @@ const l = console.log;
 
 
 const navigationGuards = new NavigationGuards(false); // Pass false to disable debug logs in NavigationGuards
+
+// Pending intents for tabs that are mid-navigation (content script not yet ready).
+// Keyed by tabId. Set by redirect() on onBeforeNavigate, consumed by onContentScriptReady().
+const pendingIntents = new Map();
+
 const promptCoordinator = new PromptCoordinator({
   applyPreemptiveHide: (tabId) => navigationGuards.applyPreemptiveHide(tabId),
   removePreemptiveHide: (tabId) => navigationGuards.removePreemptiveHide(tabId),
@@ -153,7 +158,7 @@ async function originUpdatedListener(details) {
  * @param {object} details
  * @param {string} details.url
  * @param {number} details.tabId */
-async function redirect(details) {
+async function redirect(details, immediate = false) {
   if (await checkActiveTime()) {
     if (details.frameId === 0 && !details.url.includes("auth")) {
       const toggled = await storage.redirection.get();
@@ -233,8 +238,17 @@ async function redirect(details) {
             return; // We are in global cooldown period - Don't show prompt
           }
 
-          // show consent prompt
-          promptRedirect(details.tabId, learningUri, details.url);
+          if (immediate) {
+            // Tab switch: content script already loaded, send directly.
+            promptRedirect(details.tabId, learningUri, details.url);
+          } else {
+            // Navigation: queue the prompt to fire once the content script signals ready.
+            // redirect() runs from onBeforeNavigate — the page hasn't loaded yet, so
+            // the content script listener isn't registered until it fires contentScript:ready.
+            pendingIntents.set(details.tabId, () =>
+              promptRedirect(details.tabId, learningUri, details.url)
+            );
+          }
         }
       }
     }
@@ -477,9 +491,13 @@ async function checkTab(tab) {
   if (procListNames.includes(tabSiteName)) {
     const origin = await storage.origin.get();
     if (origin) {
+      // Content script already loaded (tab switch) — send directly.
       renderContentBlocker({ tabId: tab.id, frameId: 0, url: tab.url });
     } else {
-      redirect({ frameId: 0, url: tab.url, tabId: tab.id });
+      // Content script already loaded (tab switch) — redirect() would queue a pending
+      // intent, so we run the full redirect check but mark it as immediate so the prompt
+      // fires directly without waiting for a ready signal.
+      redirect({ frameId: 0, url: tab.url, tabId: tab.id }, true);
     }
   }
 }
@@ -652,6 +670,18 @@ async function gotoOrigin(event, sourceContext = {}) {
   }
 }
 
+/**
+ * Called by the background message handler when a content script fires contentScript:ready.
+ * Consumes any pending intent queued during onBeforeNavigate for that tab.
+ */
+function onContentScriptReady(tabId) {
+  const fn = pendingIntents.get(tabId);
+  if (fn) {
+    pendingIntents.delete(tabId);
+    fn();
+  }
+}
+
 async function promptRedirect(tabId, url, originUrl) {
   await promptCoordinator.promptRedirect(tabId, url, originUrl, {
     onContinue: async () => {
@@ -759,4 +789,5 @@ export default {
   removeLearningSiteLoadedListener,
   checkActiveTab,
   finalizeAllActiveSessions,
+  onContentScriptReady,
 };

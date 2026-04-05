@@ -475,6 +475,11 @@ browser.runtime.onMessage.addListener((request) => {
   }
 });
 
+// Signal to the background that this content script is ready to receive messages.
+// The background uses this to fire any prompt that was queued during page navigation,
+// avoiding the need to poll with retries.
+browser.runtime.sendMessage({ type: "contentScript:ready" }).catch(() => {});
+
 /**
  * @function
  * @description Removes the aiki interception overlay by searching for DOM elements 
