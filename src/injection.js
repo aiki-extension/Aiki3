@@ -104,21 +104,42 @@ const makeDraggable = (element) => {
     const rect = element.getBoundingClientRect();
     const corner = getNearestCorner();
     
-    element.style.left = '';
-    element.style.top = '';
+    // Instantly convert to the target coordinate system (no transition)
+    const prevTransition = element.style.transition;
+    element.style.transition = 'none';
     
     if (corner.horizontal === 'right') {
-      element.style.right = `${window.innerWidth - x - rect.width}px`;
+      element.style.left = '';
+      element.style.right = `${window.innerWidth - rect.right}px`;
     } else {
-      element.style.left = `${x}px`;
       element.style.right = '';
+      element.style.left = `${rect.left}px`;
     }
     
     if (corner.vertical === 'bottom') {
-      element.style.bottom = `${window.innerHeight - y - rect.height}px`;
+      element.style.top = '';
+      element.style.bottom = `${window.innerHeight - rect.bottom}px`;
     } else {
-      element.style.top = `${y}px`;
       element.style.bottom = '';
+      element.style.top = `${rect.top}px`;
+    }
+    
+    // Force reflow
+    element.getBoundingClientRect();
+    
+    // Re-enable transition and animate to snapped position
+    element.style.transition = prevTransition;
+    
+    if (corner.horizontal === 'right') {
+      element.style.right = '0px';
+    } else {
+      element.style.left = '0px';
+    }
+    
+    if (corner.vertical === 'bottom') {
+      element.style.bottom = '0px';
+    } else {
+      element.style.top = '0px';
     }
   };
 
@@ -194,6 +215,16 @@ const makeDraggable = (element) => {
     if (event.target.tagName === 'BUTTON' || event.target.closest('button')) {
       return;
     }
+
+    const rect = element.getBoundingClientRect();
+    element.style.right = '';
+    element.style.bottom = '';
+    element.style.left = `${rect.left}px`;
+    element.style.top = `${rect.top}px`;
+    dragState.currentX = rect.left;
+    dragState.currentY = rect.top;
+    dragState.intendedX = rect.left;
+    dragState.intendedY = rect.top;
 
     dragState.dragging = true;
     dragState.startX = event.clientX;
