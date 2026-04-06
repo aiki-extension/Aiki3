@@ -704,7 +704,7 @@ function renderLearningContent() {
     const isCollapsedKey = "aiki-learning-collapsed";
     let isCollapsed = localStorage.getItem(isCollapsedKey) === "true";
 
-    const getPanelStyle = (collapsed) => `pointer-events: auto; padding: ${collapsed ? "10px 14px" : "clamp(16px, 3vw, 22px)"}; min-width: ${collapsed ? "140px" : "260px"}; max-width: ${collapsed ? "180px" : "320px"}; background: rgba(15, 23, 42, 0.96); color: #f8fafc; border-radius: ${collapsed ? "12px" : "18px"}; box-shadow: 0 24px 45px rgba(15, 23, 42, 0.45); font-family: 'Inter', 'Segoe UI', sans-serif; display: flex; flex-direction: column; gap: ${collapsed ? "6px" : "12px"}; cursor: grab; position: relative; font-size: 14px; transition: all 0.3s ease;`;
+    const getPanelStyle = (collapsed) => `pointer-events: auto; padding: ${collapsed ? "10px 14px" : "clamp(16px, 3vw, 22px)"}; min-width: ${collapsed ? "140px" : "260px"}; max-width: ${collapsed ? "180px" : "320px"}; margin: 8px; background: rgba(15, 23, 42, 0.96); color: #f8fafc; border-radius: ${collapsed ? "12px" : "18px"}; box-shadow: 0 24px 45px rgba(15, 23, 42, 0.45); font-family: 'Inter', 'Segoe UI', sans-serif; display: flex; flex-direction: column; gap: ${collapsed ? "6px" : "12px"}; cursor: grab; position: relative; font-size: 14px; transition: all 0.3s ease;`;
 
     function updateOverlayVisibility() {
       if (isFullScreen()) {
