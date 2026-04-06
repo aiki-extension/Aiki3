@@ -101,30 +101,55 @@ const makeDraggable = (element) => {
     return { x, y, corner };
   };
 
-  // Apply position using corner anchors
-  const applyPosition = (x, y, corner) => {
+  const applySnappedPosition = (x, y) => {
     const rect = element.getBoundingClientRect();
+    const corner = getNearestCorner();
     
-    // Clear all position properties first
-    element.style.left = '';
-    element.style.right = '';
-    element.style.top = '';
-    element.style.bottom = '';
+    // Instantly convert to the target coordinate system (no transition)
+    const prevTransition = element.style.transition;
+    element.style.transition = 'none';
     
-    // Apply appropriate corner anchors
     if (corner.horizontal === 'right') {
-      const rightOffset = window.innerWidth - x - rect.width;
-      element.style.right = `${rightOffset}px`;
+      element.style.left = '';
+      element.style.right = `${window.innerWidth - rect.right}px`;
     } else {
-      element.style.left = `${x}px`;
+      element.style.right = '';
+      element.style.left = `${rect.left}px`;
     }
     
     if (corner.vertical === 'bottom') {
-      const bottomOffset = window.innerHeight - y - rect.height;
-      element.style.bottom = `${bottomOffset}px`;
+      element.style.top = '';
+      element.style.bottom = `${window.innerHeight - rect.bottom}px`;
     } else {
-      element.style.top = `${y}px`;
+      element.style.bottom = '';
+      element.style.top = `${rect.top}px`;
     }
+    
+    // Force reflow
+    element.getBoundingClientRect();
+    
+    // Re-enable transition and animate to snapped position
+    element.style.transition = prevTransition;
+    
+    if (corner.horizontal === 'right') {
+      element.style.right = '0px';
+    } else {
+      element.style.left = '0px';
+    }
+    
+    if (corner.vertical === 'bottom') {
+      element.style.bottom = '0px';
+    } else {
+      element.style.top = '0px';
+    }
+  };
+
+  // Apply position
+  const applyPosition = (x, y) => {
+    element.style.right = '';
+    element.style.bottom = '';
+    element.style.left = `${x}px`;
+    element.style.top = `${y}px`;
   };
 
   const initializePosition = () => {
@@ -138,12 +163,12 @@ const makeDraggable = (element) => {
     element.style.transform = 'none';
     
     // Snap to nearest corner on init
-    const { x, y, corner } = snapToCorner();
+    const { x, y } = snapToCorner();
     dragState.currentX = x;
     dragState.currentY = y;
     dragState.intendedX = x;
     dragState.intendedY = y;
-    applyPosition(x, y, corner);
+    applySnappedPosition(x, y);
   };
 
   const updatePosition = (intendedX, intendedY) => {
@@ -161,29 +186,28 @@ const makeDraggable = (element) => {
     
     dragState.currentX = x;
     dragState.currentY = y;
-    
-    const corner = getNearestCorner();
-    applyPosition(x, y, corner);
+
+    applyPosition(x, y);
   };
 
   const syncIntendedPosition = () => {
     // Snap to nearest corner when size changes
-    const { x, y, corner } = snapToCorner();
+    const { x, y } = snapToCorner();
     dragState.intendedX = x;
     dragState.intendedY = y;
     dragState.currentX = x;
     dragState.currentY = y;
-    applyPosition(x, y, corner);
+    applySnappedPosition(x, y);
   };
 
   const onResize = () => {
     // Snap to corner on resize
-    const { x, y, corner } = snapToCorner();
+    const { x, y } = snapToCorner();
     dragState.intendedX = x;
     dragState.intendedY = y;
     dragState.currentX = x;
     dragState.currentY = y;
-    applyPosition(x, y, corner);
+    applySnappedPosition(x, y);
   };
 
   const onPointerDown = (event) => {
@@ -192,6 +216,16 @@ const makeDraggable = (element) => {
     if (event.target.tagName === 'BUTTON' || event.target.closest('button')) {
       return;
     }
+
+    const rect = element.getBoundingClientRect();
+    element.style.right = '';
+    element.style.bottom = '';
+    element.style.left = `${rect.left}px`;
+    element.style.top = `${rect.top}px`;
+    dragState.currentX = rect.left;
+    dragState.currentY = rect.top;
+    dragState.intendedX = rect.left;
+    dragState.intendedY = rect.top;
 
     dragState.dragging = true;
     dragState.startX = event.clientX;
@@ -233,12 +267,12 @@ const makeDraggable = (element) => {
     element.style.cursor = "grab";
     
     // Snap to nearest corner when drag ends
-    const { x, y, corner } = snapToCorner();
+    const { x, y } = snapToCorner();
     dragState.intendedX = x;
     dragState.intendedY = y;
     dragState.currentX = x;
     dragState.currentY = y;
-    applyPosition(x, y, corner);
+    applySnappedPosition(x, y);
     
     if (event.pointerId !== undefined) {
       element.releasePointerCapture(event.pointerId);
@@ -683,7 +717,7 @@ function renderLearningContent() {
     const isCollapsedKey = "aiki-learning-collapsed";
     let isCollapsed = localStorage.getItem(isCollapsedKey) === "true";
 
-    const getPanelStyle = (collapsed) => `pointer-events: auto; padding: ${collapsed ? "10px 14px" : "clamp(16px, 3vw, 22px)"}; min-width: ${collapsed ? "140px" : "260px"}; max-width: ${collapsed ? "180px" : "320px"}; background: rgba(15, 23, 42, 0.96); color: #f8fafc; border-radius: ${collapsed ? "12px" : "18px"}; box-shadow: 0 24px 45px rgba(15, 23, 42, 0.45); font-family: 'Inter', 'Segoe UI', sans-serif; display: flex; flex-direction: column; gap: ${collapsed ? "6px" : "12px"}; cursor: grab; position: relative; font-size: 14px; transition: all 0.3s ease;`;
+    const getPanelStyle = (collapsed) => `pointer-events: auto; padding: ${collapsed ? "10px 14px" : "clamp(16px, 3vw, 22px)"}; min-width: ${collapsed ? "140px" : "260px"}; max-width: ${collapsed ? "180px" : "320px"}; margin: 8px; background: rgba(15, 23, 42, 0.96); color: #f8fafc; border-radius: ${collapsed ? "12px" : "18px"}; box-shadow: 0 24px 45px rgba(15, 23, 42, 0.45); font-family: 'Inter', 'Segoe UI', sans-serif; display: flex; flex-direction: column; gap: ${collapsed ? "6px" : "12px"}; cursor: grab; position: relative; font-size: 14px; transition: all 0.3s ease;`;
 
     function updateOverlayVisibility() {
       if (isFullScreen()) {

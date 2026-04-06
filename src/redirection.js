@@ -463,6 +463,7 @@ async function checkActiveTab() {
 
         // Show redirect prompt
         promptRedirect(tab.id, learningUri, tab.url);
+        console.log("Prompt called from checkActiveTab()") // FLAG for further research, as i do not think this is ever called
       }
     }
   } catch (error) {
