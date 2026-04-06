@@ -115,10 +115,3 @@ class PromptCoordinator {
 }
 
 export default PromptCoordinator;
-
-// content script (where prompt UI actions are handled)
-if (message.action === "display:contentBlocker") {
-  const action = await showContentBlockerAndWaitForChoice(); 
-  // returns "continue" (or "redirect" if you support it)
-  return { action };
-}

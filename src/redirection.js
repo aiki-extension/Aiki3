@@ -249,7 +249,7 @@ async function redirect(details, immediate = false) {
           }
         }
 
-        const learningUri = await storage.learningUri.get();
+        const learningUri = await getLearningUrl();
         if (!learningUri) return;
 
         // dispatchPrompt re-reads origin at call time so the correct UI is shown
