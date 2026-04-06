@@ -88,9 +88,6 @@
           <SetRedirection {user} />
         </div>
       {/key}
-      <div class="container">
-        <Statistics />
-      </div>
     {/if}
   </main>
   <Footer />
