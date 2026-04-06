@@ -542,6 +542,11 @@ async function gotoOrigin(event, sourceContext = {}) {
     } catch (_) { }
   }
 
+  // Read blockedOrigin before removeAllContentBlockers() clears storage.blockedOrigins
+  const targetBlockedOrigin = targetTabId !== undefined
+    ? await storage.blockedOrigins.get(targetTabId)
+    : null;
+
   const sessionTabId = targetTabId !== undefined ? targetTabId : origin?.tabId;
   if (sessionTabId !== undefined) {
       await SessionService.finalizeSession(sessionTabId, "learning", normalizedEvent);
@@ -581,7 +586,7 @@ async function gotoOrigin(event, sourceContext = {}) {
       l(error);
     }
   } else if (targetTabId !== undefined) {
-    const blockedOrigin = await storage.blockedOrigins.get(targetTabId);
+    const blockedOrigin = targetBlockedOrigin;
     if (blockedOrigin) {
       await removeContentBlocker(targetTabId);
       try {
@@ -727,11 +732,8 @@ async function renderContentBlocker(details) {
       pendingIntents.set(details.tabId, () => renderContentBlocker(details));
     },
     onContinue: async () => {
-      await gotoOrigin("continue", {
-        type: "blocker",
-        tabId: details.tabId,
-        restoreAll: false,
-      });
+      await removeContentBlocker(details.tabId);
+      await setPromptCooldown(details.tabId, details.url);
     },
   });
 }
