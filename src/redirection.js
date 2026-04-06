@@ -235,33 +235,26 @@ async function redirect(details, immediate = false) {
           }
         }
 
-        if (!origin || isOriginValid) {
-          const learningUri = await storage.learningUri.get();
-          if (!learningUri) return; // skip redirection if no learning URL configured
-          
-          // Check global prompt lock (applies to all tabs)
-          const globalPromptLock = await storage.globalPromptLock.get();  // ← GLOBAL CHECK
-          const now = Date.now();
+        const learningUri = await storage.learningUri.get();
+        if (!learningUri) return;
 
-          if (
-            globalPromptLock &&                                           // Does global lock exists
-            now - globalPromptLock.timestamp < PROMPT_SUPPRESS_DURATION   // And still within time limit set (10 min)
-          ) {
+        // Only apply the global prompt lock when there is no active learning session.
+        if (!isOriginValid) {
+          const globalPromptLock = await storage.globalPromptLock.get();
+          if (globalPromptLock && Date.now() - globalPromptLock.timestamp < PROMPT_SUPPRESS_DURATION) {
             l("Skipping prompt due to global cooldown (10 minutes)");
-            return; // We are in global cooldown period - Don't show prompt
+            return;
           }
+        }
 
-          if (immediate) {
-            // Tab switch: content script already loaded, send directly.
-            console.log("[Aiki redirection] redirect() immediate — calling promptRedirect for tab", details.tabId);
-            promptRedirect(details.tabId, learningUri, details.url);
-          } else {
-            // Navigation: queue the prompt to fire once the content script signals ready.
-            console.log("[Aiki redirection] redirect() navigation — queuing pending intent for tab", details.tabId);
-            pendingIntents.set(details.tabId, () =>
-              promptRedirect(details.tabId, learningUri, details.url)
-            );
-          }
+        // dispatchPrompt re-reads origin at call time so the correct UI is shown
+        // regardless of async races between queuing and firing.
+        if (immediate) {
+          console.log("[Aiki redirection] redirect() immediate — dispatching for tab", details.tabId);
+          dispatchPrompt(details.tabId, learningUri, details.url);
+        } else {
+          console.log("[Aiki redirection] redirect() navigation — queuing dispatch for tab", details.tabId);
+          pendingIntents.set(details.tabId, () => dispatchPrompt(details.tabId, learningUri, details.url));
         }
       }
     }
@@ -699,14 +692,29 @@ function onContentScriptReady(tabId) {
   }
 }
 
+// Checks origin at call time and routes to the correct UI.
+// Using this instead of deciding at queue time avoids async races where origin
+// changes between when the intent is queued and when it fires.
+async function dispatchPrompt(tabId, learningUri, procUrl) {
+  const origin = await storage.origin.get();
+  if (origin) {
+    console.log("[Aiki redirection] dispatchPrompt — active session, showing content blocker for tab", tabId);
+    renderContentBlocker({ tabId, frameId: 0, url: procUrl });
+  } else {
+    console.log("[Aiki redirection] dispatchPrompt — no session, showing redirect prompt for tab", tabId);
+    promptRedirect(tabId, learningUri, procUrl);
+  }
+}
+
 async function promptRedirect(tabId, url, originUrl) {
   console.log("[Aiki redirection] promptRedirect() — tab:", tabId, "learningUrl:", url, "originUrl:", originUrl);
   await promptCoordinator.promptRedirect(tabId, url, originUrl, {
     onConnectionFailed: () => {
       // The tab navigated away before the content script could respond (e.g. an
-      // auth redirect mid-load). Re-queue so the prompt fires once the tab settles.
-      console.log("[Aiki redirection] Connection lost — re-queuing pending intent for tab", tabId);
-      pendingIntents.set(tabId, () => promptRedirect(tabId, url, originUrl));
+      // auth redirect mid-load). Re-queue via dispatchPrompt so origin is re-checked
+      // when the tab settles — avoids overwriting a newer renderContentBlocker intent.
+      console.log("[Aiki redirection] Connection lost — re-queuing dispatch for tab", tabId);
+      pendingIntents.set(tabId, () => dispatchPrompt(tabId, url, originUrl));
     },
     onContinue: async () => {
       // Set global prompt lock now that user has explicitly clicked Stay
