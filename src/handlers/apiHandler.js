@@ -1,4 +1,5 @@
 import { loginUser, registerUser, updateUserSettings, getUserSettings, deleteTimeWastingSite } from "../services/apiService";
+import storage from "../util/storage";
 import { fetchAndSyncSettings } from "../services/settingsService";
 import { REWARD_TIME_MINUTES } from "../values/defaultSettingValues";
 import redirection from "../redirection";
@@ -24,6 +25,11 @@ function toTokenResult(result) {
 }
 
 export async function handleApiMessage(message) {
+  const uid = await storage.uid.get();
+  if (uid === "guest") {
+    return { ok: true, message: "" };
+  }
+
   if (message.type === MESSAGE_API_LOGIN) {
     const result = await loginUser({ email: message.email, password: message.password });
     const validated = toTokenResult(result);
