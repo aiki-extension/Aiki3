@@ -484,7 +484,7 @@ if (document.readyState === "loading") {
 
 /* Listener for messages from background script. */
 browser.runtime.onMessage.addListener((request) => {
-  if (request.action === "display: redirectPrompt") {
+  if (request.action === "display:redirectPrompt") {
     return renderRedirectPrompt(request.url, request.originUrl);
   } else if (request.action === "display: encouragement") {
     return renderLearningContent(request.shouldShowWelcome);
@@ -499,14 +499,29 @@ browser.runtime.onMessage.addListener((request) => {
       if (rewardOverlay) rewardOverlay.remove();
     } catch (_) { }
     return Promise.resolve({ action: "end injection" });
-  } else if (request.action === "inject blocker") {
-    console.log("Request: ", request);
-    l("Render blocking function should fire now");
-    renderContentBlocker();
+  } else if (request.action === "display:contentBlocker") {
+    return renderContentBlocker(request.originUrl);
   } else if (request.action === "remove blocker") {
     removeOverlay();
   }
 });
+
+// Signal to the background that this content script is ready to receive messages.
+// Deferred to DOMContentLoaded so document.body exists when the background responds
+// with a prompt — all render functions append to document.body.
+// applyPreemptiveHide / showImmediatePrompt fire via scripting.executeScript in the
+// background, so they are unaffected by this delay.
+function sendContentScriptReady() {
+  browser.runtime.sendMessage({ type: "contentScript:ready" })
+    .then((res) => console.log("[Aiki injection] contentScript:ready ack:", res))
+    .catch((err) => console.warn("[Aiki injection] contentScript:ready send failed:", err?.message));
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", sendContentScriptReady, { once: true });
+} else {
+  sendContentScriptReady();
+}
 
 /**
  * @function
@@ -986,7 +1001,8 @@ function renderLearningContent() {
   });
 }
 
-function renderContentBlocker() {
+function renderContentBlocker(originUrl) {
+  return new Promise((resolve) => {
   try {
     removeOverlay();
   } catch (_) { }
@@ -1104,10 +1120,9 @@ function renderContentBlocker() {
 
   overlay.cleanup = cleanup;
 
-  continueButton.addEventListener("click", async () => {
-    try { await browser.runtime.sendMessage({ type: "stats:skip" }); } catch (_) { }
-    try { await browser.runtime.sendMessage({ type: "blocker:release" }); } catch (_) { }
+  continueButton.addEventListener("click", () => {
     cleanup();
+    resolve({ action: "continue" });
   });
 
   button.addEventListener("click", async () => {
@@ -1116,23 +1131,15 @@ function renderContentBlocker() {
       const uri = (typeof result === "string" ? result.trim() : "");
       if (uri) {
         cleanup();
+        resolve({ action: "return" });
         location.href = uri;
         return;
       }
     } catch (_) { }
-
-    try {
-      if (timerPort.port) {
-        timerPort.port.postMessage("goto: originTab");
-      } else {
-        const keepAlive = browser.runtime.connect({ name: "Content Communication" });
-        keepAlive.postMessage("goto: originTab");
-        setTimeout(() => { try { keepAlive.disconnect(); } catch (_) { } }, 150);
-      }
-    } catch (_) { }
-
     cleanup();
+    resolve({ action: "return" });
   });
+  }); // end Promise
 }
 
 // ============================================

@@ -10,85 +10,77 @@ class PromptCoordinator {
     this.boundRenderContentBlocker = this.renderContentBlocker.bind(this);
   }
 
-  async sendMesssageWithRetry(tabId, message, attempt = 0,) {
-    try {
-      const result = await browser.tabs.sendMessage(tabId, message);
-      console.log("Retrying message" + message);
-
-      if (!result) {
-        throw new Error("No response from content script");
-      } else {
-        return result
-      }
-    } catch (error) {
-      if (attempt < 20) {
-        return new Promise((resolve) => {
-          setTimeout(() => {
-            resolve(this.sendMesssageWithRetry(tabId, attempt + 1, message));
-          }, 100);
-        });
-      }
-    }
-  }
-
   async promptRedirect(tabId, learningUrl, originUrl, callbacks = {}) {
-    const { onAccept, onContinue } = callbacks;
+    const { onAccept, onContinue, onConnectionFailed } = callbacks;
     
     try {
       await this.applyPreemptiveHide(tabId);
       await this.showImmediatePrompt(tabId);
-      const result = await this.sendMesssageWithRetry(tabId, {
-        action: "display: redirectPrompt",
-        url: learningUrl,
-        originUrl: originUrl,
-      });
-
-      if (!result) {
-        throw new Error("No response from content script");
+      let result;
+      try {
+        result = await browser.tabs.sendMessage(tabId, {
+          action: "display:redirectPrompt",
+          url: learningUrl,
+          originUrl: originUrl,
+        });
+      } catch (sendError) {
+        if (typeof onConnectionFailed === "function") onConnectionFailed();
+        throw sendError;
       }
 
-      if (result && result.action === "continue") {
-        if (typeof onContinue === "function") {
-          await onContinue();
-        }
+      if (!result) throw new Error("No response from content script");
+
+      if (result.action === "continue") {
+        if (typeof onContinue === "function") await onContinue();
         await this.hideImmediatePrompt(tabId);
         await this.removePreemptiveHide(tabId);
-      } else if (result && result.action === "redirect") {
-        if (typeof onAccept === "function") {
-          await onAccept();
-        }
+      } else if (result.action === "redirect") {
+        if (typeof onAccept === "function") await onAccept();
       }
-    } catch (error) {
+    } catch (_) {
       await this.hideImmediatePrompt(tabId);
       await this.removePreemptiveHide(tabId);
     }
   }
 
-  async renderContentBlocker(details) {
+  async renderContentBlocker(details, callbacks = {}) {
+    const { onContinue, onConnectionFailed } = callbacks;
     if (details.frameId === 0) {
       // Check if reward timer is active - if so, don't block
       try {
         const timer = await import("./TimerManager");
-        if (timer.default.isSessionRewardActive()) {
-          console.log("[PromptCoordinator] Skipping blocker - reward mode active");
-          return;
-        }
-      } catch (_) { }
+        if (timer.default.isSessionRewardActive()) return;
+      } catch (_) {}
 
       storage.blockedTabs.add(details.tabId);
-      if (details.url) {
-        storage.blockedOrigins.add(details.tabId, details.url);
-      }
+      if (details.url) storage.blockedOrigins.add(details.tabId, details.url);
       storage.promptLocks.remove(details.tabId);
+
       try {
         await this.applyPreemptiveHide(details.tabId);
         await this.showImmediatePrompt(details.tabId);
-        await this.sendMesssageWithRetry(details.tabId, {
-          action: "inject blocker",
-        });
-        this.hideImmediatePrompt(details.tabId).catch(() => { });
-        this.removePreemptiveHide(details.tabId).catch(() => { });
-      } catch (_) { }
+
+        let result;
+        try {
+          result = await browser.tabs.sendMessage(details.tabId, {
+            action: "display:contentBlocker", // request/response prompt
+            originUrl: details.url,
+          });
+        } catch (sendError) {
+          if (typeof onConnectionFailed === "function") onConnectionFailed();
+          throw sendError;
+        }
+
+        if (result?.action === "continue" && typeof onContinue === "function") {
+          await onContinue();
+        }
+
+        await this.hideImmediatePrompt(details.tabId);
+        await this.removePreemptiveHide(details.tabId);
+      } catch (_) {
+        await this.hideImmediatePrompt(details.tabId);
+        await this.removePreemptiveHide(details.tabId);
+      }
     }
   }
 
