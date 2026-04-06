@@ -12,9 +12,6 @@ class PromptCoordinator {
 
   async promptRedirect(tabId, learningUrl, originUrl, callbacks = {}) {
     const { onAccept, onContinue, onConnectionFailed } = callbacks;
-
-  async promptRedirect(tabId, learningUrl, originUrl, callbacks = {}) {
-    const { onAccept, onContinue } = callbacks;
     
     try {
       await this.applyPreemptiveHide(tabId);
