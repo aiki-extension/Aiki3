@@ -149,6 +149,18 @@ async function originUpdatedListener(details) {
   }
 }
 
+async function isGlobalPromptLocked() {
+  try {
+    const globalPromptLock = await storage.globalPromptLock.get();
+    return Boolean(
+      globalPromptLock?.timestamp &&
+      Date.now() - globalPromptLock.timestamp < PROMPT_SUPPRESS_DURATION
+    );
+  } catch (_) {
+    return false;
+  }
+}
+
 /** #REDIRECT()#
  * @async @function
  * @description Checks if redirection should happen,
@@ -159,11 +171,14 @@ async function originUpdatedListener(details) {
  * @param {string} details.url
  * @param {number} details.tabId */
 async function redirect(details, immediate = false) {
-  console.log("[Aiki redirection] redirect() called — tab:", details.tabId, "url:", details.url, "immediate:", immediate);
+  if (await isGlobalPromptLocked()) {
+    return;
+  }
+
   if (await checkActiveTime()) {
     if (details.frameId === 0 && !details.url.includes("auth")) {
       const toggled = await storage.redirection.get();
-      if (!toggled) { console.log("[Aiki redirection] redirect() — redirection toggled off, skipping"); return; }
+      if (!toggled) { return; }
 
       const procList = await storage.list.get();
 
@@ -173,7 +188,6 @@ async function redirect(details, immediate = false) {
       const tabSiteName = parseUrl(details.url).name;
       const procListNames = (procList || []).map(site => site.name);
       if (!procListNames.includes(tabSiteName)) {
-        console.log("[Aiki redirection] redirect() — URL name", tabSiteName, "not in procrastination list, skipping");
         return;
       }
 
@@ -202,7 +216,6 @@ async function redirect(details, immediate = false) {
       const progress = await storage.dailyProgress.get();
       const goalMet = goal > 0 && progress >= goal;
 
-      console.log("[Aiki redirection] redirect() — toggled:", toggled, "shouldRedirect:", shouldRedirect, "goalMet:", goalMet);
       if (toggled && shouldRedirect && !goalMet) {
         l("ShouldRedirect", shouldRedirect);
         const origin = await storage.origin.get();
@@ -238,22 +251,11 @@ async function redirect(details, immediate = false) {
         const learningUri = await storage.learningUri.get();
         if (!learningUri) return;
 
-        // Only apply the global prompt lock when there is no active learning session.
-        if (!isOriginValid) {
-          const globalPromptLock = await storage.globalPromptLock.get();
-          if (globalPromptLock && Date.now() - globalPromptLock.timestamp < PROMPT_SUPPRESS_DURATION) {
-            l("Skipping prompt due to global cooldown (10 minutes)");
-            return;
-          }
-        }
-
         // dispatchPrompt re-reads origin at call time so the correct UI is shown
         // regardless of async races between queuing and firing.
         if (immediate) {
-          console.log("[Aiki redirection] redirect() immediate — dispatching for tab", details.tabId);
           dispatchPrompt(details.tabId, learningUri, details.url);
         } else {
-          console.log("[Aiki redirection] redirect() navigation — queuing dispatch for tab", details.tabId);
           pendingIntents.set(details.tabId, () => dispatchPrompt(details.tabId, learningUri, details.url));
         }
       }
@@ -474,9 +476,9 @@ async function checkActiveTab() {
 async function checkTabById({ tabId }) {
   try {
     const tab = await browser.tabs.get(tabId);
-    checkTab(tab);
+    await checkTab(tab);
   } catch (error) {
-    // console.log(error.message);
+    console.log(error.message);
   }
 }
 // TODO: Rewrite these two functions ^ & v to 1 single function that checks if tab has url (if not, get it)
@@ -491,21 +493,14 @@ async function checkTabById({ tabId }) {
  * @param {string} tab.url
  * @param {number} tab.id */
 async function checkTab(tab) {
-  const tabSiteName = parseUrl(tab.url).name;
-  const procList = await storage.list.get();
-  const procListNames = procList.map((site) => site.name);
-  if (procListNames.includes(tabSiteName)) {
-    const origin = await storage.origin.get();
-    if (origin) {
-      // Content script already loaded (tab switch) — send directly.
-      renderContentBlocker({ tabId: tab.id, frameId: 0, url: tab.url });
-    } else {
-      // Content script already loaded (tab switch) — redirect() would queue a pending
-      // intent, so we run the full redirect check but mark it as immediate so the prompt
-      // fires directly without waiting for a ready signal.
-      redirect({ frameId: 0, url: tab.url, tabId: tab.id }, true);
-    }
-  }
+  if (!tab?.id || !tab?.url) return;
+
+  // Single routing path: reuse redirect logic for tab-activation events.
+  // `immediate=true` avoids pending-intent queue for already-loaded tabs.
+  await redirect(
+    { frameId: 0, url: tab.url, tabId: tab.id },
+    true
+  );
 }
 
 /** #GOTOORIGIN()#
@@ -549,20 +544,9 @@ async function gotoOrigin(event, sourceContext = {}) {
     } catch (_) { }
   }
 
-  console.log("[Aiki Debug] gotoOrigin called:", {
-    event,
-    normalizedEvent,
-    targetTabId,
-    originTabId: origin?.tabId,
-    originUrl: origin?.url,
-  });
-
   const sessionTabId = targetTabId !== undefined ? targetTabId : origin?.tabId;
   if (sessionTabId !== undefined) {
-      console.log("[Aiki Debug] Finalizing learning session for tab:", sessionTabId);
       await SessionService.finalizeSession(sessionTabId, "learning", normalizedEvent);
-  } else {
-    console.log("[Aiki Debug] No session to finalize - sessionTabId is undefined");
   }
 
   removeOriginUpdatedListener();
@@ -646,15 +630,9 @@ async function gotoOrigin(event, sourceContext = {}) {
   const hasRemainingLearningTabs = remainingLearningTabs.length > 0;
 
   // Start a time wasting session for the destination tab
-  console.log("[Aiki Debug] gotoOrigin procrastination session check:", { destinationUrl, targetTabId });
   if (destinationUrl && targetTabId !== undefined) {
-    console.log("[Aiki Debug] Starting procrastination session:", { targetTabId, destinationUrl });
     await SessionService.startSession(targetTabId, "procrastination", destinationUrl);
-  } else {
-    console.log("[Aiki Debug] NOT starting procrastination session - missing destinationUrl or targetTabId");
   }
-
-
 
   const redirectionToggled = await storage.redirection.get();
   if (redirectionToggled && !hasRemainingLearningTabs) {
@@ -681,14 +659,10 @@ async function gotoOrigin(event, sourceContext = {}) {
  * Consumes any pending intent queued during onBeforeNavigate for that tab.
  */
 function onContentScriptReady(tabId) {
-  console.log("[Aiki redirection] onContentScriptReady tabId:", tabId, "| pending intents:", [...pendingIntents.keys()]);
   const fn = pendingIntents.get(tabId);
   if (fn) {
-    console.log("[Aiki redirection] Executing pending intent for tab", tabId);
     pendingIntents.delete(tabId);
     fn();
-  } else {
-    console.log("[Aiki redirection] No pending intent for tab", tabId);
   }
 }
 
@@ -698,22 +672,18 @@ function onContentScriptReady(tabId) {
 async function dispatchPrompt(tabId, learningUri, procUrl) {
   const origin = await storage.origin.get();
   if (origin) {
-    console.log("[Aiki redirection] dispatchPrompt — active session, showing content blocker for tab", tabId);
     renderContentBlocker({ tabId, frameId: 0, url: procUrl });
   } else {
-    console.log("[Aiki redirection] dispatchPrompt — no session, showing redirect prompt for tab", tabId);
     promptRedirect(tabId, learningUri, procUrl);
   }
 }
 
 async function promptRedirect(tabId, url, originUrl) {
-  console.log("[Aiki redirection] promptRedirect() — tab:", tabId, "learningUrl:", url, "originUrl:", originUrl);
   await promptCoordinator.promptRedirect(tabId, url, originUrl, {
     onConnectionFailed: () => {
       // The tab navigated away before the content script could respond (e.g. an
       // auth redirect mid-load). Re-queue via dispatchPrompt so origin is re-checked
       // when the tab settles — avoids overwriting a newer renderContentBlocker intent.
-      console.log("[Aiki redirection] Connection lost — re-queuing dispatch for tab", tabId);
       pendingIntents.set(tabId, () => dispatchPrompt(tabId, url, originUrl));
     },
     onContinue: async () => {
