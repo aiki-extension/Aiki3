@@ -11,16 +11,30 @@ class PromptCoordinator {
   }
 
   async promptRedirect(tabId, learningUrl, originUrl, callbacks = {}) {
-    const { onAccept, onContinue } = callbacks;
+    const { onAccept, onContinue, onConnectionFailed } = callbacks;
+    console.log("[Aiki PromptCoordinator] promptRedirect() — tab:", tabId, "learningUrl:", learningUrl);
 
     try {
       await this.applyPreemptiveHide(tabId);
       await this.showImmediatePrompt(tabId);
-      const result = await browser.tabs.sendMessage(tabId, {
-        action: "display: redirectPrompt",
-        url: learningUrl,
-        originUrl: originUrl,
-      });
+      console.log("[Aiki PromptCoordinator] Sending display:redirectPrompt to tab", tabId);
+      let result;
+      try {
+        result = await browser.tabs.sendMessage(tabId, {
+          action: "display: redirectPrompt",
+          url: learningUrl,
+          originUrl: originUrl,
+        });
+      } catch (sendError) {
+        console.error("[Aiki PromptCoordinator] sendMessage threw:", sendError?.message);
+        // Page navigated away mid-flight (e.g. auth redirect). Signal the caller
+        // so it can re-queue the intent for when the tab settles.
+        if (typeof onConnectionFailed === "function") {
+          onConnectionFailed();
+        }
+        throw sendError;
+      }
+      console.log("[Aiki PromptCoordinator] sendMessage result:", result);
 
       if (!result) {
         throw new Error("No response from content script");

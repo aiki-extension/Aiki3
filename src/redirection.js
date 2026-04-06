@@ -159,12 +159,24 @@ async function originUpdatedListener(details) {
  * @param {string} details.url
  * @param {number} details.tabId */
 async function redirect(details, immediate = false) {
+  console.log("[Aiki redirection] redirect() called — tab:", details.tabId, "url:", details.url, "immediate:", immediate);
   if (await checkActiveTime()) {
     if (details.frameId === 0 && !details.url.includes("auth")) {
       const toggled = await storage.redirection.get();
-      if (!toggled) return;
+      if (!toggled) { console.log("[Aiki redirection] redirect() — redirection toggled off, skipping"); return; }
 
       const procList = await storage.list.get();
+
+      // The hostSuffix URL filter is broad (e.g. "youtube.com" also matches
+      // "accounts.youtube.com"). Guard here so auth/redirect subdomains never
+      // queue a pending intent or overwrite a legitimate one.
+      const tabSiteName = parseUrl(details.url).name;
+      const procListNames = (procList || []).map(site => site.name);
+      if (!procListNames.includes(tabSiteName)) {
+        console.log("[Aiki redirection] redirect() — URL name", tabSiteName, "not in procrastination list, skipping");
+        return;
+      }
+
       const procHosts = (procList || []).map(item => item?.host || item?.name || "").filter(Boolean);
       const learningUrl = await storage.learningUri.get();
 
@@ -190,6 +202,7 @@ async function redirect(details, immediate = false) {
       const progress = await storage.dailyProgress.get();
       const goalMet = goal > 0 && progress >= goal;
 
+      console.log("[Aiki redirection] redirect() — toggled:", toggled, "shouldRedirect:", shouldRedirect, "goalMet:", goalMet);
       if (toggled && shouldRedirect && !goalMet) {
         l("ShouldRedirect", shouldRedirect);
         const origin = await storage.origin.get();
@@ -240,11 +253,11 @@ async function redirect(details, immediate = false) {
 
           if (immediate) {
             // Tab switch: content script already loaded, send directly.
+            console.log("[Aiki redirection] redirect() immediate — calling promptRedirect for tab", details.tabId);
             promptRedirect(details.tabId, learningUri, details.url);
           } else {
             // Navigation: queue the prompt to fire once the content script signals ready.
-            // redirect() runs from onBeforeNavigate — the page hasn't loaded yet, so
-            // the content script listener isn't registered until it fires contentScript:ready.
+            console.log("[Aiki redirection] redirect() navigation — queuing pending intent for tab", details.tabId);
             pendingIntents.set(details.tabId, () =>
               promptRedirect(details.tabId, learningUri, details.url)
             );
@@ -675,15 +688,26 @@ async function gotoOrigin(event, sourceContext = {}) {
  * Consumes any pending intent queued during onBeforeNavigate for that tab.
  */
 function onContentScriptReady(tabId) {
+  console.log("[Aiki redirection] onContentScriptReady tabId:", tabId, "| pending intents:", [...pendingIntents.keys()]);
   const fn = pendingIntents.get(tabId);
   if (fn) {
+    console.log("[Aiki redirection] Executing pending intent for tab", tabId);
     pendingIntents.delete(tabId);
     fn();
+  } else {
+    console.log("[Aiki redirection] No pending intent for tab", tabId);
   }
 }
 
 async function promptRedirect(tabId, url, originUrl) {
+  console.log("[Aiki redirection] promptRedirect() — tab:", tabId, "learningUrl:", url, "originUrl:", originUrl);
   await promptCoordinator.promptRedirect(tabId, url, originUrl, {
+    onConnectionFailed: () => {
+      // The tab navigated away before the content script could respond (e.g. an
+      // auth redirect mid-load). Re-queue so the prompt fires once the tab settles.
+      console.log("[Aiki redirection] Connection lost — re-queuing pending intent for tab", tabId);
+      pendingIntents.set(tabId, () => promptRedirect(tabId, url, originUrl));
+    },
     onContinue: async () => {
       // Set global prompt lock now that user has explicitly clicked Stay
       // This prevents the prompt from appearing again for 10 minutes (across all tabs)

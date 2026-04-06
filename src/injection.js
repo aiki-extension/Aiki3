@@ -451,6 +451,7 @@ if (document.readyState === "loading") {
 
 /* Listener for messages from background script. */
 browser.runtime.onMessage.addListener((request) => {
+  console.log("[Aiki injection] onMessage received:", request?.action);
   if (request.action === "display: redirectPrompt") {
     return renderRedirectPrompt(request.url, request.originUrl);
   } else if (request.action === "display: encouragement") {
@@ -476,9 +477,22 @@ browser.runtime.onMessage.addListener((request) => {
 });
 
 // Signal to the background that this content script is ready to receive messages.
-// The background uses this to fire any prompt that was queued during page navigation,
-// avoiding the need to poll with retries.
-browser.runtime.sendMessage({ type: "contentScript:ready" }).catch(() => {});
+// Deferred to DOMContentLoaded so document.body exists when the background responds
+// with a prompt — all render functions append to document.body.
+// applyPreemptiveHide / showImmediatePrompt fire via scripting.executeScript in the
+// background, so they are unaffected by this delay.
+function sendContentScriptReady() {
+  console.log("[Aiki injection] Sending contentScript:ready for", location.href);
+  browser.runtime.sendMessage({ type: "contentScript:ready" })
+    .then((res) => console.log("[Aiki injection] contentScript:ready ack:", res))
+    .catch((err) => console.warn("[Aiki injection] contentScript:ready send failed:", err?.message));
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", sendContentScriptReady, { once: true });
+} else {
+  sendContentScriptReady();
+}
 
 /**
  * @function

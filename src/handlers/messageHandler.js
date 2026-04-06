@@ -24,6 +24,7 @@ if (!message || typeof message !== "object") {
 
   
   if (message.type === "contentScript:ready" && sender?.tab?.id !== undefined) {
+    console.log("[Aiki messageHandler] contentScript:ready from tab", sender.tab.id, sender.tab.url);
     redirection.onContentScriptReady(sender.tab.id);
     return;
   }
