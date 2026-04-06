@@ -7,7 +7,7 @@ import redirection from "../redirection";
 
 /*
 This module handles incoming messages from content scripts and other parts of the extension.
-It processes different message types, such as timer requests, learning session management, and blocker release commands.
+It processes different message types, such as timer requests, learning session management.
 Auth messages are delegated to apiHandler.
 */
 
@@ -24,7 +24,6 @@ if (!message || typeof message !== "object") {
 
   
   if (message.type === "contentScript:ready" && sender?.tab?.id !== undefined) {
-    console.log("[Aiki messageHandler] contentScript:ready from tab", sender.tab.id, sender.tab.url);
     redirection.onContentScriptReady(sender.tab.id);
     return;
   }
@@ -107,11 +106,6 @@ if (!message || typeof message !== "object") {
       }
       return true;
     })();
-  }
-
-  if (message.type === "blocker:release" && sender && sender.tab && sender.tab.id !== undefined) {
-    storage.blockedTabs.remove(sender.tab.id);
-    storage.blockedOrigins.remove(sender.tab.id);
   }
 
   if (message.type === "session:claimReward") {
@@ -205,7 +199,7 @@ if (!message || typeof message !== "object") {
                 
                 // Show redirect prompt
                 const response = await browser.tabs.sendMessage(tabs[0].id, {
-                  action: "display: redirectPrompt",
+                  action: "display:redirectPrompt",
                   url: learningUrl,
                   originUrl: timeWastingUrl
                 });

@@ -443,10 +443,7 @@ async function messageLearningResource(details) {
 is a time wasting website. */
 async function checkActiveTab() {
   try {
-    const tabs = await browser.tabs.query({
-      active: true,
-      currentWindow: true,
-    });
+    const tabs = await browser.tabs.query({ active: true, currentWindow: true });
     if (tabs.length > 0) {
       const tab = tabs[0];
       const tabSiteName = parseUrl(tab.url).name;
@@ -459,13 +456,12 @@ async function checkActiveTab() {
         const procHosts = procList.map(item => item?.host || item?.name || "").filter(Boolean);
         const handled = await strategy.handleNavigation(
           { tabId: tab.id, url: tab.url },
-          { procrastinationHosts: procHosts, learningUrl }
+          { procrastinationHosts: procHosts, learningUrl: learningUri } // fixed name
         );
         if (handled) return;
 
         // Show redirect prompt
         promptRedirect(tab.id, learningUri, tab.url);
-        console.log("Prompt called from checkActiveTab()") // FLAG for further research, as i do not think this is ever called
       }
     }
   } catch (error) {
@@ -722,7 +718,20 @@ async function promptRedirect(tabId, url, originUrl) {
 }
 
 async function renderContentBlocker(details) {
-  return promptCoordinator.renderContentBlocker(details);
+  if (await isGlobalPromptLocked()) return;
+
+  return promptCoordinator.renderContentBlocker(details, {
+    onConnectionFailed: () => {
+      pendingIntents.set(details.tabId, () => renderContentBlocker(details));
+    },
+    onContinue: async () => {
+      await gotoOrigin("continue", {
+        type: "blocker",
+        tabId: details.tabId,
+        restoreAll: false,
+      });
+    },
+  });
 }
 
 async function removeContentBlocker(tabId) {

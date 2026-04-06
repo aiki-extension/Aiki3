@@ -12,76 +12,75 @@ class PromptCoordinator {
 
   async promptRedirect(tabId, learningUrl, originUrl, callbacks = {}) {
     const { onAccept, onContinue, onConnectionFailed } = callbacks;
-    console.log("[Aiki PromptCoordinator] promptRedirect() — tab:", tabId, "learningUrl:", learningUrl);
 
     try {
       await this.applyPreemptiveHide(tabId);
       await this.showImmediatePrompt(tabId);
-      console.log("[Aiki PromptCoordinator] Sending display:redirectPrompt to tab", tabId);
       let result;
       try {
         result = await browser.tabs.sendMessage(tabId, {
-          action: "display: redirectPrompt",
+          action: "display:redirectPrompt",
           url: learningUrl,
           originUrl: originUrl,
         });
       } catch (sendError) {
-        console.error("[Aiki PromptCoordinator] sendMessage threw:", sendError?.message);
-        // Page navigated away mid-flight (e.g. auth redirect). Signal the caller
-        // so it can re-queue the intent for when the tab settles.
-        if (typeof onConnectionFailed === "function") {
-          onConnectionFailed();
-        }
+        if (typeof onConnectionFailed === "function") onConnectionFailed();
         throw sendError;
       }
-      console.log("[Aiki PromptCoordinator] sendMessage result:", result);
 
-      if (!result) {
-        throw new Error("No response from content script");
-      }
+      if (!result) throw new Error("No response from content script");
 
       if (result.action === "continue") {
-        if (typeof onContinue === "function") {
-          await onContinue();
-        }
+        if (typeof onContinue === "function") await onContinue();
         await this.hideImmediatePrompt(tabId);
         await this.removePreemptiveHide(tabId);
       } else if (result.action === "redirect") {
-        if (typeof onAccept === "function") {
-          await onAccept();
-        }
+        if (typeof onAccept === "function") await onAccept();
       }
-    } catch (error) {
+    } catch (_) {
       await this.hideImmediatePrompt(tabId);
       await this.removePreemptiveHide(tabId);
     }
   }
 
-  async renderContentBlocker(details) {
+  async renderContentBlocker(details, callbacks = {}) {
+    const { onContinue, onConnectionFailed } = callbacks;
     if (details.frameId === 0) {
       // Check if reward timer is active - if so, don't block
       try {
         const timer = await import("./TimerManager");
-        if (timer.default.isSessionRewardActive()) {
-          console.log("[PromptCoordinator] Skipping blocker - reward mode active");
-          return;
-        }
-      } catch (_) { }
+        if (timer.default.isSessionRewardActive()) return;
+      } catch (_) {}
 
       storage.blockedTabs.add(details.tabId);
-      if (details.url) {
-        storage.blockedOrigins.add(details.tabId, details.url);
-      }
+      if (details.url) storage.blockedOrigins.add(details.tabId, details.url);
       storage.promptLocks.remove(details.tabId);
+
       try {
         await this.applyPreemptiveHide(details.tabId);
         await this.showImmediatePrompt(details.tabId);
-        await browser.tabs.sendMessage(details.tabId, {
-          action: "inject blocker",
-        });
-        this.hideImmediatePrompt(details.tabId).catch(() => { });
-        this.removePreemptiveHide(details.tabId).catch(() => { });
-      } catch (_) { }
+
+        let result;
+        try {
+          result = await browser.tabs.sendMessage(details.tabId, {
+            action: "display:contentBlocker", // request/response prompt
+            originUrl: details.url,
+          });
+        } catch (sendError) {
+          if (typeof onConnectionFailed === "function") onConnectionFailed();
+          throw sendError;
+        }
+
+        if (result?.action === "continue" && typeof onContinue === "function") {
+          await onContinue();
+        }
+
+        await this.hideImmediatePrompt(details.tabId);
+        await this.removePreemptiveHide(details.tabId);
+      } catch (_) {
+        await this.hideImmediatePrompt(details.tabId);
+        await this.removePreemptiveHide(details.tabId);
+      }
     }
   }
 
@@ -116,3 +115,10 @@ class PromptCoordinator {
 }
 
 export default PromptCoordinator;
+
+// content script (where prompt UI actions are handled)
+if (message.action === "display:contentBlocker") {
+  const action = await showContentBlockerAndWaitForChoice(); 
+  // returns "continue" (or "redirect" if you support it)
+  return { action };
+}
