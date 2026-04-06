@@ -5,21 +5,27 @@
 <script>
   import Container from "./Container.svelte";
   import storage from "../../../util/storage";
-  import { parseUrl } from "../../../util/utilities";
+  import { parseUrl, normalizeUrl } from "../../../util/utilities";
   import Fa from "svelte-fa";
   import {
     faTrashAlt,
     faGlobe,
     faKeyboard,
     faTimes,
-    faPlusCircle
+    faPlusCircle,
+
   } from "@fortawesome/free-solid-svg-icons";
-  import { alertStore } from '../../../services/alertService'; 
+  import { alertStore } from '../../../services/alertService';
+  import browser from "webextension-polyfill";
+  import { 
+    MESSAGE_API_UPDATE_TIME_WASTING_SITE, 
+    MESSAGE_API_REMOVE_TIME_WASTING_SITE 
+  } from "../../../values/messageTypeValues";
 
   export let port;
   $: list = [];
 
-  let learningUri = ""; 
+  let learningUri = "";
 
   async function setup() {
     const storedList = (await storage.list.get()) || [];
@@ -61,16 +67,36 @@
   ];
 
   async function removeItem(index) {
+    const domain = list[index].host;
+
     let newList = [...list];
     newList.splice(index, 1);
     list = newList;
     storage.list.set(list);
-    port.postMessage(`Update: list`);
 
     alertStore.add({
         type: 'success',
         message: 'Website removed!',
       })
+
+    try {
+      const result = await browser.runtime.sendMessage({
+        type: MESSAGE_API_REMOVE_TIME_WASTING_SITE,
+        domain: domain
+      });
+      console.log("result:", result);
+    } catch(e) {
+      console.error("sendMessage failed:", e);
+    }
+
+    port.postMessage(`Update: list`);
+
+    if (!result?.ok) {
+      alertStore.add({
+        type: 'warning',
+        message: "Could not reach the server"
+      });
+    }
   }
 
   async function addItem() {
@@ -81,6 +107,19 @@
       })
       return;
     }
+
+    const normalized = normalizeUrl(addItemValue);
+
+    if (!normalized) {
+      alertStore.add({
+        type: 'warning',
+        message: 'Invalid URL format!'
+      })
+      return;
+    }
+
+    // The site that has been normalized, now becomes "www.example.com" and stored in addItemvalue
+    addItemValue = normalized;
 
     learningUri = parseUrl(await storage.learningUri.get())
     let site = parseUrl(addItemValue);
@@ -114,6 +153,18 @@
         type: 'success',
         message: 'New Website Added!',
       })
+
+      const result = await browser.runtime.sendMessage({
+        type: MESSAGE_API_UPDATE_TIME_WASTING_SITE,
+        site: site
+      })
+
+      if (!result?.ok) {
+        alertStore.add({
+          type: 'warning',
+          message: "Could not reach the server"
+        });
+      }
     }
   }
 

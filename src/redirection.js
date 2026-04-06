@@ -5,7 +5,11 @@ import { parseUrl, makeDate, parseTime } from "./util/utilities";
 import SessionService from "./services/SessionService";
 import NavigationGuards from "./services/NavigationGuards";
 import PromptCoordinator from "./services/PromptCoordinator";
+<<<<<<< bug/fix-flicker
 import { PROMPT_SUPPRESS_DURATION } from "../src/values/defaultSettingValues"
+=======
+import { getLearningUrl } from "./services/siteDetector";
+>>>>>>> sprint-4
 
 const l = console.log;
 
@@ -135,7 +139,7 @@ async function originUpdatedListener(details) {
     if (origin.tabId === details) {
       const tab = await browser.tabs.get(details);
       l(tab);
-      const currentLearning = await storage.learningUri.get();
+      const currentLearning = await getLearningUrl();
       const learningName = parseUrl(currentLearning).name;
       if (tab.url.includes(learningName)) {
         storage.learningUri.set(tab.url);
@@ -161,7 +165,7 @@ async function redirect(details) {
 
       const procList = await storage.list.get();
       const procHosts = (procList || []).map(item => item?.host || item?.name || "").filter(Boolean);
-      const learningUrl = await storage.learningUri.get();
+      const learningUrl = await getLearningUrl();
 
       const handled = await strategy.handleNavigation(details, {
         applyPreemptiveHide: (tabId) => navigationGuards.applyPreemptiveHide(tabId),
@@ -195,7 +199,7 @@ async function redirect(details) {
         if (origin && origin.tabId !== undefined) {
           try {
             const originTab = await browser.tabs.get(origin.tabId);
-            const learningUri = await storage.learningUri.get();
+            const learningUri = await getLearningUrl();
             if (originTab && learningUri) {
               const learningName = parseUrl(learningUri).name;
               if (learningName && originTab.url && originTab.url.includes(learningName)) {
@@ -218,7 +222,7 @@ async function redirect(details) {
         }
 
         if (!origin || isOriginValid) {
-          const learningUri = await storage.learningUri.get();
+          const learningUri = await getLearningUrl();
           if (!learningUri) return; // skip redirection if no learning URL configured
           
           // Check global prompt lock (applies to all tabs)
@@ -270,7 +274,7 @@ async function onOriginRemoved(details) {
   const origin = await storage.origin.get();
   if (origin) {
     if (details === origin.tabId) {
-      const learningUri = await storage.learningUri.get();
+      const learningUri = await getLearningUrl();
       let migrated = false;
       if (learningUri) {
         const learningName = parseUrl(learningUri).name;
@@ -311,7 +315,7 @@ async function onOriginRemoved(details) {
 }
 
 async function addLearningSiteLoadedListener() {
-  const currentLearning = await storage.learningUri.get();
+  const currentLearning = await getLearningUrl();
   if (!currentLearning) return;
   const learningName = parseUrl(currentLearning).name;
   if (!learningName) return;
@@ -326,7 +330,7 @@ async function addLearningSiteLoadedListener() {
  */
 async function addControlledLearningSiteListener() {
 
-  const currentLearning = await storage.learningUri.get();
+  const currentLearning = await getLearningUrl();
   if (!currentLearning) return;
   const learningName = parseUrl(currentLearning).name;
   if (!learningName) return;
@@ -351,7 +355,7 @@ function removeLearningSiteLoadedListener() {
 }
 
 async function getActiveLearningTabs(excludedIds = new Set()) {
-  const learningUri = await storage.learningUri.get();
+  const learningUri = await getLearningUrl();
   if (!learningUri) return [];
   const learningName = parseUrl(learningUri).name;
   if (!learningName) return [];
@@ -431,7 +435,7 @@ async function checkActiveTab() {
       const procList = await storage.list.get();
       const procListNames = procList.map((site) => site.name);
       if (procListNames.includes(tabSiteName)) {
-        const learningUri = await storage.learningUri.get();
+        const learningUri = await getLearningUrl();
         if (!learningUri) return; // no learning site set; do nothing
 
         const procHosts = procList.map(item => item?.host || item?.name || "").filter(Boolean);
@@ -548,7 +552,7 @@ async function gotoOrigin(event, sourceContext = {}) {
   if (origin && origin.tabId !== undefined) {
     try {
       const learningTab = await browser.tabs.get(origin.tabId);
-      const configuredLearning = await storage.learningUri.get();
+      const configuredLearning = await getLearningUrl();
       if (configuredLearning) {
         const configuredName = parseUrl(configuredLearning).name;
         const currentName = parseUrl(learningTab.url).name;
