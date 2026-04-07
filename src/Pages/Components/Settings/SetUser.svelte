@@ -6,11 +6,21 @@
   import { onMount } from "svelte";
   import Container from "./Container.svelte";
   import storage from "../../../util/storage";
+  import { setTheme } from "../../../util/themes";
   import Fa from "svelte-fa";
   import { faUserSlash, faUserPlus } from "@fortawesome/free-solid-svg-icons";
   import { alertStore } from "../../../services/alertService";
   import browser from "webextension-polyfill";
   import {createEventDispatcher } from "svelte";
+  import {
+    ACTIVE_TIME_TO_HOURS,
+    ACTIVE_TIME_TO_MINUTES,
+    ACTIVE_TIME_FROM_HOURS,
+    ACTIVE_TIME_FROM_MINUTES,
+    MIN_LEARNING_MINUTES,
+    REWARD_TIME_MINUTES,
+    SESSION_TIME_MINUTES,
+  } from "../../../values/defaultSettingValues";
   import {
     MESSAGE_API_LOGIN,
     MESSAGE_API_REGISTER
@@ -67,13 +77,30 @@
     userIsRegistered = true;
   }
 
-  async function clearSessionLocally() {
+  async function loadDefaultSettingsLocally() {
+    await storage.operatingHours.from.set({
+      hrs: ACTIVE_TIME_FROM_HOURS,
+      min: ACTIVE_TIME_FROM_MINUTES,
+    });
+    await storage.operatingHours.to.set({
+      hrs: ACTIVE_TIME_TO_HOURS,
+      min: ACTIVE_TIME_TO_MINUTES,
+    });
+    await storage.timeSettings.learningTime.set({ min: MIN_LEARNING_MINUTES, sec: 0 });
+    await storage.timeSettings.sessionMinutes.set(SESSION_TIME_MINUTES);
+    await storage.timeSettings.sessionSeconds.set(0);
+    await storage.timeSettings.rewardMinutes.set(REWARD_TIME_MINUTES);
+    await storage.timeSettings.rewardSeconds.set(0);
+  }
+
+  async function clearSessionLocally({ loadDefaults = false } = {}) {
     await storage.clearStorage();
-    await storage.shouldRedirect.set(true);
-    await storage.redirection.toggle();
-    await storage.jwt.set("");
-    await storage.uid.set("");
-    await storage.inviteCode.set("");
+    await setTheme("dark");
+    if (loadDefaults) {
+      await loadDefaultSettingsLocally();
+      await storage.shouldRedirect.set(true);
+      await storage.redirection.toggle();
+    }
     user = "";
     userIsRegistered = false;
   }
@@ -172,7 +199,7 @@
 
   async function resetUid() {
     if (!confirm("Are you sure you want to sign out?")) return;
-    await clearSessionLocally();
+    await clearSessionLocally({ loadDefaults: false });
     resetFormFields();
     authMode = "login";
     notifySuccess("You have been signed out.");
@@ -293,7 +320,7 @@
               href="#guest"
               class="auth-switch-link"
               on:click|preventDefault={async () => {
-                await clearSessionLocally();
+                await clearSessionLocally({ loadDefaults: true });
                 await persistSessionLocally("guest", null);
                 notifySuccess("You are now signed in as a guest.");
               }}
