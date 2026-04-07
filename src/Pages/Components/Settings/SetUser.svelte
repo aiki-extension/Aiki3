@@ -28,8 +28,6 @@
 
   export let user = "";
   export let userIsRegistered;
-  export let port;
-  void port;
   let authMode = "login";
   let password = "";
   let confirmPassword = "";
