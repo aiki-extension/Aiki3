@@ -64,7 +64,7 @@ const activeSessionsStore = createKeyedStore("activeSessions");
  * @function
  * @description Clears all stored data in browser storage. */
 function clearStorage() {
-  storage.clear();
+  return storage.clear();
 }
 
 /**
@@ -73,10 +73,9 @@ function clearStorage() {
  * that determines whether or not a user should be redirected.
  * redirectionToggled is a settings parameter changed by the user. */
 
-function toggleRedirection() {
-  storage.get("toggled").then((data) => {
-    storage.set({ toggled: !data.toggled });
-  });
+async function toggleRedirection() {
+  const data = await storage.get("toggled");
+  await storage.set({ toggled: !data.toggled });
 }
 
 /**

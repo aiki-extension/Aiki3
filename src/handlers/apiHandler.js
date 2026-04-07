@@ -1,7 +1,6 @@
 import { loginUser, registerUser, updateUserSettings, getUserSettings, deleteTimeWastingSite } from "../services/apiService";
 import storage from "../util/storage";
 import { fetchAndSyncSettings } from "../services/settingsService";
-import { REWARD_TIME_MINUTES } from "../values/defaultSettingValues";
 import redirection from "../redirection";
 import { 
   MESSAGE_API_LOGIN,

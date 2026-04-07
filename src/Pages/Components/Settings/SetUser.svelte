@@ -19,6 +19,7 @@
   export let user = "";
   export let userIsRegistered;
   export let port;
+  void port;
   let authMode = "login";
   let password = "";
   let confirmPassword = "";
@@ -67,6 +68,9 @@
   }
 
   async function clearSessionLocally() {
+    await storage.clearStorage();
+    await storage.shouldRedirect.set(true);
+    await storage.redirection.toggle();
     await storage.jwt.set("");
     await storage.uid.set("");
     await storage.inviteCode.set("");
@@ -289,6 +293,7 @@
               href="#guest"
               class="auth-switch-link"
               on:click|preventDefault={async () => {
+                await clearSessionLocally();
                 await persistSessionLocally("guest", null);
                 notifySuccess("You are now signed in as a guest.");
               }}
