@@ -1,4 +1,5 @@
 import browser from "webextension-polyfill";
+import { getLearningUrl } from "./services/siteDetector";
 
 const l = console.log;
 
@@ -100,30 +101,55 @@ const makeDraggable = (element) => {
     return { x, y, corner };
   };
 
-  // Apply position using corner anchors
-  const applyPosition = (x, y, corner) => {
+  const applySnappedPosition = (x, y) => {
     const rect = element.getBoundingClientRect();
+    const corner = getNearestCorner();
     
-    // Clear all position properties first
-    element.style.left = '';
-    element.style.right = '';
-    element.style.top = '';
-    element.style.bottom = '';
+    // Instantly convert to the target coordinate system (no transition)
+    const prevTransition = element.style.transition;
+    element.style.transition = 'none';
     
-    // Apply appropriate corner anchors
     if (corner.horizontal === 'right') {
-      const rightOffset = window.innerWidth - x - rect.width;
-      element.style.right = `${rightOffset}px`;
+      element.style.left = '';
+      element.style.right = `${window.innerWidth - rect.right}px`;
     } else {
-      element.style.left = `${x}px`;
+      element.style.right = '';
+      element.style.left = `${rect.left}px`;
     }
     
     if (corner.vertical === 'bottom') {
-      const bottomOffset = window.innerHeight - y - rect.height;
-      element.style.bottom = `${bottomOffset}px`;
+      element.style.top = '';
+      element.style.bottom = `${window.innerHeight - rect.bottom}px`;
     } else {
-      element.style.top = `${y}px`;
+      element.style.bottom = '';
+      element.style.top = `${rect.top}px`;
     }
+    
+    // Force reflow
+    element.getBoundingClientRect();
+    
+    // Re-enable transition and animate to snapped position
+    element.style.transition = prevTransition;
+    
+    if (corner.horizontal === 'right') {
+      element.style.right = '0px';
+    } else {
+      element.style.left = '0px';
+    }
+    
+    if (corner.vertical === 'bottom') {
+      element.style.bottom = '0px';
+    } else {
+      element.style.top = '0px';
+    }
+  };
+
+  // Apply position
+  const applyPosition = (x, y) => {
+    element.style.right = '';
+    element.style.bottom = '';
+    element.style.left = `${x}px`;
+    element.style.top = `${y}px`;
   };
 
   const initializePosition = () => {
@@ -137,12 +163,12 @@ const makeDraggable = (element) => {
     element.style.transform = 'none';
     
     // Snap to nearest corner on init
-    const { x, y, corner } = snapToCorner();
+    const { x, y } = snapToCorner();
     dragState.currentX = x;
     dragState.currentY = y;
     dragState.intendedX = x;
     dragState.intendedY = y;
-    applyPosition(x, y, corner);
+    applySnappedPosition(x, y);
   };
 
   const updatePosition = (intendedX, intendedY) => {
@@ -160,29 +186,28 @@ const makeDraggable = (element) => {
     
     dragState.currentX = x;
     dragState.currentY = y;
-    
-    const corner = getNearestCorner();
-    applyPosition(x, y, corner);
+
+    applyPosition(x, y);
   };
 
   const syncIntendedPosition = () => {
     // Snap to nearest corner when size changes
-    const { x, y, corner } = snapToCorner();
+    const { x, y } = snapToCorner();
     dragState.intendedX = x;
     dragState.intendedY = y;
     dragState.currentX = x;
     dragState.currentY = y;
-    applyPosition(x, y, corner);
+    applySnappedPosition(x, y);
   };
 
   const onResize = () => {
     // Snap to corner on resize
-    const { x, y, corner } = snapToCorner();
+    const { x, y } = snapToCorner();
     dragState.intendedX = x;
     dragState.intendedY = y;
     dragState.currentX = x;
     dragState.currentY = y;
-    applyPosition(x, y, corner);
+    applySnappedPosition(x, y);
   };
 
   const onPointerDown = (event) => {
@@ -191,6 +216,16 @@ const makeDraggable = (element) => {
     if (event.target.tagName === 'BUTTON' || event.target.closest('button')) {
       return;
     }
+
+    const rect = element.getBoundingClientRect();
+    element.style.right = '';
+    element.style.bottom = '';
+    element.style.left = `${rect.left}px`;
+    element.style.top = `${rect.top}px`;
+    dragState.currentX = rect.left;
+    dragState.currentY = rect.top;
+    dragState.intendedX = rect.left;
+    dragState.intendedY = rect.top;
 
     dragState.dragging = true;
     dragState.startX = event.clientX;
@@ -232,12 +267,12 @@ const makeDraggable = (element) => {
     element.style.cursor = "grab";
     
     // Snap to nearest corner when drag ends
-    const { x, y, corner } = snapToCorner();
+    const { x, y } = snapToCorner();
     dragState.intendedX = x;
     dragState.intendedY = y;
     dragState.currentX = x;
     dragState.currentY = y;
-    applyPosition(x, y, corner);
+    applySnappedPosition(x, y);
     
     if (event.pointerId !== undefined) {
       element.releasePointerCapture(event.pointerId);
@@ -378,9 +413,7 @@ async function bootstrapLearningOverlayIfNeeded() {
   if (bootstrapAttemptPending) return;
   bootstrapAttemptPending = true;
   try {
-    const result = await browser.storage.local.get("learningUri");
-    const learningUri =
-      result && typeof result.learningUri === "string" ? result.learningUri.trim() : "";
+    const learningUri = await getLearningUrl();
     if (!learningUri || !matchesLearningHost(learningUri)) {
       bootstrapAttemptPending = false;
       return;
@@ -451,7 +484,7 @@ if (document.readyState === "loading") {
 
 /* Listener for messages from background script. */
 browser.runtime.onMessage.addListener((request) => {
-  if (request.action === "display: redirectPrompt") {
+  if (request.action === "display:redirectPrompt") {
     return renderRedirectPrompt(request.url, request.originUrl);
   } else if (request.action === "display: encouragement") {
     return renderLearningContent(request.shouldShowWelcome);
@@ -466,14 +499,29 @@ browser.runtime.onMessage.addListener((request) => {
       if (rewardOverlay) rewardOverlay.remove();
     } catch (_) { }
     return Promise.resolve({ action: "end injection" });
-  } else if (request.action === "inject blocker") {
-    console.log("Request: ", request);
-    l("Render blocking function should fire now");
-    renderContentBlocker();
+  } else if (request.action === "display:contentBlocker") {
+    return renderContentBlocker(request.originUrl);
   } else if (request.action === "remove blocker") {
     removeOverlay();
   }
 });
+
+// Signal to the background that this content script is ready to receive messages.
+// Deferred to DOMContentLoaded so document.body exists when the background responds
+// with a prompt — all render functions append to document.body.
+// applyPreemptiveHide / showImmediatePrompt fire via scripting.executeScript in the
+// background, so they are unaffected by this delay.
+function sendContentScriptReady() {
+  browser.runtime.sendMessage({ type: "contentScript:ready" })
+    .then((res) => console.log("[Aiki injection] contentScript:ready ack:", res))
+    .catch((err) => console.warn("[Aiki injection] contentScript:ready send failed:", err?.message));
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", sendContentScriptReady, { once: true });
+} else {
+  sendContentScriptReady();
+}
 
 /**
  * @function
@@ -661,7 +709,6 @@ function renderRedirectPrompt(originUrl) {
     overlay.cleanup = () => {
       if (done) return;
       done = true;
-      resolve({ action: "continue" });
       if (hostWatchInterval) {
         clearInterval(hostWatchInterval);
         hostWatchInterval = null;
@@ -688,7 +735,7 @@ function renderLearningContent() {
     const isCollapsedKey = "aiki-learning-collapsed";
     let isCollapsed = localStorage.getItem(isCollapsedKey) === "true";
 
-    const getPanelStyle = (collapsed) => `pointer-events: auto; padding: ${collapsed ? "10px 14px" : "clamp(16px, 3vw, 22px)"}; min-width: ${collapsed ? "140px" : "260px"}; max-width: ${collapsed ? "180px" : "320px"}; background: rgba(15, 23, 42, 0.96); color: #f8fafc; border-radius: ${collapsed ? "12px" : "18px"}; box-shadow: 0 24px 45px rgba(15, 23, 42, 0.45); font-family: 'Inter', 'Segoe UI', sans-serif; display: flex; flex-direction: column; gap: ${collapsed ? "6px" : "12px"}; cursor: grab; position: relative; font-size: 14px; transition: all 0.3s ease;`;
+    const getPanelStyle = (collapsed) => `pointer-events: auto; padding: ${collapsed ? "10px 14px" : "clamp(16px, 3vw, 22px)"}; min-width: ${collapsed ? "140px" : "260px"}; max-width: ${collapsed ? "180px" : "320px"}; margin: 8px; background: rgba(15, 23, 42, 0.96); color: #f8fafc; border-radius: ${collapsed ? "12px" : "18px"}; box-shadow: 0 24px 45px rgba(15, 23, 42, 0.45); font-family: 'Inter', 'Segoe UI', sans-serif; display: flex; flex-direction: column; gap: ${collapsed ? "6px" : "12px"}; cursor: grab; position: relative; font-size: 14px; transition: all 0.3s ease;`;
 
     function updateOverlayVisibility() {
       if (isFullScreen()) {
@@ -972,7 +1019,8 @@ function renderLearningContent() {
   });
 }
 
-function renderContentBlocker() {
+function renderContentBlocker(originUrl) {
+  return new Promise((resolve) => {
   try {
     removeOverlay();
   } catch (_) { }
@@ -1024,24 +1072,24 @@ function renderContentBlocker() {
   continueButton.textContent = "Visit site anyway";
   continueButton.setAttribute(
     "style",
-    `padding: 10px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.25); background: transparent; color: #f9fafb; font-weight: 600; cursor: pointer; transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;`
+    `padding: 0px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.25); background: transparent; color: #f9fafb; font-weight: 600; cursor: pointer; transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;`
   );
   continueButton.onmouseenter = () =>
     continueButton.setAttribute(
       "style",
-      `padding: 10px 16px; border-radius: 999px; border: 1px solid rgba(56,189,248,0.7); background: rgba(56,189,248,0.15); color: #e0f2fe; font-weight: 600; cursor: pointer; transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;`
+      `padding: 0px 16px; border-radius: 999px; border: 1px solid rgba(56,189,248,0.7); background: rgba(56,189,248,0.15); color: #e0f2fe; font-weight: 600; cursor: pointer; transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;`
     );
   continueButton.onmouseleave = () =>
     continueButton.setAttribute(
       "style",
-      `padding: 10px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.25); background: transparent; color: #f9fafb; font-weight: 600; cursor: pointer; transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;`
+      `padding: 0px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.25); background: transparent; color: #f9fafb; font-weight: 600; cursor: pointer; transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;`
     );
 
   const button = document.createElement("button");
   button.textContent = "Return to learning";
   button.setAttribute(
     "style",
-    `padding: 10px 16px; background: linear-gradient(135deg, #2563eb, #7c3aed); color: #fff; border: none; border-radius: 999px; font-weight: 600; cursor: pointer; box-shadow: 0 12px 24px rgba(37, 99, 235, 0.28);`
+    `padding: 0px 16px; background: linear-gradient(135deg, #2563eb, #7c3aed); color: #fff; border: none; border-radius: 999px; font-weight: 600; cursor: pointer; box-shadow: 0 12px 24px rgba(37, 99, 235, 0.28);`
   );
 
   actions.appendChild(continueButton);
@@ -1090,35 +1138,26 @@ function renderContentBlocker() {
 
   overlay.cleanup = cleanup;
 
-  continueButton.addEventListener("click", async () => {
-    try { await browser.runtime.sendMessage({ type: "stats:skip" }); } catch (_) { }
-    try { await browser.runtime.sendMessage({ type: "blocker:release" }); } catch (_) { }
+  continueButton.addEventListener("click", () => {
     cleanup();
+    resolve({ action: "continue" });
   });
 
   button.addEventListener("click", async () => {
     try {
-      const result = await browser.storage.local.get("learningUri");
-      const uri = result && typeof result.learningUri === "string" ? result.learningUri.trim() : "";
+      const result = await getLearningUrl();
+      const uri = (typeof result === "string" ? result.trim() : "");
       if (uri) {
         cleanup();
+        resolve({ action: "return" });
         location.href = uri;
         return;
       }
     } catch (_) { }
-
-    try {
-      if (timerPort.port) {
-        timerPort.port.postMessage("goto: originTab");
-      } else {
-        const keepAlive = browser.runtime.connect({ name: "Content Communication" });
-        keepAlive.postMessage("goto: originTab");
-        setTimeout(() => { try { keepAlive.disconnect(); } catch (_) { } }, 150);
-      }
-    } catch (_) { }
-
     cleanup();
+    resolve({ action: "return" });
   });
+  }); // end Promise
 }
 
 // ============================================
@@ -1264,7 +1303,7 @@ function renderProcrastinationRewardOverlay() {
   snoozeBtn.textContent = "⏰ +1 Minute";
   snoozeBtn.setAttribute(
     "style",
-    "display: none; margin-top: 6px; padding: 10px 16px; background: rgba(255, 255, 255, 0.95); color: #b45309; border: none; border-radius: 10px; font-size: 0.9em; font-weight: 600; cursor: pointer; transition: all 0.2s ease; text-align: center;"
+    "display: none; margin-top: 6px; padding: 0px 16px; background: rgba(255, 255, 255, 0.95); color: #b45309; border: none; border-radius: 10px; font-size: 0.9em; font-weight: 600; cursor: pointer; transition: all 0.2s ease; text-align: center;"
   );
   snoozeBtn.addEventListener("mouseenter", () => {
     snoozeBtn.style.transform = "scale(1.02)";

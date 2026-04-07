@@ -1,6 +1,7 @@
 import storage from "../util/storage";
 import browser from "webextension-polyfill";
 import { parseTime, parseUrl } from "../util/utilities";
+import { getLearningUrl } from "./siteDetector";
 
 class TimerManager {
   constructor() {
@@ -233,7 +234,7 @@ class TimerManager {
         const origin = await storage.origin.get();
 
         try {
-          const learningUri = await storage.learningUri.get();
+          const learningUri = await getLearningUrl();
           const learningName = learningUri ? parseUrl(learningUri).name : "";
 
           // Only count as active if the current tab is both the origin tab AND still on the learning host

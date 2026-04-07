@@ -10,8 +10,8 @@ The background script will then call the appropriate function from this apiServi
 
 import storage from "../util/storage";
 
-const API_BASE_URL = "http://localhost:3000/api/"; // This is the base URL for the backend server. Adjust as needed.
-
+// This is the base URL for the backend server. 
+const API_BASE_URL = __API_BASE_URL__; // Rollup replace will insert the actual value from env at __API_BASE_URL__
 
 /**
  * Returns: { ok: boolean, message: string, data: any }
@@ -35,7 +35,7 @@ async function apiCall(endpoint, method, data = null, token = null) {
     const response_json = await response.json();
 
     if (!response.ok) {
-      return { ok: false, message: response_json?.message ?? response.statusText };
+      return { ok: false, message: response_json?.message ?? response_json?.error ?? response.statusText };
     }
     return { ok: true, message: "", ...response_json };
   } catch (error) {
@@ -62,4 +62,8 @@ export async function getUserSettings() {
 
 export async function updateUserSettings(patch) {
   return await authApiCall("users/settings", "PATCH", patch);
+}
+
+export async function deleteTimeWastingSite(domain) {
+  return await authApiCall(`users/settings/time-wasting-sites/${domain}`, "DELETE", {});
 }
