@@ -68,6 +68,7 @@
 
   async function removeItem(index) {
     const domain = list[index].host;
+    let result;
 
     let newList = [...list];
     newList.splice(index, 1);
@@ -80,7 +81,7 @@
       })
 
     try {
-      const result = await browser.runtime.sendMessage({
+      result = await browser.runtime.sendMessage({
         type: MESSAGE_API_REMOVE_TIME_WASTING_SITE,
         domain: domain
       });
