@@ -185,7 +185,12 @@
         return;
       }
 
-      persistSessionLocally(normalizedUser, authResult.token);
+      await persistSessionLocally(normalizedUser, authResult.token);
+      await storage.shouldRedirect.set(true);
+      const redirectionEnabled = await storage.redirection.get();
+      if (redirectionEnabled !== true) {
+        await storage.redirection.toggle();
+      }
 
       // After successful login/register, notify parent (Settings.svelte) 
       // so it can sync DB settings to local storage and re-render child components
