@@ -10,16 +10,7 @@ import { setTheme } from "../util/themes";
 
 export async function installationSetup() {
   storage.clearStorage();
-  storage.stats.init();
-  storage.operatingHours.init();
   setTheme("dark");
-  storage.shouldRedirect.set(true);
-  storage.redirection.toggle();
-  storage.list.set([]);
-  storage.uid.set("");
-  // Leave learning URL empty by default; user sets this in settings
-  storage.learningUri.set("");
-  storage.timeSettings.init();
   try {
     await browser.runtime.openOptionsPage();
   } catch (e) {
@@ -32,6 +23,5 @@ export async function installationSetup() {
 
 export async function setup() {
   intervals.intervalSetup();
-  storage.shouldRedirect.set(true);
   await redirection.start();
 }

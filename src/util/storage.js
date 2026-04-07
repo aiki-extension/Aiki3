@@ -241,6 +241,9 @@ async function getDailyProgress() {
     "dailyProgressDate",
   ]);
   const today = getTodayKey();
+  if (dailyProgress === undefined && dailyProgressDate === undefined) {
+    return 0;
+  }
   if (dailyProgressDate !== today) {
     await storage.set({ dailyProgress: 0, dailyProgressDate: today });
     await setShouldRedirect(true);
