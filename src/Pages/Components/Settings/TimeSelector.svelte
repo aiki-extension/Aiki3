@@ -140,7 +140,14 @@
       title="Enter a session duration in minutes"
       bind:value={sessionMinutes}
       on:change={() => {
-        sessionMinutes = Math.max(1, parseInt(sessionMinutes) || 1);
+        const parsedValue = Math.max(1, parseInt(sessionMinutes) || 1);
+        if (parsedValue > learnMin) {
+          alertStore.add({
+            type: 'warning',
+            message: `Session duration can't exceed daily goal (${learnMin} min). Adjusted to ${learnMin} min.`,
+          });
+        }
+        sessionMinutes = Math.max(1, Math.min(learnMin, parseInt(sessionMinutes) || 1));
         setSessionTime();
       }}
       class="form-control form-control-sm inline"
