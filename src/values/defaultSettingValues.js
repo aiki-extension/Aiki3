@@ -12,6 +12,5 @@ export const ACTIVE_TIME_FROM_MINUTES = 0
 export const MIN_LEARNING_MINUTES = 30;
 export const REWARD_TIME_MINUTES = 2;
 export const SESSION_TIME_MINUTES = 5; 
-export const SESSION_DURATION_OPTIONS = [5, 10, 15, 20, 25, 30];
 
 export const PROMPT_SUPPRESS_DURATION = 10 * 60 * 1000; // 10 minutes - global cooldown across all tabs
