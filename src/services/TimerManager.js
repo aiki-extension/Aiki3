@@ -298,11 +298,6 @@ class TimerManager {
           if (!this.sessionCompleted) {
             this.sessionCompleted = true;
             
-            // Add 1-second buffer to compensate for checkActive() timing drift
-            this.dailyProgress += 1000;
-            await storage.dailyProgress.set(this.dailyProgress);
-            console.log("[Session] Added 1s timing buffer to daily progress");
-            
             if (typeof this.sessionOnComplete === "function") {
               this.sessionOnComplete();
               this.sessionOnComplete = null;
