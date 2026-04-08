@@ -46,7 +46,7 @@ const formatDuration = (value) => {
 const formatDurationShort = (value) => {
   if (typeof value !== "number" || value <= 0) return "0m";
   const totalSeconds = Math.floor(value / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
+  const minutes = Math.ceil(totalSeconds / 60);
   return `${minutes}m`;
 };
 
