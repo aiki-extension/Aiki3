@@ -96,8 +96,14 @@ if (!message || typeof message !== "object") {
             console.log("[Session] Session already running with same duration");
           }
         } else {
+          // Caps session if remaining of daily goal is lower than set session amount
+          const dailyGoal = parseTime.toSystem(await storage.timeSettings.learningTime.get());
+          const dailyProgress = await storage.dailyProgress.get();
+          const remaining = dailyGoal > 0 ? Math.max(0, dailyGoal - dailyProgress) : sessionDuration;
+          const timerDuration = dailyGoal > 0 ? Math.min(sessionDuration, remaining) : sessionDuration;
+
           // Start new session timer
-          await timer.startSessionTimer(sessionDuration, () => {
+          await timer.startSessionTimer(timerDuration, () => {
             console.log("[Session] Session complete!");
             // Timer will stop automatically; user must claim reward via button
           });
