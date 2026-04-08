@@ -310,8 +310,7 @@ class TimerManager {
 
   // Start a learning session timer
   async startSessionTimer(durationMs, onComplete) {
-    // Session timers replace the daily learning interval; otherwise dailyProgress
-    // can advance from two intervals at once and appear to run too fast.
+    // Pause the daily timer while a session timer runs.
     if (this.learningTimeIntervalRef) {
       clearInterval(this.learningTimeIntervalRef);
       this.learningTimeIntervalRef = undefined;
@@ -378,8 +377,7 @@ class TimerManager {
 
   // Start session reward timer
   startSessionRewardTimer(durationMs, onComplete) {
-    // Reward timers should also pause the daily learning interval so the shared
-    // daily progress counter stays on a single 1-second cadence.
+    // Pause the daily timer while a session timer runs.
     if (this.learningTimeIntervalRef) {
       clearInterval(this.learningTimeIntervalRef);
       this.learningTimeIntervalRef = undefined;
