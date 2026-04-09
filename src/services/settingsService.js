@@ -1,6 +1,6 @@
 import browser from "webextension-polyfill";
 import storage from "../util/storage";
-import { MESSAGE_API_GET_USER_SETTINGS } from "../values/messageTypeValues";
+import { MESSAGE_API_GET_USER_SETTINGS, MESSAGE_REDIRECTION_REFRESH_FILTERS } from "../values/messageTypeValues";
 import { parseUrl } from "../util/utilities";
 import { alertStore } from "../services/alertService";
 
@@ -27,6 +27,7 @@ export async function fetchAndSyncSettings() {
     if (!result.ok) return { ok: false, message: result.message };
 
     await syncDBSettingsToLocalStorage(result.data);
+    await browser.runtime.sendMessage({ type: MESSAGE_REDIRECTION_REFRESH_FILTERS });
     console.log("[Settings] Synced DB settings to local storage:", result.data);
     return { ok: true };
 }

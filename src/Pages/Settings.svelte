@@ -72,7 +72,7 @@
     {/if}
     <div class="container">
       <!-- Listens for the "authenticated" event in SetUser.svelte. Thus triggering the function to trigger, to refresh values on the page-->
-      <SetUser bind:user bind:userIsRegistered {port} on:authenticated={handleAuthenticated} />
+      <SetUser bind:user bind:userIsRegistered on:authenticated={handleAuthenticated} />
     </div>
     {#if userIsRegistered}
       <div class="container">
