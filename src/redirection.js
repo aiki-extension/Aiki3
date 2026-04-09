@@ -217,6 +217,39 @@ async function redirect(details, immediate = false) {
       const progress = await storage.dailyProgress.get();
       const goalMet = goal > 0 && progress >= goal;
 
+      const sessionCompleted = timer.getTime().sessionRemaining <= 0 && timer.getTime().sessionGoal > 0;
+      const rewardActive = timer.isSessionRewardActive?.();
+
+      if (toggled && sessionCompleted && !rewardActive) {
+        await storage.origin.remove();
+        await storage.shouldRedirect.set(false);
+
+        const [rewardMinutes, rewardSeconds] = await Promise.all([
+          storage.timeSettings.rewardMinutes.get(),
+          storage.timeSettings.rewardSeconds.get(),
+        ]);
+        let rewardDuration = (rewardMinutes * 60 * 1000) + (rewardSeconds * 1000);
+        if (rewardDuration <= 0) rewardDuration = 60 * 1000;
+
+        await SessionService.startSession(details.tabId, "procrastination", details.url);
+
+        await timer.startProcrastinationSession(checkActiveTab, rewardDuration);
+
+        setTimeout(async () => {
+          try {
+            const rewardTimeRemaining = timer.getTime().procrastinationTimeRemaining;
+            await browser.tabs.sendMessage(details.tabId, { 
+              action: "display: rewardOverlay",
+              sessionRewardGoal: rewardDuration,  
+              sessionRewardRemaining: rewardTimeRemaining 
+            });
+          } catch (error) {
+            console.log("Failed to send reward overlay:", error);
+          }
+        }, 2000);
+        return;
+      }
+
       if (toggled && shouldRedirect && !goalMet) {
         l("ShouldRedirect", shouldRedirect);
         const origin = await storage.origin.get();
@@ -259,19 +292,6 @@ async function redirect(details, immediate = false) {
         } else {
           pendingIntents.set(details.tabId, () => dispatchPrompt(details.tabId, learningUri, details.url));
         }
-      }else if (toggled && shouldRedirect && goalMet) {
-        // Goal met + reward unclaimed: auto-start reward without any prompt
-        const [rewardMinutes, rewardSeconds] = await Promise.all([
-          storage.timeSettings.rewardMinutes.get(),
-          storage.timeSettings.rewardSeconds.get(),
-        ]);
-        let rewardDuration = (rewardMinutes * 60 * 1000) + (rewardSeconds * 1000);
-        if (rewardDuration <= 0) {
-          rewardDuration = 60 * 1000;
-        }
-        await storage.shouldRedirect.set(false);
-        await timer.startProcrastinationSession(checkActiveTab, rewardDuration);
-        return;
       }
     }
   }
