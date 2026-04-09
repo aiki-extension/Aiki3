@@ -446,7 +446,7 @@ async function bootstrapRewardOverlayIfNeeded() {
     const timerData = await browser.runtime.sendMessage({ type: "timer:get" });
 
     // If reward timer is active (goal > 0), check if we're on a time wasting site
-    if (timerData && timerData.sessionrewardGoal > 0) {
+    if (timerData && timerData.sessionRewardGoal > 0) {
       // Get time wasting sites list
       const result = await browser.storage.local.get("list");
       const procList = result?.list || [];
