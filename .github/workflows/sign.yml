@@ -87,7 +87,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Changelog generation from full git history
+          fetch-depth: 0 # Changelog generation from full git history
 
       - name: Download signed extension artifact
         uses: actions/download-artifact@v4

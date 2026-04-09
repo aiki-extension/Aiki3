@@ -1,8 +1,8 @@
-import browser from "webextension-polyfill";
-import SessionService from "./SessionService";
-import siteDetector from "./siteDetector";
-import storage from "../util/storage";
-import PreemptiveHide from "./PreemptiveHide";
+import browser from 'webextension-polyfill';
+import SessionService from './SessionService';
+import siteDetector from './siteDetector';
+import storage from '../util/storage';
+import PreemptiveHide from './PreemptiveHide';
 
 /**
  * NavigationGuards centralizes tab/window listeners and delegates session handling.
@@ -33,14 +33,19 @@ class NavigationGuards {
 
   async stopNavigationListener() {
     if (this.navigationHandler) {
-      browser.webNavigation.onBeforeNavigate.removeListener(this.navigationHandler);
+      browser.webNavigation.onBeforeNavigate.removeListener(
+        this.navigationHandler,
+      );
     }
   }
 
   async restartNavigationListener() {
     await this.stopNavigationListener();
     if (this.navigationHandler && this.filterBuilder) {
-      await this.startNavigationListener(this.filterBuilder, this.navigationHandler);
+      await this.startNavigationListener(
+        this.filterBuilder,
+        this.navigationHandler,
+      );
     }
   }
 
@@ -51,13 +56,18 @@ class NavigationGuards {
       if (!tab || !tab.url) return;
 
       if (await siteDetector.checkIfProcrastination(tab.url)) {
-        await SessionService.startSession(tabId, "procrastination", tab.url);
+        await SessionService.startSession(tabId, 'procrastination', tab.url);
         return;
       }
 
       if (await siteDetector.checkIfLearning(tab.url)) {
         const origin = await storage.origin.get();
-        await SessionService.startSession(tabId, "learning", tab.url, origin?.url || null);
+        await SessionService.startSession(
+          tabId,
+          'learning',
+          tab.url,
+          origin?.url || null,
+        );
         return;
       }
     } catch (_) {
@@ -65,16 +75,23 @@ class NavigationGuards {
     }
   }
 
-  async finalizeAllActiveSessions(reason = "window_blur") {
+  async finalizeAllActiveSessions(reason = 'window_blur') {
     try {
-      const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+      const tabs = await browser.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
       for (const tab of tabs) {
         if (tab?.id !== undefined) {
-          await SessionService.finalizeSession(tab.id, "procrastination", reason);
-          await SessionService.finalizeSession(tab.id, "learning", reason);
+          await SessionService.finalizeSession(
+            tab.id,
+            'procrastination',
+            reason,
+          );
+          await SessionService.finalizeSession(tab.id, 'learning', reason);
         }
       }
-    } catch (_) { }
+    } catch (_) {}
   }
 
   async handleTabNavigation(tabId, nextUrl) {
@@ -84,31 +101,41 @@ class NavigationGuards {
 
     const extractName = (value) => {
       try {
-        return siteDetector.getSiteName(value || "");
+        return siteDetector.getSiteName(value || '');
       } catch (_) {
-        return "";
+        return '';
       }
     };
 
     const nextName = extractName(nextUrl);
 
-    if (session.sessionType === "procrastination") {
+    if (session.sessionType === 'procrastination') {
       const currentName = extractName(session.procrastinationUrl);
       if (currentName && nextName && currentName === nextName) {
-        await storage.activeSessions.set(tabId, { ...session, procrastinationUrl: nextUrl });
+        await storage.activeSessions.set(tabId, {
+          ...session,
+          procrastinationUrl: nextUrl,
+        });
         return;
       }
-      await SessionService.finalizeSession(tabId, "procrastination", "navigation");
+      await SessionService.finalizeSession(
+        tabId,
+        'procrastination',
+        'navigation',
+      );
       return;
     }
 
-    if (session.sessionType === "learning") {
+    if (session.sessionType === 'learning') {
       const currentName = extractName(session.learningUrl);
       if (currentName && nextName && currentName === nextName) {
-        await storage.activeSessions.set(tabId, { ...session, learningUrl: nextUrl });
+        await storage.activeSessions.set(tabId, {
+          ...session,
+          learningUrl: nextUrl,
+        });
         return;
       }
-      await SessionService.finalizeSession(tabId, "learning", "navigation");
+      await SessionService.finalizeSession(tabId, 'learning', 'navigation');
     }
   }
 
@@ -133,9 +160,9 @@ class NavigationGuards {
           const overlay = document.getElementById(overlayId);
           if (overlay && overlay.remove) overlay.remove();
         },
-        args: ["__aiki-preprompt"],
+        args: ['__aiki-preprompt'],
       });
-    } catch (_) { }
+    } catch (_) {}
   }
 
   install() {
@@ -150,8 +177,16 @@ class NavigationGuards {
         setTimeout(async () => {
           try {
             await browser.tabs.get(previousTabId);
-            await SessionService.finalizeSession(previousTabId, "procrastination", "tab_switch");
-            await SessionService.finalizeSession(previousTabId, "learning", "tab_switch");
+            await SessionService.finalizeSession(
+              previousTabId,
+              'procrastination',
+              'tab_switch',
+            );
+            await SessionService.finalizeSession(
+              previousTabId,
+              'learning',
+              'tab_switch',
+            );
           } catch {
             // Tab closed; ignore
           }
@@ -166,8 +201,12 @@ class NavigationGuards {
       if (this.strategy?.handleTabClose) {
         await this.strategy.handleTabClose(tabId);
       } else {
-        await SessionService.finalizeSession(tabId, "procrastination", "tab_closed");
-        await SessionService.finalizeSession(tabId, "learning", "tab_closed");
+        await SessionService.finalizeSession(
+          tabId,
+          'procrastination',
+          'tab_closed',
+        );
+        await SessionService.finalizeSession(tabId, 'learning', 'tab_closed');
       }
 
       if (removeInfo?.windowId !== undefined) {
@@ -183,15 +222,21 @@ class NavigationGuards {
       if (changeInfo.url) {
         await this.handleTabNavigation(tabId, changeInfo.url);
       }
-      if (changeInfo.status === "complete") {
-        await PreemptiveHide.revealIfPending(tabId, this.hideImmediatePrompt.bind(this));
+      if (changeInfo.status === 'complete') {
+        await PreemptiveHide.revealIfPending(
+          tabId,
+          this.hideImmediatePrompt.bind(this),
+        );
       }
     };
     browser.tabs.onUpdated.addListener(this.onUpdatedHandler);
 
     this.onCommittedHandler = async (details) => {
       if (details.frameId !== 0) return;
-      await PreemptiveHide.revealIfPending(details.tabId, this.hideImmediatePrompt.bind(this));
+      await PreemptiveHide.revealIfPending(
+        details.tabId,
+        this.hideImmediatePrompt.bind(this),
+      );
       if (this.strategy?.onLearningSiteNavigation && details.url) {
         await this.strategy.onLearningSiteNavigation(details);
       }
@@ -200,7 +245,7 @@ class NavigationGuards {
 
     this.onFocusChangedHandler = async (windowId) => {
       if (windowId === browser.windows.WINDOW_ID_NONE) {
-        await this.finalizeAllActiveSessions("window_blur");
+        await this.finalizeAllActiveSessions('window_blur');
       } else {
         try {
           const tabs = await browser.tabs.query({ active: true, windowId });
@@ -210,7 +255,7 @@ class NavigationGuards {
               await this.maybeStartSessionForTab(tab.id);
             }
           }
-        } catch (_) { }
+        } catch (_) {}
       }
     };
     browser.windows.onFocusChanged.addListener(this.onFocusChangedHandler);
@@ -219,10 +264,14 @@ class NavigationGuards {
   teardown() {
     if (!this.procrastinationGuardsRegistered) return;
     this.procrastinationGuardsRegistered = false;
-    if (this.onActivatedHandler) browser.tabs.onActivated.removeListener(this.onActivatedHandler);
-    if (this.onRemovedHandler) browser.tabs.onRemoved.removeListener(this.onRemovedHandler);
-    if (this.onUpdatedHandler) browser.tabs.onUpdated.removeListener(this.onUpdatedHandler);
-    if (this.onCommittedHandler) browser.webNavigation.onCommitted.removeListener(this.onCommittedHandler);
+    if (this.onActivatedHandler)
+      browser.tabs.onActivated.removeListener(this.onActivatedHandler);
+    if (this.onRemovedHandler)
+      browser.tabs.onRemoved.removeListener(this.onRemovedHandler);
+    if (this.onUpdatedHandler)
+      browser.tabs.onUpdated.removeListener(this.onUpdatedHandler);
+    if (this.onCommittedHandler)
+      browser.webNavigation.onCommitted.removeListener(this.onCommittedHandler);
     if (this.onFocusChangedHandler)
       browser.windows.onFocusChanged.removeListener(this.onFocusChangedHandler);
     this.onActivatedHandler = null;

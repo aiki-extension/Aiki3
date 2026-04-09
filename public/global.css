@@ -5,8 +5,8 @@
 :root {
   /* UNIVERSAL RULES */
   /* Fonts */
-  --fontHeaders: "Roboto", sans-serif;
-  --fontContent: "Lato", sans-serif;
+  --fontHeaders: 'Roboto', sans-serif;
+  --fontContent: 'Lato', sans-serif;
   --fontSizeSettings: 16px;
   --fontSizePopup: 14px;
 
@@ -65,13 +65,13 @@ textarea {
   border-radius: 2px;
 }
 /* Remove number input spinners */
-input[type="number"]::-webkit-outer-spin-button,
-input[type="number"]::-webkit-inner-spin-button {
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
 
-input[type="number"] {
+input[type='number'] {
   -moz-appearance: textfield;
 }
 
@@ -166,7 +166,7 @@ body::-webkit-scrollbar-thumb {
   border-top: 5px solid hsla(0, 0%, 20%, 0.9);
   border-right: 5px solid transparent;
   border-left: 5px solid transparent;
-  content: " ";
+  content: ' ';
   font-size: 0;
   line-height: 0;
   transition-delay: 0.5s;
@@ -178,8 +178,8 @@ body::-webkit-scrollbar-thumb {
   opacity: 1;
   transform: translate(-50%, 0);
 }
-[data-tooltip="false"]:hover:before,
-[data-tooltip="false"]:hover:after {
+[data-tooltip='false']:hover:before,
+[data-tooltip='false']:hover:after {
   visibility: hidden;
   opacity: 0;
 }

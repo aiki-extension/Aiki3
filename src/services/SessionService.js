@@ -1,4 +1,4 @@
-import storage from "../util/storage";
+import storage from '../util/storage';
 let cachedGoalSeconds = null;
 let lastGoalFetch = 0;
 
@@ -9,12 +9,19 @@ async function getGoalSeconds() {
   }
   try {
     const timeSetting = await storage.timeSettings.learningTime.get();
-    if (timeSetting && typeof timeSetting.min === "number" && typeof timeSetting.sec === "number") {
-      cachedGoalSeconds = Math.max(0, Math.round(timeSetting.min * 60 + timeSetting.sec));
+    if (
+      timeSetting &&
+      typeof timeSetting.min === 'number' &&
+      typeof timeSetting.sec === 'number'
+    ) {
+      cachedGoalSeconds = Math.max(
+        0,
+        Math.round(timeSetting.min * 60 + timeSetting.sec),
+      );
       lastGoalFetch = now;
       return cachedGoalSeconds;
     }
-  } catch (_) { }
+  } catch (_) {}
   cachedGoalSeconds = 0;
   lastGoalFetch = now;
   return cachedGoalSeconds;
@@ -33,7 +40,7 @@ async function startSession(tabId, sessionType, siteUrl, triggerUrl = null) {
     startedAt: Date.now(),
   };
 
-  if (sessionType === "learning") {
+  if (sessionType === 'learning') {
     sessionData.learningUrl = siteUrl;
     sessionData.procrastinationUrl = triggerUrl;
   } else {
@@ -43,7 +50,7 @@ async function startSession(tabId, sessionType, siteUrl, triggerUrl = null) {
   await storage.activeSessions.set(tabId, sessionData);
 }
 
-async function finalizeSession(tabId, sessionType, reason = "switch") {
+async function finalizeSession(tabId, sessionType, reason = 'switch') {
   if (tabId === undefined || tabId === null) return;
 
   const finalizeKey = `${tabId}:${sessionType}`;
@@ -75,14 +82,13 @@ async function finalizeSession(tabId, sessionType, reason = "switch") {
 
     if (session.goalMs) {
       logData.goalSeconds = Math.round(session.goalMs / 1000);
-    } else if (sessionType === "learning") {
+    } else if (sessionType === 'learning') {
       logData.goalSeconds = await getGoalSeconds();
     }
 
-    if (sessionType === "learning") {
+    if (sessionType === 'learning') {
       logData.learningSite = session.learningUrl;
     }
-
   } finally {
     SessionFinalizer.delete(finalizeKey);
   }

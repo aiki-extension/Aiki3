@@ -1,34 +1,34 @@
-import svelte from "eslint-plugin-svelte";
-import svelteParser from "svelte-eslint-parser";
-import tsParser from "@typescript-eslint/parser";
+import svelte from 'eslint-plugin-svelte';
+import svelteParser from 'svelte-eslint-parser';
+import tsParser from '@typescript-eslint/parser';
 
 export default [
   {
-    files: ["**/*.svelte"],
+    files: ['**/*.svelte'],
     languageOptions: {
       parser: svelteParser,
       parserOptions: {
         parser: tsParser,
-        extraFileExtensions: [".svelte"]
-      }
+        extraFileExtensions: ['.svelte'],
+      },
     },
     plugins: {
-      svelte
+      svelte,
     },
     rules: {
-      ...svelte.configs.recommended.rules
-    }
+      ...svelte.configs.recommended.rules,
+    },
   },
   {
-    files: ["**/*.{js}"],
+    files: ['**/*.{js}'],
     languageOptions: {
-      parser: tsParser
+      parser: tsParser,
     },
-    rules: {}
+    rules: {},
   },
   {
     rules: {
-      "no-unused-vars": "warn"
-    }
-  }
+      'no-unused-vars': 'warn',
+    },
+  },
 ];

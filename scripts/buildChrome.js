@@ -11,10 +11,10 @@ const targetManifest = path.join(publicDir, 'manifest.json');
 const version = require('../package.json').version;
 
 if (fs.existsSync(chromeManifest)) {
-    fs.copyFileSync(chromeManifest, targetManifest);
-    console.log('✓ Restored Chrome manifest to manifest.json');
+  fs.copyFileSync(chromeManifest, targetManifest);
+  console.log('✓ Restored Chrome manifest to manifest.json');
 } else {
-    console.log('✓ Chrome manifest already in place');
+  console.log('✓ Chrome manifest already in place');
 }
 
 const manifest = JSON.parse(fs.readFileSync(targetManifest, 'utf8'));
