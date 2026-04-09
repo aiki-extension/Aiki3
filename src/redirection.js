@@ -259,6 +259,19 @@ async function redirect(details, immediate = false) {
         } else {
           pendingIntents.set(details.tabId, () => dispatchPrompt(details.tabId, learningUri, details.url));
         }
+      }else if (toggled && shouldRedirect && goalMet) {
+        // Goal met + reward unclaimed: auto-start reward without any prompt
+        const [rewardMinutes, rewardSeconds] = await Promise.all([
+          storage.timeSettings.rewardMinutes.get(),
+          storage.timeSettings.rewardSeconds.get(),
+        ]);
+        let rewardDuration = (rewardMinutes * 60 * 1000) + (rewardSeconds * 1000);
+        if (rewardDuration <= 0) {
+          rewardDuration = 60 * 1000;
+        }
+        await storage.shouldRedirect.set(false);
+        await timer.startProcrastinationSession(checkActiveTab, rewardDuration);
+        return;
       }
     }
   }
