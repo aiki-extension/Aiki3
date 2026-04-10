@@ -5,6 +5,7 @@ import { parseTime } from "../util/utilities";
 import { handleApiMessage } from "./apiHandler";
 import redirection from "../redirection";
 import { getLearningUrl } from "../services/siteDetector";
+import { MESSAGE_REDIRECTION_REFRESH_FILTERS } from "../values/messageTypeValues";
 
 /*
 This module handles incoming messages from content scripts and other parts of the extension.
@@ -27,6 +28,15 @@ if (!message || typeof message !== "object") {
   if (message.type === "contentScript:ready" && sender?.tab?.id !== undefined) {
     redirection.onContentScriptReady(sender.tab.id);
     return;
+  }
+
+  if (message.type === MESSAGE_REDIRECTION_REFRESH_FILTERS) {
+    try {
+      await redirection.navigationListener.restart();
+      return { ok: true };
+    } catch (_) {
+      return { ok: false };
+    }
   }
 
   if (message.type === "timer:get") {

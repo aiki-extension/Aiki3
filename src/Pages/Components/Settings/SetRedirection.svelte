@@ -26,6 +26,11 @@
   let hasSaved = false;
   let urlInputRef;
 
+  // Check if the user is a guest.
+  $: isGuestUser =
+    user === "guest" ||
+    user?.isGuest === true;
+
   onMount(async () => {
     try {
       learningUri = await storage.learningUri.get();
@@ -118,9 +123,8 @@
       <div class="actions">
         {#if isEditing}
           <button
-            type="button"
+            type="submit"
             class="btn btn-success"
-            on:click={saveUri}
             id="learning-url-save"
           >
             Save
@@ -152,8 +156,10 @@
   <TimeSettings {user} />
   <hr />
   <OperatingHoursSettings {user} />
-  <hr />
-  <InviteCodeSettings />
+  {#if user && !isGuestUser}
+    <hr />
+    <InviteCodeSettings />
+  {/if}
   <hr />
   <h5>Other Settings:</h5>
   <div>

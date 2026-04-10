@@ -5,7 +5,7 @@ import { parseUrl, makeDate, parseTime } from "./util/utilities";
 import SessionService from "./services/SessionService";
 import NavigationGuards from "./services/NavigationGuards";
 import PromptCoordinator from "./services/PromptCoordinator";
-import { PROMPT_SUPPRESS_DURATION } from "../src/values/defaultSettingValues"
+import { PROMPT_SUPPRESS_DURATION } from "./values/defaultSettingValues";
 import { getLearningUrl } from "./services/siteDetector";
 
 const l = console.log;

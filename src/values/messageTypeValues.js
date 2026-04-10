@@ -17,3 +17,5 @@ export const MESSAGE_API_UPDATE_LEARNING_URI = "api:updateLearningUri"
 export const MESSAGE_API_UPDATE_TIME_WASTING_SITE = "api:addTimeWastingSite"
 
 export const MESSAGE_API_REMOVE_TIME_WASTING_SITE = "api:removeTimeWastingSite"
+
+export const MESSAGE_REDIRECTION_REFRESH_FILTERS = "redirection:refreshFilters"

@@ -14,7 +14,6 @@
   import Privacy from "./Components/Settings/Privacy.svelte";
   import SetUser from "./Components/Settings/SetUser.svelte";
   import SetWebsites from "./Components/Settings/SetTimeWastingSites.svelte";
-  import Statistics from "./Components/Settings/Statistics.svelte";
   import SetRedirection from "./Components/Settings/SetRedirection.svelte";
   import AikiDescription from "./Components/Settings/AikiDescription.svelte";
   import Alerts from "./Components/Alerts/AlertContainer.svelte";
@@ -72,7 +71,7 @@
     {/if}
     <div class="container">
       <!-- Listens for the "authenticated" event in SetUser.svelte. Thus triggering the function to trigger, to refresh values on the page-->
-      <SetUser bind:user bind:userIsRegistered {port} on:authenticated={handleAuthenticated} />
+      <SetUser bind:user bind:userIsRegistered on:authenticated={handleAuthenticated} />
     </div>
     {#if userIsRegistered}
       <div class="container">
