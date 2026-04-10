@@ -26,6 +26,11 @@
   let hasSaved = false;
   let urlInputRef;
 
+  // Check if the user is a guest.
+  $: isGuestUser =
+    user === "guest" ||
+    user?.isGuest === true;
+
   onMount(async () => {
     try {
       learningUri = await storage.learningUri.get();
@@ -103,7 +108,7 @@
 <Container headline="Redirection Settings">
   <h5>Your Redirection Platform:</h5>
   <div class="container">
-    <div class="full" id="learning-url-container">
+    <form class="full" id="learning-url-container" on:submit|preventDefault={saveUri}>
       <input
         class="form-control form-control-lg url-input"
         type="text"
@@ -117,9 +122,8 @@
       <div class="actions">
         {#if isEditing}
           <button
-            type="button"
+            type="submit"
             class="btn btn-success"
-            on:click={saveUri}
             id="learning-url-save"
           >
             Save
@@ -144,14 +148,16 @@
           </button>
         {/if}
       </div>
-    </div>
+    </form>
   </div>
   <hr />
   <TimeSettings {user} />
   <hr />
   <OperatingHoursSettings {user} />
-  <hr />
-  <InviteCodeSettings />
+  {#if user && !isGuestUser}
+    <hr />
+    <InviteCodeSettings />
+  {/if}
   <hr />
   <h5>Other Settings:</h5>
   <div>

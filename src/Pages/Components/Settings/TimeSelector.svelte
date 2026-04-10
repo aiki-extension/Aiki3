@@ -4,7 +4,7 @@
 <script>
   import { onMount } from "svelte";
   import storage from "../../../util/storage";
-  import { SESSION_DURATION_OPTIONS } from '../../../values/defaultSettingValues';
+  import { SESSION_DURATION_OPTIONS } from "../../../values/defaultSettingValues";
   import browser from "webextension-polyfill";
   import { alertStore } from "../../../services/alertService";
   import { 
