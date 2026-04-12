@@ -314,13 +314,8 @@ class TimerManager {
 
           if (!this.sessionCompleted) {
             this.sessionCompleted = true;
-
-            // Add 1-second buffer to compensate for checkActive() timing drift
-            this.dailyProgress += 1000;
-            await storage.dailyProgress.set(this.dailyProgress);
-            console.log('[Session] Added 1s timing buffer to daily progress');
-
-            if (typeof this.sessionOnComplete === 'function') {
+            
+            if (typeof this.sessionOnComplete === "function") {
               this.sessionOnComplete();
               this.sessionOnComplete = null;
             }
@@ -332,6 +327,12 @@ class TimerManager {
 
   // Start a learning session timer
   async startSessionTimer(durationMs, onComplete) {
+    // Pause the daily timer while a session timer runs.
+    if (this.learningTimeIntervalRef) {
+      clearInterval(this.learningTimeIntervalRef);
+      this.learningTimeIntervalRef = undefined;
+    }
+
     this.stopSessionTimer();
     this.stopSessionRewardTimer();
 
@@ -395,6 +396,12 @@ class TimerManager {
 
   // Start session reward timer
   startSessionRewardTimer(durationMs, onComplete) {
+    // Pause the daily timer while a session timer runs.
+    if (this.learningTimeIntervalRef) {
+      clearInterval(this.learningTimeIntervalRef);
+      this.learningTimeIntervalRef = undefined;
+    }
+
     this.stopSessionTimer();
     this.stopSessionRewardTimer();
 

@@ -45,7 +45,7 @@ const formatDuration = (value) => {
 const formatDurationShort = (value) => {
   if (typeof value !== 'number' || value <= 0) return '0m';
   const totalSeconds = Math.floor(value / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
+  const minutes = Math.ceil(totalSeconds / 60);
   return `${minutes}m`;
 };
 
@@ -886,21 +886,13 @@ function renderLearningContent() {
       if (currentLeft) panel.style.left = currentLeft;
       if (currentTop) panel.style.top = currentTop;
       if (currentTransform) panel.style.transform = currentTransform;
-
-      heading.style.display = isCollapsed ? 'none' : 'block';
-      status.style.display = isCollapsed ? 'none' : 'block';
-      barShell.style.height = isCollapsed ? '6px' : '10px';
-      progressLabel.style.fontSize = isCollapsed ? '0.95em' : '0.9em';
-      progressLabel.style.fontWeight = isCollapsed ? '600' : '400';
-
-      // Hide snooze button when collapsed
-      if (isCollapsed && snoozeBtn.style.display !== 'none') {
-        snoozeBtn.dataset.wasVisible = 'true';
-        snoozeBtn.style.display = 'none';
-      } else if (!isCollapsed && snoozeBtn.dataset.wasVisible === 'true') {
-        snoozeBtn.style.display = 'block';
-      }
-
+      
+      heading.style.display = isCollapsed ? "none" : "block";
+      status.style.display = isCollapsed ? "none" : "block";
+      barShell.style.height = isCollapsed ? "6px" : "10px";
+      progressLabel.style.fontSize = isCollapsed ? "0.95em" : "0.9em";
+      progressLabel.style.fontWeight = isCollapsed ? "600" : "400";
+      
       // Sync the intended position after size change
       setTimeout(() => {
         if (dragHandle && dragHandle.syncIntendedPosition) {
@@ -1327,7 +1319,6 @@ function installRewardOverlayPersistence() {
 /**
  * Render a reward time overlay for controlled variant on time wasting sites.
  * Non-blocking panel showing countdown until learning resumes.
- * Shows snooze button at 5 seconds remaining.
  */
 function renderProcrastinationRewardOverlay() {
   // Install persistence guards on first render
@@ -1404,34 +1395,6 @@ function renderProcrastinationRewardOverlay() {
   );
   status.textContent = 'Enjoy your break!';
 
-  // Snooze button (hidden initially, shows at 5 seconds remaining)
-  const snoozeBtn = document.createElement('button');
-  snoozeBtn.textContent = '⏰ +1 Minute';
-  snoozeBtn.setAttribute(
-    'style',
-    'display: none; margin-top: 6px; padding: 0px 16px; background: rgba(255, 255, 255, 0.95); color: #b45309; border: none; border-radius: 10px; font-size: 0.9em; font-weight: 600; cursor: pointer; transition: all 0.2s ease; text-align: center;',
-  );
-  snoozeBtn.addEventListener('mouseenter', () => {
-    snoozeBtn.style.transform = 'scale(1.02)';
-    snoozeBtn.style.boxShadow = '0 6px 16px rgba(0, 0, 0, 0.2)';
-  });
-  snoozeBtn.addEventListener('mouseleave', () => {
-    snoozeBtn.style.transform = 'scale(1)';
-    snoozeBtn.style.boxShadow = 'none';
-  });
-  snoozeBtn.addEventListener('click', async () => {
-    try {
-      await browser.runtime.sendMessage({ type: 'controlled:snoozeReward' });
-      // Hide button after snooze
-      snoozeBtn.style.display = 'none';
-      status.textContent = 'Added 1 minute! Enjoy!';
-      currentBg = 'linear-gradient(135deg, #22c55e, #14b8a6)';
-      panel.style.background = currentBg;
-    } catch (e) {
-      console.log('[Aiki] Failed to snooze:', e);
-    }
-  });
-
   // Collapse/expand toggle handler
   const toggleCollapse = () => {
     isCollapsed = !isCollapsed;
@@ -1456,21 +1419,13 @@ function renderProcrastinationRewardOverlay() {
     if (currentTop) panel.style.top = currentTop;
     if (currentBottom) panel.style.bottom = currentBottom;
     if (currentTransform) panel.style.transform = currentTransform;
-
-    heading.style.display = isCollapsed ? 'none' : 'block';
-    status.style.display = isCollapsed ? 'none' : 'block';
-    barShell.style.height = isCollapsed ? '5px' : '8px';
-    progressLabel.style.fontSize = isCollapsed ? '0.9em' : '0.85em';
-    progressLabel.style.fontWeight = isCollapsed ? '600' : '400';
-
-    // Hide snooze button when collapsed
-    if (isCollapsed && snoozeBtn.style.display !== 'none') {
-      snoozeBtn.dataset.wasVisible = 'true';
-      snoozeBtn.style.display = 'none';
-    } else if (!isCollapsed && snoozeBtn.dataset.wasVisible === 'true') {
-      snoozeBtn.style.display = 'block';
-    }
-
+    
+    heading.style.display = isCollapsed ? "none" : "block";
+    status.style.display = isCollapsed ? "none" : "block";
+    barShell.style.height = isCollapsed ? "5px" : "8px";
+    progressLabel.style.fontSize = isCollapsed ? "0.9em" : "0.85em";
+    progressLabel.style.fontWeight = isCollapsed ? "600" : "400";
+    
     // Sync the intended position after size change
     setTimeout(() => {
       if (dragHandle && dragHandle.syncIntendedPosition) {
@@ -1488,7 +1443,6 @@ function renderProcrastinationRewardOverlay() {
   panel.appendChild(progressLabel);
   panel.appendChild(barShell);
   panel.appendChild(status);
-  panel.appendChild(snoozeBtn);
   overlay.appendChild(panel);
   document.body.appendChild(overlay);
 
@@ -1528,29 +1482,25 @@ function renderProcrastinationRewardOverlay() {
     if (remaining <= 5000 && remaining > 0) {
       if (!warningShown) {
         warningShown = true;
-        snoozeBtn.style.display = 'block';
-        panel.style.background = 'linear-gradient(135deg, #dc2626, #b91c1c)';
+        panel.style.background = "linear-gradient(135deg, #dc2626, #b91c1c)";
         heading.textContent = "⚠️ Time's almost up!";
       }
       status.textContent = `Returning to learning in ${Math.ceil(remaining / 1000)} seconds...`;
     } else if (remaining <= 0) {
-      status.textContent = 'Reward time over! Returning to learning...';
-      panel.style.background = 'linear-gradient(135deg, #6366f1, #8b5cf6)';
-      snoozeBtn.style.display = 'none';
+      status.textContent = "Reward time over! Returning to learning...";
+      panel.style.background = "linear-gradient(135deg, #6366f1, #8b5cf6)";
     } else if (remaining < 30000) {
       status.textContent = 'Almost time to learn again!';
       if (remaining > 5000) {
         warningShown = false;
-        snoozeBtn.style.display = 'none';
-        heading.textContent = '🎉 Reward time';
-        panel.style.background = 'linear-gradient(135deg, #ADD8E6, #32CD32)';
+        heading.textContent = "🎉 Reward time";
+        panel.style.background = "linear-gradient(135deg, #ADD8E6, #32CD32)";
       }
     } else {
       status.textContent = 'Enjoy your break!';
       warningShown = false;
-      snoozeBtn.style.display = 'none';
-      heading.textContent = '🎉 Reward time';
-      panel.style.background = 'linear-gradient(135deg, #ADD8E6, #32CD32)';
+      heading.textContent = "🎉 Reward time";
+      panel.style.background = "linear-gradient(135deg, #ADD8E6, #32CD32)";
     }
   };
 
