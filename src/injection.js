@@ -614,15 +614,12 @@ function renderRedirectPrompt(originUrl) {
     const formatDomain = (h) => h.replace(/^www\./, "");
     const updateDescription = (h) => {
       description.innerHTML = "";
-      if (h) {
         description.appendChild(document.createTextNode("You're visiting "));
         const strong = document.createElement("strong");
         strong.textContent = formatDomain(h);
         description.appendChild(strong);
-        description.appendChild(document.createTextNode(". Switch to your learning platform?"));
-      } else {
-        description.textContent = "You've reached a focus site. Do you want to jump to your learning platform?";
-      }
+        description.appendChild(document.createTextNode(" Redirect to your learning platform?"));
+      
     };
 
     updateDescription(host);
@@ -644,6 +641,9 @@ function renderRedirectPrompt(originUrl) {
     continueButton.setAttribute("style", btnSecStyle);
     continueButton.onmouseenter = () => continueButton.setAttribute("style", btnSecHoverStyle);
     continueButton.onmouseleave = () => continueButton.setAttribute("style", btnSecStyle);
+    continueButton.onfocus = () => continueButton.setAttribute("style", btnSecHoverStyle);
+    continueButton.onblur = () => continueButton.setAttribute("style", btnSecStyle);
+
 
     const redirectButton = document.createElement("button");
     redirectButton.textContent = "Redirect";
@@ -652,6 +652,10 @@ function renderRedirectPrompt(originUrl) {
     redirectButton.setAttribute("style", btnPriStyle);
     redirectButton.onmouseenter = () => redirectButton.setAttribute("style", btnPriHoverStyle);
     redirectButton.onmouseleave = () => redirectButton.setAttribute("style", btnPriStyle);
+    redirectButton.onfocus = () => redirectButton.setAttribute("style", btnPriHoverStyle);
+    redirectButton.onblur = () => redirectButton.setAttribute("style", btnPriStyle);
+
+    
 
     const finalize = (action) => {
       if (done) return;
@@ -664,8 +668,22 @@ function renderRedirectPrompt(originUrl) {
       resolve({ action });
     };
 
+    const onPromptKeyDown = (e) => {
+      if (done) return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        finalize("continue");
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        finalize("redirect");
+      }
+    };
+
     continueButton.addEventListener("click", () => finalize("continue"));
     redirectButton.addEventListener("click", () => finalize("redirect"));
+    document.addEventListener("keydown", onPromptKeyDown,true);
+
+
 
     // Keep host label in sync if the user navigates while the prompt is open.
     let hostWatchInterval = null;
