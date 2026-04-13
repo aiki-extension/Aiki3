@@ -19,7 +19,7 @@ export function isProcrastinationSite(url, hosts) {
       const h = (host || '').replace(/^www\./, '').toLowerCase();
       return h && (urlHost === h || urlHost.endsWith('.' + h));
     });
-  } catch (e) {
+  } catch {
     return false;
   }
 }

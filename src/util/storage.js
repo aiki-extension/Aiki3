@@ -518,11 +518,6 @@ function clearParticipantRecord() {
   return storage.remove("participantRecord");
 }
 
-function normalizeSessionKey(tabId) {
-  if (tabId === null || tabId === undefined) return null;
-  return String(tabId);
-}
-
 async function setUserPreferencesId(id) {
   if (id && typeof id === "string") {
     storage.set({ userPreferencesId: id });
