@@ -4,7 +4,6 @@
 <script>
   import { onMount } from "svelte";
   import storage from "../../../util/storage";
-  import { SESSION_DURATION_OPTIONS } from "../../../values/defaultSettingValues";
   import browser from "webextension-polyfill";
   import { alertStore } from "../../../services/alertService";
   import { 
@@ -134,15 +133,25 @@
       <input class="form-control form-control-sm inline placeholder" disabled />
       <p class="placeholder">:</p>
       <!-- svelte-ignore a11y-no-onchange -->
-      <select
-        bind:value={sessionMinutes}
-        on:change={setSessionTime}
-        class="custom-select custom-select-sm inline"
-      >
-        {#each SESSION_DURATION_OPTIONS as value}
-          <option {value}>{value}</option>
-        {/each}
-      </select>
+      <input
+      type="number"
+      id="session-mins"
+      min="1"
+      title="Enter a session duration in minutes"
+      bind:value={sessionMinutes}
+      on:change={() => {
+        const parsedValue = Math.max(1, parseInt(sessionMinutes) || 1);
+        if (parsedValue > learnMin) {
+          alertStore.add({
+            type: 'warning',
+            message: `Session duration can't exceed daily goal (${learnMin} min). Adjusted to ${learnMin} min.`,
+          });
+        }
+        sessionMinutes = Math.max(1, Math.min(learnMin, parseInt(sessionMinutes) || 1));
+        setSessionTime();
+      }}
+      class="form-control form-control-sm inline"
+      />
       <p><small>Min&nbsp;&nbsp;&nbsp;&nbsp;</small></p>
     </div>
   </div>

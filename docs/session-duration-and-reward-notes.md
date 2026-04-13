@@ -1,6 +1,9 @@
 ## Settings page
 For the settings page, we have decided that the user can freely write any amount of minutes as reward time.
-But for the session duration minutes, we have decided to have set options for them to pick. The sessions can be 5, 10, 15, 20, 25 or 30 minutes each. They can't insert any number of choice, as it could cause some "awkward" scenarios. For example if the user chose 7 minute sessions and had a 30 minute daily goal, then they would have to actually do 5 more minutes of work than they wanted to. This avoids these edge cases by doing so.
+
+Initially the session duration minutes was set options. The sessions could be 5, 10, 15, 20, 25 or 30 minutes each. They couldn't insert any number of choice, as it could cause some "awkward" scenarios. For example if the user chose 7 minute sessions and had a 30 minute daily goal, then they would have to actually do 5 more minutes of work than they wanted to. This avoided these edge cases by doing so.
+
+But after some further testing, it felt odd that reward time was an input field whilst session duration was set options. But then another solution had to be found to fix these "awkward" scenarios. The fix was instead to do a "remaining" session for the last session. So if the user have a daily goal of 27 minutes and you have 10 minute sessions, then the last session would be 7 minutes. So in this way, the user only does the amount of minutes that they actually have to do, instead of having to do additional minutes. 
 
 ## Reward 
 When the user has finished a session, they will be prompted with a a button to claim their reward.

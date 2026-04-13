@@ -1,6 +1,6 @@
-import browser from "webextension-polyfill";
-import storage from "./util/storage";
-import { parseUrl } from "./util/utilities";
+import browser from 'webextension-polyfill';
+import storage from './util/storage';
+import { parseUrl } from './util/utilities';
 
 let list = [];
 let user = null;
@@ -28,8 +28,8 @@ async function counter() {
   const currentWindow = await browser.windows.getCurrent();
 
   const views =
-    typeof chrome !== "undefined" && chrome.runtime?.getViews
-      ? chrome.runtime.getViews({ type: "popup" })
+    typeof chrome !== 'undefined' && chrome.runtime?.getViews
+      ? chrome.runtime.getViews({ type: 'popup' })
       : [];
 
   if (currentWindow.focused || views.length > 0) {
@@ -107,7 +107,7 @@ function calculateCategoryTime(data, siteList) {
   const siteDetails = [];
 
   Object.entries(data).forEach(([name, seconds]) => {
-    if (typeof seconds === "number" && siteList.includes(name)) {
+    if (typeof seconds === 'number' && siteList.includes(name)) {
       totalSeconds += seconds;
       siteDetails.push({ name, seconds });
     }

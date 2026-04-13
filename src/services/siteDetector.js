@@ -2,8 +2,8 @@
  * Site Detector - Shared detection logic for time wasting and learning sites
  */
 
-import storage from "../util/storage";
-import { parseUrl } from "../util/utilities";
+import storage from '../util/storage';
+import { parseUrl } from '../util/utilities';
 
 /**
  * Check if a URL is a time wasting site.
@@ -14,10 +14,10 @@ import { parseUrl } from "../util/utilities";
 export function isProcrastinationSite(url, hosts) {
   if (!url || !hosts || hosts.length === 0) return false;
   try {
-    const urlHost = new URL(url).hostname.replace(/^www\./, "").toLowerCase();
-    return hosts.some(host => {
-      const h = (host || "").replace(/^www\./, "").toLowerCase();
-      return h && (urlHost === h || urlHost.endsWith("." + h));
+    const urlHost = new URL(url).hostname.replace(/^www\./, '').toLowerCase();
+    return hosts.some((host) => {
+      const h = (host || '').replace(/^www\./, '').toLowerCase();
+      return h && (urlHost === h || urlHost.endsWith('.' + h));
     });
   } catch (e) {
     return false;
@@ -33,9 +33,11 @@ export function isProcrastinationSite(url, hosts) {
 export function isLearningSite(url, learningUrl) {
   if (!url || !learningUrl) return false;
   try {
-    const urlHost = new URL(url).hostname.replace(/^www\./, "").toLowerCase();
-    const learningHost = new URL(learningUrl).hostname.replace(/^www\./, "").toLowerCase();
-    return urlHost === learningHost || urlHost.endsWith("." + learningHost);
+    const urlHost = new URL(url).hostname.replace(/^www\./, '').toLowerCase();
+    const learningHost = new URL(learningUrl).hostname
+      .replace(/^www\./, '')
+      .toLowerCase();
+    return urlHost === learningHost || urlHost.endsWith('.' + learningHost);
   } catch (e) {
     return false;
   }
@@ -48,7 +50,7 @@ export function isLearningSite(url, learningUrl) {
 export async function getProcrastinationHosts() {
   const procList = await storage.list.get();
   return (procList || [])
-    .map(item => item?.host || item?.name || "")
+    .map((item) => item?.host || item?.name || '')
     .filter(Boolean);
 }
 
@@ -89,7 +91,7 @@ export async function checkIfLearning(url) {
  * @returns {string}
  */
 export function getSiteName(url) {
-  return parseUrl(url).name || "";
+  return parseUrl(url).name || '';
 }
 
 export default {

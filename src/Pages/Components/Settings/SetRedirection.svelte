@@ -108,7 +108,8 @@
 <Container headline="Redirection Settings">
   <h5>Your Redirection Platform:</h5>
   <div class="container">
-    <form class="full" id="learning-url-container" on:submit|preventDefault={saveUri}>
+    <div class="full" id="learning-url-container">
+    <form on:submit|preventDefault={saveUri}>
       <input
         class="form-control form-control-lg url-input"
         type="text"
@@ -149,6 +150,7 @@
         {/if}
       </div>
     </form>
+    </div>
   </div>
   <hr />
   <TimeSettings {user} />

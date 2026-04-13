@@ -12,18 +12,18 @@ const chromeManifest = path.join(publicDir, 'manifest.chrome.json');
 const version = require('../package.json').version;
 
 if (!fs.existsSync(chromeManifest)) {
-    if (fs.existsSync(targetManifest)) {
-        fs.copyFileSync(targetManifest, chromeManifest);
-        console.log('✓ Backed up Chrome manifest to manifest.chrome.json');
-    }
+  if (fs.existsSync(targetManifest)) {
+    fs.copyFileSync(targetManifest, chromeManifest);
+    console.log('✓ Backed up Chrome manifest to manifest.chrome.json');
+  }
 }
 
 if (fs.existsSync(firefoxManifest)) {
-    fs.copyFileSync(firefoxManifest, targetManifest);
-    console.log('✓ Copied Firefox manifest to manifest.json');
+  fs.copyFileSync(firefoxManifest, targetManifest);
+  console.log('✓ Copied Firefox manifest to manifest.json');
 } else {
-    console.error('✗ Firefox manifest not found:', firefoxManifest);
-    process.exit(1);
+  console.error('✗ Firefox manifest not found:', firefoxManifest);
+  process.exit(1);
 }
 
 const manifest = JSON.parse(fs.readFileSync(targetManifest, 'utf8'));
