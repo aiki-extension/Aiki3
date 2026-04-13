@@ -1,4 +1,4 @@
-import browser from "webextension-polyfill";
+import browser from 'webextension-polyfill';
 
 const hiddenTabs = new Set();
 const pendingRevealTabs = new Set();
@@ -17,7 +17,7 @@ async function apply(tabId) {
     await browser.scripting.insertCSS({
       target: { tabId },
       css: PRELOAD_HIDE_CSS,
-      origin: "USER",
+      origin: 'USER',
     });
     hiddenTabs.add(tabId);
   } catch (_) {}
@@ -29,7 +29,7 @@ async function remove(tabId) {
     await browser.scripting.removeCSS({
       target: { tabId },
       css: PRELOAD_HIDE_CSS,
-      origin: "USER",
+      origin: 'USER',
     });
   } catch (_) {}
   hiddenTabs.delete(tabId);
@@ -43,7 +43,7 @@ function scheduleReveal(tabId) {
 async function revealIfPending(tabId, cleanup) {
   if (!pendingRevealTabs.has(tabId)) return;
   pendingRevealTabs.delete(tabId);
-  if (typeof cleanup === "function") {
+  if (typeof cleanup === 'function') {
     await cleanup(tabId);
   }
   await remove(tabId);

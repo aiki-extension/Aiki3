@@ -1,8 +1,13 @@
-import browser from "webextension-polyfill";
-import storage from "../util/storage";
+import browser from 'webextension-polyfill';
+import storage from '../util/storage';
 
 class PromptCoordinator {
-  constructor({ applyPreemptiveHide, removePreemptiveHide, showImmediatePrompt, hideImmediatePrompt }) {
+  constructor({
+    applyPreemptiveHide,
+    removePreemptiveHide,
+    showImmediatePrompt,
+    hideImmediatePrompt,
+  }) {
     this.applyPreemptiveHide = applyPreemptiveHide;
     this.removePreemptiveHide = removePreemptiveHide;
     this.showImmediatePrompt = showImmediatePrompt;
@@ -12,30 +17,30 @@ class PromptCoordinator {
 
   async promptRedirect(tabId, learningUrl, originUrl, callbacks = {}) {
     const { onAccept, onContinue, onConnectionFailed } = callbacks;
-    
+
     try {
       await this.applyPreemptiveHide(tabId);
       await this.showImmediatePrompt(tabId);
       let result;
       try {
         result = await browser.tabs.sendMessage(tabId, {
-          action: "display:redirectPrompt",
+          action: 'display:redirectPrompt',
           url: learningUrl,
           originUrl: originUrl,
         });
       } catch (sendError) {
-        if (typeof onConnectionFailed === "function") onConnectionFailed();
+        if (typeof onConnectionFailed === 'function') onConnectionFailed();
         throw sendError;
       }
 
-      if (!result) throw new Error("No response from content script");
+      if (!result) throw new Error('No response from content script');
 
-      if (result.action === "continue") {
-        if (typeof onContinue === "function") await onContinue();
+      if (result.action === 'continue') {
+        if (typeof onContinue === 'function') await onContinue();
         await this.hideImmediatePrompt(tabId);
         await this.removePreemptiveHide(tabId);
-      } else if (result.action === "redirect") {
-        if (typeof onAccept === "function") await onAccept();
+      } else if (result.action === 'redirect') {
+        if (typeof onAccept === 'function') await onAccept();
       }
     } catch (_) {
       await this.hideImmediatePrompt(tabId);
@@ -48,7 +53,7 @@ class PromptCoordinator {
     if (details.frameId === 0) {
       // Check if reward timer is active - if so, don't block
       try {
-        const timer = await import("./TimerManager");
+        const timer = await import('./TimerManager');
         if (timer.default.isSessionRewardActive()) return;
       } catch (_) {}
 
@@ -63,15 +68,15 @@ class PromptCoordinator {
         let result;
         try {
           result = await browser.tabs.sendMessage(details.tabId, {
-            action: "display:contentBlocker", // request/response prompt
+            action: 'display:contentBlocker', // request/response prompt
             originUrl: details.url,
           });
         } catch (sendError) {
-          if (typeof onConnectionFailed === "function") onConnectionFailed();
+          if (typeof onConnectionFailed === 'function') onConnectionFailed();
           throw sendError;
         }
 
-        if (result?.action === "continue" && typeof onContinue === "function") {
+        if (result?.action === 'continue' && typeof onContinue === 'function') {
           await onContinue();
         }
 
@@ -91,13 +96,17 @@ class PromptCoordinator {
       await storage.blockedOrigins.remove(tabId);
       await storage.blockedTabs.remove(tabId);
       await storage.promptLocks.remove(tabId);
-      return browser.tabs.sendMessage(tabId, { action: "remove blocker" }).catch(() => { });
-    } catch (_) { }
+      return browser.tabs
+        .sendMessage(tabId, { action: 'remove blocker' })
+        .catch(() => {});
+    } catch (_) {}
   }
 
   async removeAllContentBlockers() {
     const blockedTabs = await storage.blockedTabs.get();
-    await Promise.allSettled(blockedTabs.map((tabId) => this.removeContentBlocker(tabId)));
+    await Promise.allSettled(
+      blockedTabs.map((tabId) => this.removeContentBlocker(tabId)),
+    );
     storage.blockedTabs.clear();
     storage.blockedOrigins.clear();
     storage.promptLocks.clear();
@@ -106,11 +115,16 @@ class PromptCoordinator {
   async addProcsiteLoadedListener(createFilter) {
     const filter = await createFilter();
     if (!filter) return;
-    browser.webNavigation.onCompleted.addListener(this.boundRenderContentBlocker, filter);
+    browser.webNavigation.onCompleted.addListener(
+      this.boundRenderContentBlocker,
+      filter,
+    );
   }
 
   removeProcsiteLoadedListener() {
-    browser.webNavigation.onCompleted.removeListener(this.boundRenderContentBlocker);
+    browser.webNavigation.onCompleted.removeListener(
+      this.boundRenderContentBlocker,
+    );
   }
 }
 

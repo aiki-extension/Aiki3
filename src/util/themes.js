@@ -2,15 +2,15 @@
 // Currently offers four themes.
 
 // TODO: Put storage functions in storage
-import browser from "webextension-polyfill";
+import browser from 'webextension-polyfill';
 const storage = browser.storage.local;
 
 // Lazily resolve the document root style; no-op in service worker.
 let root;
 function getRoot() {
   if (root) return root;
-  if (typeof document === "undefined") return null;
-  const el = document.querySelector(":root");
+  if (typeof document === 'undefined') return null;
+  const el = document.querySelector(':root');
   root = el ? el.style : null;
   return root;
 }
@@ -20,7 +20,7 @@ function getRoot() {
  * @returns {string} Theme
  * @description  Returns the name of the theme stored in localstorage. */
 export async function getTheme() {
-  const result = await storage.get("theme");
+  const result = await storage.get('theme');
   return result.theme;
 }
 
@@ -39,16 +39,16 @@ export function setTheme(theme) {
 export async function drawTheme() {
   const theme = await getTheme();
   switch (theme) {
-    case "dark":
+    case 'dark':
       drawDarkMode();
       break;
-    case "light":
+    case 'light':
       drawLightMode();
       break;
-    case "blue":
+    case 'blue':
       drawBlueMode();
       break;
-    case "zeeguu":
+    case 'zeeguu':
       drawZeeguuMode();
       break;
     default:
@@ -63,18 +63,18 @@ export async function drawTheme() {
 export function drawDarkMode() {
   const r = getRoot();
   if (!r) return;
-  r.setProperty("--textColor", "#FFFFFF");
-  r.setProperty("--textColorSecondary", "rgba(255, 255, 255, 0.7)");
-  r.setProperty("--progressBarBackground", "#D1D5DB");
-  r.setProperty("--progressBarFill", "#22c55e");
-  r.setProperty("--backgroundColorPrimary", "#1F2933");
-  r.setProperty("--backgroundColorSecondary", "#323F4B");
-  r.setProperty("--borderColor", "#12171D");
-  r.setProperty("--bannerTextColor", "#FFFFFF");
-  r.setProperty("--bannerBackgroundColor", "#3E4C59");
-  r.setProperty("--hrColor", "#616E7C");
-  r.setProperty("--footerBackgroundColor", "#3E4C59");
-  r.setProperty("--theadBackgroundColor", "#3E4C59");
+  r.setProperty('--textColor', '#FFFFFF');
+  r.setProperty('--textColorSecondary', 'rgba(255, 255, 255, 0.7)');
+  r.setProperty('--progressBarBackground', '#D1D5DB');
+  r.setProperty('--progressBarFill', '#22c55e');
+  r.setProperty('--backgroundColorPrimary', '#1F2933');
+  r.setProperty('--backgroundColorSecondary', '#323F4B');
+  r.setProperty('--borderColor', '#12171D');
+  r.setProperty('--bannerTextColor', '#FFFFFF');
+  r.setProperty('--bannerBackgroundColor', '#3E4C59');
+  r.setProperty('--hrColor', '#616E7C');
+  r.setProperty('--footerBackgroundColor', '#3E4C59');
+  r.setProperty('--theadBackgroundColor', '#3E4C59');
 }
 
 /**
@@ -84,18 +84,18 @@ export function drawDarkMode() {
 export function drawLightMode() {
   const r = getRoot();
   if (!r) return;
-  r.setProperty("--textColor", "#222222");
-  r.setProperty("--textColorSecondary", "rgba(34, 34, 34, 0.7)");
-  r.setProperty("--progressBarBackground", "#D1D5DB");
-  r.setProperty("--progressBarFill", "#22c55e");
-  r.setProperty("--backgroundColorPrimary", "#f0f2f5");
-  r.setProperty("--backgroundColorSecondary", "#FFFFFF");
-  r.setProperty("--borderColor", "#AAAAAA");
-  r.setProperty("--bannerTextColor", "#FFFFFF");
-  r.setProperty("--bannerBackgroundColor", "#282C34");
-  r.setProperty("--hrColor", "#D3D3D3");
-  r.setProperty("--footerBackgroundColor", "#E8ECF3");
-  r.setProperty("--theadBackgroundColor", "#D3D3D3");
+  r.setProperty('--textColor', '#222222');
+  r.setProperty('--textColorSecondary', 'rgba(34, 34, 34, 0.7)');
+  r.setProperty('--progressBarBackground', '#D1D5DB');
+  r.setProperty('--progressBarFill', '#22c55e');
+  r.setProperty('--backgroundColorPrimary', '#f0f2f5');
+  r.setProperty('--backgroundColorSecondary', '#FFFFFF');
+  r.setProperty('--borderColor', '#AAAAAA');
+  r.setProperty('--bannerTextColor', '#FFFFFF');
+  r.setProperty('--bannerBackgroundColor', '#282C34');
+  r.setProperty('--hrColor', '#D3D3D3');
+  r.setProperty('--footerBackgroundColor', '#E8ECF3');
+  r.setProperty('--theadBackgroundColor', '#D3D3D3');
 }
 
 /**
@@ -105,18 +105,18 @@ export function drawLightMode() {
 export function drawBlueMode() {
   const r = getRoot();
   if (!r) return;
-  r.setProperty("--textColor", "#212121");
-  r.setProperty("--textColorSecondary", "rgba(33, 33, 33, 0.7)");
-  r.setProperty("--progressBarBackground", "#D1D5DB");
-  r.setProperty("--progressBarFill", "#22c55e");
-  r.setProperty("--backgroundColorPrimary", "#F5F6FB");
-  r.setProperty("--backgroundColorSecondary", "#FFFFFF");
-  r.setProperty("--borderColor", "#EDEDED");
-  r.setProperty("--bannerTextColor", "#FFFFFF");
-  r.setProperty("--bannerBackgroundColor", "#3366FF");
-  r.setProperty("--hrColor", "#EAEAEA");
-  r.setProperty("--footerBackgroundColor", "#99B2FF");
-  r.setProperty("--theadBackgroundColor", "#EAEAEA");
+  r.setProperty('--textColor', '#212121');
+  r.setProperty('--textColorSecondary', 'rgba(33, 33, 33, 0.7)');
+  r.setProperty('--progressBarBackground', '#D1D5DB');
+  r.setProperty('--progressBarFill', '#22c55e');
+  r.setProperty('--backgroundColorPrimary', '#F5F6FB');
+  r.setProperty('--backgroundColorSecondary', '#FFFFFF');
+  r.setProperty('--borderColor', '#EDEDED');
+  r.setProperty('--bannerTextColor', '#FFFFFF');
+  r.setProperty('--bannerBackgroundColor', '#3366FF');
+  r.setProperty('--hrColor', '#EAEAEA');
+  r.setProperty('--footerBackgroundColor', '#99B2FF');
+  r.setProperty('--theadBackgroundColor', '#EAEAEA');
 }
 
 /**
@@ -126,16 +126,16 @@ export function drawBlueMode() {
 export function drawZeeguuMode() {
   const r = getRoot();
   if (!r) return;
-  r.setProperty("--textColor", "#263238");
-  r.setProperty("--textColorSecondary", "rgba(38, 50, 56, 0.7)");
-  r.setProperty("--progressBarBackground", "#D1D5DB");
-  r.setProperty("--progressBarFill", "#22c55e");
-  r.setProperty("--backgroundColorPrimary", "#F7F7F7");
-  r.setProperty("--backgroundColorSecondary", "#FFFFFF");
-  r.setProperty("--borderColor", "#EFEFEF");
-  r.setProperty("--bannerTextColor", "#FFFFFF");
-  r.setProperty("--bannerBackgroundColor", "#FEBF00");
-  r.setProperty("--hrColor", "#EFEFEF");
-  r.setProperty("--footerBackgroundColor", "#F2C76B");
-  r.setProperty("--theadBackgroundColor", "#F7F7F7");
+  r.setProperty('--textColor', '#263238');
+  r.setProperty('--textColorSecondary', 'rgba(38, 50, 56, 0.7)');
+  r.setProperty('--progressBarBackground', '#D1D5DB');
+  r.setProperty('--progressBarFill', '#22c55e');
+  r.setProperty('--backgroundColorPrimary', '#F7F7F7');
+  r.setProperty('--backgroundColorSecondary', '#FFFFFF');
+  r.setProperty('--borderColor', '#EFEFEF');
+  r.setProperty('--bannerTextColor', '#FFFFFF');
+  r.setProperty('--bannerBackgroundColor', '#FEBF00');
+  r.setProperty('--hrColor', '#EFEFEF');
+  r.setProperty('--footerBackgroundColor', '#F2C76B');
+  r.setProperty('--theadBackgroundColor', '#F7F7F7');
 }
