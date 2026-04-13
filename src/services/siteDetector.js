@@ -38,7 +38,7 @@ export function isLearningSite(url, learningUrl) {
       .replace(/^www\./, '')
       .toLowerCase();
     return urlHost === learningHost || urlHost.endsWith('.' + learningHost);
-  } catch (e) {
+  } catch {
     return false;
   }
 }

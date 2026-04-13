@@ -28,7 +28,7 @@ async function killAiki() {
   });
   try {
     await browser.tabs.sendMessage(tabs[0].id, { action: 'kill aiki' });
-  } catch (_) {
+  } catch {
     // Tab may not have content script or context invalidated
   }
   timer.stopLearningSession();
@@ -40,7 +40,7 @@ async function gotoOriginTab() {
   const origin = await storage.origin.get();
   try {
     await browser.tabs.update(origin.tabId, { active: true });
-  } catch (_) {}
+  } catch {}
 }
 
 export default {

@@ -4,6 +4,9 @@ import tsParser from '@typescript-eslint/parser';
 
 export default [
   {
+    ignores: ['public/build/bundle.js', 'public/build/**/*.js']
+  },
+  {
     files: ['**/*.svelte'],
     languageOptions: {
       parser: svelteParser,

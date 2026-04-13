@@ -20,7 +20,7 @@ async function apply(tabId) {
       origin: 'USER',
     });
     hiddenTabs.add(tabId);
-  } catch (_) {}
+  } catch {}
 }
 
 async function remove(tabId) {
@@ -31,7 +31,7 @@ async function remove(tabId) {
       css: PRELOAD_HIDE_CSS,
       origin: 'USER',
     });
-  } catch (_) {}
+  } catch {}
   hiddenTabs.delete(tabId);
 }
 
