@@ -217,7 +217,7 @@ async function redirect(details, immediate = false) {
       const progress = await storage.dailyProgress.get();
       const goalMet = goal > 0 && progress >= goal;
 
-      if (toggled && shouldRedirect && !goalMet) {
+      if (toggled && shouldRedirect && !goalMet && !timer.isSessionRewardActive()) {
         l("ShouldRedirect", shouldRedirect);
         const origin = await storage.origin.get();
         l("Checking against this: ", origin);
@@ -340,7 +340,12 @@ async function onOriginRemoved(details) {
         await SessionService.finalizeSession(details, "learning", "tab_closed");
         timer.stopBonusTime();
         timer.stopLearningSession();
-        storage.shouldRedirect.set(true);
+        
+        // Don't re-enable redirects if a session reward is currently active,
+        // closing the origin tab while on reward time should not cancel the reward.
+        if (!timer.isSessionRewardActive()) {
+          storage.shouldRedirect.set(true);
+        }
       }
     }
   }
