@@ -6,18 +6,32 @@
   import { onMount } from "svelte";
   import Container from "./Container.svelte";
   import storage from "../../../util/storage";
+  import { setTheme } from "../../../util/themes";
   import Fa from "svelte-fa";
   import { faUserSlash, faUserPlus } from "@fortawesome/free-solid-svg-icons";
   import { alertStore } from "../../../services/alertService";
   import browser from "webextension-polyfill";
   import {createEventDispatcher } from "svelte";
+  import {
+    ACTIVE_TIME_TO_HOURS,
+    ACTIVE_TIME_TO_MINUTES,
+    ACTIVE_TIME_FROM_HOURS,
+    ACTIVE_TIME_FROM_MINUTES,
+    MIN_LEARNING_MINUTES,
+    REWARD_TIME_MINUTES,
+    SESSION_TIME_MINUTES,
+  } from "../../../values/defaultSettingValues";
+  import {
+    MESSAGE_API_LOGIN,
+    MESSAGE_API_REGISTER
+  } from "../../../values/messageTypeValues";
 
   export let user = "";
   export let userIsRegistered;
-  export let port;
   let authMode = "login";
   let password = "";
   let confirmPassword = "";
+  let inviteCode = "";
   let isSubmitting = false;
   const basicEmailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const dispatch = createEventDispatcher();
@@ -33,6 +47,7 @@
     }
     password = "";
     confirmPassword = "";
+    inviteCode = "";
   }
   
   function isValidEmail(value) {
@@ -60,20 +75,42 @@
     userIsRegistered = true;
   }
 
-  async function clearSessionLocally() {
-    await storage.jwt.set("");
-    await storage.uid.set("");
+  async function loadDefaultSettingsLocally() {
+    await storage.operatingHours.from.set({
+      hrs: ACTIVE_TIME_FROM_HOURS,
+      min: ACTIVE_TIME_FROM_MINUTES,
+    });
+    await storage.operatingHours.to.set({
+      hrs: ACTIVE_TIME_TO_HOURS,
+      min: ACTIVE_TIME_TO_MINUTES,
+    });
+    await storage.timeSettings.learningTime.set({ min: MIN_LEARNING_MINUTES, sec: 0 });
+    await storage.timeSettings.sessionMinutes.set(SESSION_TIME_MINUTES);
+    await storage.timeSettings.sessionSeconds.set(0);
+    await storage.timeSettings.rewardMinutes.set(REWARD_TIME_MINUTES);
+    await storage.timeSettings.rewardSeconds.set(0);
+  }
+
+  async function clearSessionLocally({ loadDefaults = false } = {}) {
+    await storage.clearStorage();
+    await setTheme("dark");
+    if (loadDefaults) {
+      await loadDefaultSettingsLocally();
+      await storage.shouldRedirect.set(true);
+      await storage.redirection.toggle();
+    }
     user = "";
     userIsRegistered = false;
   }
 
-  async function authenticateWithBackend({ mode, email, plainTextPassword }) {
-   const type = mode === "register" ? "api:register" : "api:login";
+  async function authenticateWithBackend({ mode, email, plainTextPassword, inviteCode }) {
+   const type = mode === "register" ? MESSAGE_API_REGISTER : MESSAGE_API_LOGIN;
    try {
      const result = await browser.runtime.sendMessage({
         type,
         email,
         password: plainTextPassword,
+        ...(mode === "register" && inviteCode ? { inviteCode } : {}) // Only include inviteCode if we're in register mode and it's provided
       });
      if (!result || !result.ok) {
        return { ok: false, message: result?.message || "Server error. Please try again.", token: null };
@@ -138,6 +175,7 @@
         mode: authMode,
         email: normalizedUser,
         plainTextPassword: password,
+        inviteCode
       });
 
       if (!authResult?.ok) {
@@ -145,7 +183,12 @@
         return;
       }
 
-      persistSessionLocally(normalizedUser, authResult.token);
+      await persistSessionLocally(normalizedUser, authResult.token);
+      await storage.shouldRedirect.set(true);
+      const redirectionEnabled = await storage.redirection.get();
+      if (redirectionEnabled !== true) {
+        await storage.redirection.toggle();
+      }
 
       // After successful login/register, notify parent (Settings.svelte) 
       // so it can sync DB settings to local storage and re-render child components
@@ -159,7 +202,7 @@
 
   async function resetUid() {
     if (!confirm("Are you sure you want to sign out?")) return;
-    await clearSessionLocally();
+    await clearSessionLocally({ loadDefaults: false });
     resetFormFields();
     authMode = "login";
     notifySuccess("You have been signed out.");
@@ -230,6 +273,14 @@
             placeholder="Re-enter your password..."
             autocomplete="new-password"
           />
+
+          <input
+            bind:value={inviteCode}
+            type="text"
+            class="form-control auth-input"
+            placeholder="Enter your invite code (optional)..."
+          />
+
         {/if}
 
         <button class="btn btn-primary submit-button" type="submit" disabled={isSubmitting}>
@@ -272,6 +323,7 @@
               href="#guest"
               class="auth-switch-link"
               on:click|preventDefault={async () => {
+                await clearSessionLocally({ loadDefaults: true });
                 await persistSessionLocally("guest", null);
                 notifySuccess("You are now signed in as a guest.");
               }}

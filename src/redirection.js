@@ -5,11 +5,18 @@ import { parseUrl, makeDate, parseTime } from "./util/utilities";
 import SessionService from "./services/SessionService";
 import NavigationGuards from "./services/NavigationGuards";
 import PromptCoordinator from "./services/PromptCoordinator";
+import { PROMPT_SUPPRESS_DURATION } from "./values/defaultSettingValues";
+import { getLearningUrl } from "./services/siteDetector";
 
 const l = console.log;
 
 
 const navigationGuards = new NavigationGuards(false); // Pass false to disable debug logs in NavigationGuards
+
+// Pending intents for tabs that are mid-navigation (content script not yet ready).
+// Keyed by tabId. Set by redirect() on onBeforeNavigate, consumed by onContentScriptReady().
+const pendingIntents = new Map();
+
 const promptCoordinator = new PromptCoordinator({
   applyPreemptiveHide: (tabId) => navigationGuards.applyPreemptiveHide(tabId),
   removePreemptiveHide: (tabId) => navigationGuards.removePreemptiveHide(tabId),
@@ -24,7 +31,6 @@ const strategy = {
 };
 
 let shouldShowWelcome = true;
-const PROMPT_SUPPRESS_DURATION = 10 * 60 * 1000; // 10 minutes - global cooldown across all tabs
 const PREPROMPT_ID = "__aiki-preprompt";
 
 function buildProcrastinationUrlFilters(list = []) {
@@ -135,12 +141,24 @@ async function originUpdatedListener(details) {
     if (origin.tabId === details) {
       const tab = await browser.tabs.get(details);
       l(tab);
-      const currentLearning = await storage.learningUri.get();
+      const currentLearning = await getLearningUrl();
       const learningName = parseUrl(currentLearning).name;
       if (tab.url.includes(learningName)) {
         storage.learningUri.set(tab.url);
       }
     }
+  }
+}
+
+async function isGlobalPromptLocked() {
+  try {
+    const globalPromptLock = await storage.globalPromptLock.get();
+    return Boolean(
+      globalPromptLock?.timestamp &&
+      Date.now() - globalPromptLock.timestamp < PROMPT_SUPPRESS_DURATION
+    );
+  } catch (_) {
+    return false;
   }
 }
 
@@ -153,15 +171,29 @@ async function originUpdatedListener(details) {
  * @param {object} details
  * @param {string} details.url
  * @param {number} details.tabId */
-async function redirect(details) {
+async function redirect(details, immediate = false) {
+  if (await isGlobalPromptLocked()) {
+    return;
+  }
+
   if (await checkActiveTime()) {
     if (details.frameId === 0 && !details.url.includes("auth")) {
       const toggled = await storage.redirection.get();
-      if (!toggled) return;
+      if (!toggled) { return; }
 
       const procList = await storage.list.get();
+
+      // The hostSuffix URL filter is broad (e.g. "youtube.com" also matches
+      // "accounts.youtube.com"). Guard here so auth/redirect subdomains never
+      // queue a pending intent or overwrite a legitimate one.
+      const tabSiteName = parseUrl(details.url).name;
+      const procListNames = (procList || []).map(site => site.name);
+      if (!procListNames.includes(tabSiteName)) {
+        return;
+      }
+
       const procHosts = (procList || []).map(item => item?.host || item?.name || "").filter(Boolean);
-      const learningUrl = await storage.learningUri.get();
+      const learningUrl = await getLearningUrl();
 
       const handled = await strategy.handleNavigation(details, {
         applyPreemptiveHide: (tabId) => navigationGuards.applyPreemptiveHide(tabId),
@@ -195,7 +227,7 @@ async function redirect(details) {
         if (origin && origin.tabId !== undefined) {
           try {
             const originTab = await browser.tabs.get(origin.tabId);
-            const learningUri = await storage.learningUri.get();
+            const learningUri = await getLearningUrl();
             if (originTab && learningUri) {
               const learningName = parseUrl(learningUri).name;
               if (learningName && originTab.url && originTab.url.includes(learningName)) {
@@ -217,25 +249,29 @@ async function redirect(details) {
           }
         }
 
-        if (!origin || isOriginValid) {
-          const learningUri = await storage.learningUri.get();
-          if (!learningUri) return; // skip redirection if no learning URL configured
-          
-          // Check global prompt lock (applies to all tabs)
-          const globalPromptLock = await storage.globalPromptLock.get();  // ← GLOBAL CHECK
-          const now = Date.now();
+        const learningUri = await getLearningUrl();
+        if (!learningUri) return;
 
-          if (
-            globalPromptLock &&                                           // Does global lock exists
-            now - globalPromptLock.timestamp < PROMPT_SUPPRESS_DURATION   // And still within time limit set (10 min)
-          ) {
-            l("Skipping prompt due to global cooldown (10 minutes)");
-            return; // We are in global cooldown period - Don't show prompt
-          }
-
-          // Experimental variant: show consent prompt
-          promptRedirect(details.tabId, learningUri, details.url);
+        // dispatchPrompt re-reads origin at call time so the correct UI is shown
+        // regardless of async races between queuing and firing.
+        if (immediate) {
+          dispatchPrompt(details.tabId, learningUri, details.url);
+        } else {
+          pendingIntents.set(details.tabId, () => dispatchPrompt(details.tabId, learningUri, details.url));
         }
+      }else if (toggled && shouldRedirect && goalMet) {
+        // Goal met + reward unclaimed: auto-start reward without any prompt
+        const [rewardMinutes, rewardSeconds] = await Promise.all([
+          storage.timeSettings.rewardMinutes.get(),
+          storage.timeSettings.rewardSeconds.get(),
+        ]);
+        let rewardDuration = (rewardMinutes * 60 * 1000) + (rewardSeconds * 1000);
+        if (rewardDuration <= 0) {
+          rewardDuration = 60 * 1000;
+        }
+        await storage.shouldRedirect.set(false);
+        await timer.startProcrastinationSession(checkActiveTab, rewardDuration);
+        return;
       }
     }
   }
@@ -270,7 +306,7 @@ async function onOriginRemoved(details) {
   const origin = await storage.origin.get();
   if (origin) {
     if (details === origin.tabId) {
-      const learningUri = await storage.learningUri.get();
+      const learningUri = await getLearningUrl();
       let migrated = false;
       if (learningUri) {
         const learningName = parseUrl(learningUri).name;
@@ -311,7 +347,7 @@ async function onOriginRemoved(details) {
 }
 
 async function addLearningSiteLoadedListener() {
-  const currentLearning = await storage.learningUri.get();
+  const currentLearning = await getLearningUrl();
   if (!currentLearning) return;
   const learningName = parseUrl(currentLearning).name;
   if (!learningName) return;
@@ -326,7 +362,7 @@ async function addLearningSiteLoadedListener() {
  */
 async function addControlledLearningSiteListener() {
 
-  const currentLearning = await storage.learningUri.get();
+  const currentLearning = await getLearningUrl();
   if (!currentLearning) return;
   const learningName = parseUrl(currentLearning).name;
   if (!learningName) return;
@@ -351,7 +387,7 @@ function removeLearningSiteLoadedListener() {
 }
 
 async function getActiveLearningTabs(excludedIds = new Set()) {
-  const learningUri = await storage.learningUri.get();
+  const learningUri = await getLearningUrl();
   if (!learningUri) return [];
   const learningName = parseUrl(learningUri).name;
   if (!learningName) return [];
@@ -421,28 +457,26 @@ async function messageLearningResource(details) {
 is a time wasting website. */
 async function checkActiveTab() {
   try {
-    const tabs = await browser.tabs.query({
-      active: true,
-      currentWindow: true,
-    });
+    const tabs = await browser.tabs.query({ active: true, currentWindow: true });
     if (tabs.length > 0) {
       const tab = tabs[0];
       const tabSiteName = parseUrl(tab.url).name;
       const procList = await storage.list.get();
       const procListNames = procList.map((site) => site.name);
       if (procListNames.includes(tabSiteName)) {
-        const learningUri = await storage.learningUri.get();
+        const learningUri = await getLearningUrl();
         if (!learningUri) return; // no learning site set; do nothing
 
         const procHosts = procList.map(item => item?.host || item?.name || "").filter(Boolean);
         const handled = await strategy.handleNavigation(
           { tabId: tab.id, url: tab.url },
-          { procrastinationHosts: procHosts, learningUrl }
+          { procrastinationHosts: procHosts, learningUrl: learningUri } // fixed name
         );
         if (handled) return;
 
-        // EXPERIMENTAL VARIANT: Show redirect prompt
+        // Show redirect prompt
         promptRedirect(tab.id, learningUri, tab.url);
+        console.log("Prompt called from checkActiveTab()") // FLAG for further research, as i do not think this is ever called
       }
     }
   } catch (error) {
@@ -453,9 +487,9 @@ async function checkActiveTab() {
 async function checkTabById({ tabId }) {
   try {
     const tab = await browser.tabs.get(tabId);
-    checkTab(tab);
+    await checkTab(tab);
   } catch (error) {
-    // console.log(error.message);
+    console.log(error.message);
   }
 }
 // TODO: Rewrite these two functions ^ & v to 1 single function that checks if tab has url (if not, get it)
@@ -470,17 +504,14 @@ async function checkTabById({ tabId }) {
  * @param {string} tab.url
  * @param {number} tab.id */
 async function checkTab(tab) {
-  const tabSiteName = parseUrl(tab.url).name;
-  const procList = await storage.list.get();
-  const procListNames = procList.map((site) => site.name);
-  if (procListNames.includes(tabSiteName)) {
-    const origin = await storage.origin.get();
-    if (origin) {
-      renderContentBlocker({ tabId: tab.id, frameId: 0, url: tab.url });
-    } else {
-      redirect({ frameId: 0, url: tab.url, tabId: tab.id });
-    }
-  }
+  if (!tab?.id || !tab?.url) return;
+
+  // Single routing path: reuse redirect logic for tab-activation events.
+  // `immediate=true` avoids pending-intent queue for already-loaded tabs.
+  await redirect(
+    { frameId: 0, url: tab.url, tabId: tab.id },
+    true
+  );
 }
 
 /** #GOTOORIGIN()#
@@ -524,20 +555,14 @@ async function gotoOrigin(event, sourceContext = {}) {
     } catch (_) { }
   }
 
-  console.log("[Aiki Debug] gotoOrigin called:", {
-    event,
-    normalizedEvent,
-    targetTabId,
-    originTabId: origin?.tabId,
-    originUrl: origin?.url,
-  });
+  // Read blockedOrigin before removeAllContentBlockers() clears storage.blockedOrigins
+  const targetBlockedOrigin = targetTabId !== undefined
+    ? await storage.blockedOrigins.get(targetTabId)
+    : null;
 
   const sessionTabId = targetTabId !== undefined ? targetTabId : origin?.tabId;
   if (sessionTabId !== undefined) {
-      console.log("[Aiki Debug] Finalizing learning session for tab:", sessionTabId);
       await SessionService.finalizeSession(sessionTabId, "learning", normalizedEvent);
-  } else {
-    console.log("[Aiki Debug] No session to finalize - sessionTabId is undefined");
   }
 
   removeOriginUpdatedListener();
@@ -547,7 +572,7 @@ async function gotoOrigin(event, sourceContext = {}) {
   if (origin && origin.tabId !== undefined) {
     try {
       const learningTab = await browser.tabs.get(origin.tabId);
-      const configuredLearning = await storage.learningUri.get();
+      const configuredLearning = await getLearningUrl();
       if (configuredLearning) {
         const configuredName = parseUrl(configuredLearning).name;
         const currentName = parseUrl(learningTab.url).name;
@@ -574,7 +599,7 @@ async function gotoOrigin(event, sourceContext = {}) {
       l(error);
     }
   } else if (targetTabId !== undefined) {
-    const blockedOrigin = await storage.blockedOrigins.get(targetTabId);
+    const blockedOrigin = targetBlockedOrigin;
     if (blockedOrigin) {
       await removeContentBlocker(targetTabId);
       try {
@@ -621,15 +646,9 @@ async function gotoOrigin(event, sourceContext = {}) {
   const hasRemainingLearningTabs = remainingLearningTabs.length > 0;
 
   // Start a time wasting session for the destination tab
-  console.log("[Aiki Debug] gotoOrigin procrastination session check:", { destinationUrl, targetTabId });
   if (destinationUrl && targetTabId !== undefined) {
-    console.log("[Aiki Debug] Starting procrastination session:", { targetTabId, destinationUrl });
     await SessionService.startSession(targetTabId, "procrastination", destinationUrl);
-  } else {
-    console.log("[Aiki Debug] NOT starting procrastination session - missing destinationUrl or targetTabId");
   }
-
-
 
   const redirectionToggled = await storage.redirection.get();
   if (redirectionToggled && !hasRemainingLearningTabs) {
@@ -651,14 +670,45 @@ async function gotoOrigin(event, sourceContext = {}) {
   }
 }
 
+/**
+ * Called by the background message handler when a content script fires contentScript:ready.
+ * Consumes any pending intent queued during onBeforeNavigate for that tab.
+ */
+function onContentScriptReady(tabId) {
+  const fn = pendingIntents.get(tabId);
+  if (fn) {
+    pendingIntents.delete(tabId);
+    fn();
+  }
+}
+
+// Checks origin at call time and routes to the correct UI.
+// Using this instead of deciding at queue time avoids async races where origin
+// changes between when the intent is queued and when it fires.
+async function dispatchPrompt(tabId, learningUri, procUrl) {
+  const origin = await storage.origin.get();
+  if (origin) {
+    renderContentBlocker({ tabId, frameId: 0, url: procUrl });
+  } else {
+    promptRedirect(tabId, learningUri, procUrl);
+  }
+}
+
 async function promptRedirect(tabId, url, originUrl) {
   await promptCoordinator.promptRedirect(tabId, url, originUrl, {
+    onConnectionFailed: () => {
+      // The tab navigated away before the content script could respond (e.g. an
+      // auth redirect mid-load). Re-queue via dispatchPrompt so origin is re-checked
+      // when the tab settles — avoids overwriting a newer renderContentBlocker intent.
+      pendingIntents.set(tabId, () => dispatchPrompt(tabId, url, originUrl));
+    },
     onContinue: async () => {
       // Set global prompt lock now that user has explicitly clicked Stay
       // This prevents the prompt from appearing again for 10 minutes (across all tabs)
       await storage.globalPromptLock.set({  
         timestamp: Date.now(),
       });
+      console.log("Lock engaged");
 
       // Start tracking procastination session
       navigationGuards.install();
@@ -688,7 +738,17 @@ async function promptRedirect(tabId, url, originUrl) {
 }
 
 async function renderContentBlocker(details) {
-  return promptCoordinator.renderContentBlocker(details);
+  if (await isGlobalPromptLocked()) return;
+
+  return promptCoordinator.renderContentBlocker(details, {
+    onConnectionFailed: () => {
+      pendingIntents.set(details.tabId, () => renderContentBlocker(details));
+    },
+    onContinue: async () => {
+      await removeContentBlocker(details.tabId);
+      await setPromptCooldown(details.tabId, details.url);
+    },
+  });
 }
 
 async function removeContentBlocker(tabId) {
@@ -757,4 +817,5 @@ export default {
   removeLearningSiteLoadedListener,
   checkActiveTab,
   finalizeAllActiveSessions,
+  onContentScriptReady,
 };

@@ -6,13 +6,16 @@
   // Functional and module imports
   import storage from "../../../util/storage";
   import { onMount, tick } from "svelte";
-  import { parseUrl } from "../../../util/utilities";
+  import { parseUrl, normalizeUrl } from "../../../util/utilities";
   import { alertStore } from '../../../services/alertService';
+  import browser from "webextension-polyfill";
+  import { MESSAGE_API_UPDATE_LEARNING_URI } from '../../../values/messageTypeValues';
 
   // Component imports
   import Container from "./Container.svelte";
   import ThemeSelector from "./ThemeSelector.svelte";
   import OperatingHoursSettings from "./OperatingHoursSettings.svelte";
+  import InviteCodeSettings from "./InviteCodeSettings.svelte";
   import TimeSettings from "./TimeSettings.svelte";
 
   export let user = "";
@@ -22,6 +25,11 @@
   let isEditing = true;
   let hasSaved = false;
   let urlInputRef;
+
+  // Check if the user is a guest.
+  $: isGuestUser =
+    user === "guest" ||
+    user?.isGuest === true;
 
   onMount(async () => {
     try {
@@ -33,23 +41,25 @@
     isEditing = !hasSaved;
   });
 
-  function normalize(url) {
-    if (!url) return "";
-    const trimmed = url.trim();
-    if (!trimmed) return "";
-    if (/^https?:\/\//i.test(trimmed)) return trimmed;
-    return `https://${trimmed}`;
-  }
-
   async function saveUri() {
     if (!isEditing) return;
 
-    const uri = normalize(learningUri);
+    const wwwHost = normalizeUrl(learningUri);
 
-    const hostToCompare = parseUrl(uri).host; // Get just the domain (e.g., "example.com")
+    if (!wwwHost) {
+      if (!learningUri.trim()){
+        await storage.learningUri.set("");
+        hasSaved = false;
+        isEditing = true;
+        alertStore.add({ type: 'success', message: 'Learning platform cleared.' });
+      } else {
+        alertStore.add({ type: 'warning', message: 'Invalid URL.' });
+      }
+      return;
+    }
 
     const timeWasteList = (await storage.list.get()) || [];
-    if (timeWasteList.some(item => item.host === hostToCompare)) {
+    if (timeWasteList.some(item => item.host === wwwHost)) {
       alertStore.add({
         type: 'warning',
         message: 'Your learning site cant be the same as a time wasting site',
@@ -57,20 +67,8 @@
       return;    
     }
 
-    if (!uri) {
-      learningUri = "";
-      await storage.learningUri.set("");
-      hasSaved = false;
-      isEditing = true;
-      alertStore.add({
-        type: 'success',
-        message: 'Learning platform cleared.',
-      })
-      return;
-    }
-
-    learningUri = uri;
-    await storage.learningUri.set(uri);
+    await storage.learningUri.set(wwwHost);
+    learningUri = wwwHost; // Used to display it correctly in the settings page
 
     hasSaved = true;
     isEditing = false;
@@ -79,6 +77,12 @@
         type: 'success',
         message: 'Learning platform saved!',
       })
+    
+    // API Call at the end, to ensure it doesn't block for local storage (focused on guest mode especially)
+    const backendResult = await browser.runtime.sendMessage({
+      type: MESSAGE_API_UPDATE_LEARNING_URI,
+      learningUri: wwwHost,
+    });
   }
 
   async function enableEditing() {
@@ -105,10 +109,11 @@
   <h5>Your Redirection Platform:</h5>
   <div class="container">
     <div class="full" id="learning-url-container">
+    <form on:submit|preventDefault={saveUri}>
       <input
         class="form-control form-control-lg url-input"
         type="text"
-        placeholder="https://example.com"
+        placeholder="www.example.com"
         bind:value={learningUri}
         bind:this={urlInputRef}
         readonly={!isEditing}
@@ -118,9 +123,8 @@
       <div class="actions">
         {#if isEditing}
           <button
-            type="button"
+            type="submit"
             class="btn btn-success"
-            on:click={saveUri}
             id="learning-url-save"
           >
             Save
@@ -145,13 +149,17 @@
           </button>
         {/if}
       </div>
+    </form>
     </div>
   </div>
   <hr />
   <TimeSettings {user} />
   <hr />
   <OperatingHoursSettings {user} />
-
+  {#if user && !isGuestUser}
+    <hr />
+    <InviteCodeSettings />
+  {/if}
   <hr />
   <h5>Other Settings:</h5>
   <div>

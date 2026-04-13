@@ -1,6 +1,7 @@
-import storage from "../util/storage";
-import browser from "webextension-polyfill";
-import { parseTime, parseUrl } from "../util/utilities";
+import storage from '../util/storage';
+import browser from 'webextension-polyfill';
+import { parseTime, parseUrl } from '../util/utilities';
+import { getLearningUrl } from './siteDetector';
 
 class TimerManager {
   constructor() {
@@ -68,7 +69,7 @@ class TimerManager {
     await storage.dailyProgress.set(this.dailyProgress);
     try {
       await storage.shouldRedirect.set(false);
-    } catch (_) { }
+    } catch (_) {}
     clearInterval(this.learningTimeIntervalRef);
     this.learningTimeIntervalRef = undefined;
     this.bonusTime = 0;
@@ -76,19 +77,22 @@ class TimerManager {
 
   async startLearningSession() {
     if (this.bonusTimeIntervalRef) this.stopBonusTime();
-    if (this.learningTimeIntervalRef) clearInterval(this.learningTimeIntervalRef);
+    if (this.learningTimeIntervalRef)
+      clearInterval(this.learningTimeIntervalRef);
     this.clearRewardTimer();
     this.rewardTimeRemaining = 0;
     this.rewardUnlockAt = 0;
-    storage.rewardUnlock.set(0).catch(() => { });
-    const goal = parseTime.toSystem(await storage.timeSettings.learningTime.get());
+    storage.rewardUnlock.set(0).catch(() => {});
+    const goal = parseTime.toSystem(
+      await storage.timeSettings.learningTime.get(),
+    );
     const progress = await storage.dailyProgress.get();
     this.dailyGoal = goal;
     this.dailyProgress = progress; // Allow progress to exceed goal
     this.learningTimeRemaining = Math.max(goal - this.dailyProgress, 0);
     if (this.learningTimeRemaining > 0) {
       this.learningTimeIntervalRef = setInterval(() => {
-        this.decrementLearningTime().catch(() => { });
+        this.decrementLearningTime().catch(() => {});
       }, 1000);
     } else {
       await this.handleGoalCompletion();
@@ -96,7 +100,9 @@ class TimerManager {
   }
 
   async syncDailyState() {
-    const goal = parseTime.toSystem(await storage.timeSettings.learningTime.get());
+    const goal = parseTime.toSystem(
+      await storage.timeSettings.learningTime.get(),
+    );
     const progress = await storage.dailyProgress.get();
     this.dailyGoal = goal;
     this.dailyProgress = progress; // Allow progress to exceed goal
@@ -108,7 +114,7 @@ class TimerManager {
       this.rewardTimeRemaining = Math.max(0, this.rewardUnlockAt - Date.now());
       if (this.rewardTimeRemaining === 0) {
         this.rewardUnlockAt = 0;
-        storage.rewardUnlock.set(0).catch(() => { });
+        storage.rewardUnlock.set(0).catch(() => {});
         storage.shouldRedirect.set(true);
       }
     } else {
@@ -125,7 +131,7 @@ class TimerManager {
     this.learningTimeIntervalRef = undefined;
     if (this.dailyGoal > 0) {
       const consumed = Math.max(0, this.dailyGoal - this.learningTimeRemaining);
-      storage.dailyProgress.set(consumed).catch(() => { });
+      storage.dailyProgress.set(consumed).catch(() => {});
     }
     this.learningTimeRemaining = 0;
   }
@@ -143,7 +149,7 @@ class TimerManager {
       this.clearRewardTimer();
       await storage.rewardUnlock.set(0);
       await storage.shouldRedirect.set(true);
-      if (typeof callback === "function") callback();
+      if (typeof callback === 'function') callback();
       return;
     }
 
@@ -153,7 +159,7 @@ class TimerManager {
       this.rewardUnlockAt = 0;
       await storage.rewardUnlock.set(0);
       await storage.shouldRedirect.set(true);
-      if (typeof callback === "function") callback();
+      if (typeof callback === 'function') callback();
     }
   }
 
@@ -176,7 +182,7 @@ class TimerManager {
     await storage.shouldRedirect.set(false);
 
     this.rewardTimeIntervalRef = setInterval(() => {
-      this.decrementRewardTime(callback).catch(() => { });
+      this.decrementRewardTime(callback).catch(() => {});
     }, 1000);
   }
 
@@ -186,7 +192,7 @@ class TimerManager {
     this.rewardUnlockAt = 0;
     await storage.rewardUnlock.set(0);
     await storage.shouldRedirect.set(true);
-    if (typeof callback === "function") callback();
+    if (typeof callback === 'function') callback();
   }
 
   async incrementBonusTime() {
@@ -204,7 +210,7 @@ class TimerManager {
     clearInterval(this.learningTimeIntervalRef);
     this.learningTimeIntervalRef = undefined;
     this.bonusTimeIntervalRef = setInterval(() => {
-      this.incrementBonusTime().catch(() => { });
+      this.incrementBonusTime().catch(() => {});
     }, 1000);
   }
 
@@ -220,9 +226,10 @@ class TimerManager {
 
   async checkActive() {
     const window = await browser.windows.getCurrent();
-    const views = (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.getViews)
-      ? chrome.runtime.getViews({ type: "popup" })
-      : [];
+    const views =
+      typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.getViews
+        ? chrome.runtime.getViews({ type: 'popup' })
+        : [];
     if (window.focused || views.length > 0) {
       const currentTabs = await browser.tabs.query({
         active: true,
@@ -233,22 +240,34 @@ class TimerManager {
         const origin = await storage.origin.get();
 
         try {
-          const learningUri = await storage.learningUri.get();
-          const learningName = learningUri ? parseUrl(learningUri).name : "";
+          const learningUri = await getLearningUrl();
+          const learningName = learningUri ? parseUrl(learningUri).name : '';
 
           // Only count as active if the current tab is both the origin tab AND still on the learning host
-          if (origin && origin.tabId !== undefined && current.id === origin.tabId) {
-            if (learningName && current.url && current.url.includes(learningName)) {
+          if (
+            origin &&
+            origin.tabId !== undefined &&
+            current.id === origin.tabId
+          ) {
+            if (
+              learningName &&
+              current.url &&
+              current.url.includes(learningName)
+            ) {
               return true;
             }
             return false;
           }
 
           // Otherwise allow active if current tab is on the learning site
-          if (learningName && current.url && current.url.includes(learningName)) {
+          if (
+            learningName &&
+            current.url &&
+            current.url.includes(learningName)
+          ) {
             return true;
           }
-        } catch (_) { }
+        } catch (_) {}
       }
     }
     return false;
@@ -259,7 +278,7 @@ class TimerManager {
     this.rewardTimeIntervalRef = undefined;
     this.stopBonusTime();
     storage.shouldRedirect.set(true);
-    storage.rewardUnlock.set(0).catch(() => { });
+    storage.rewardUnlock.set(0).catch(() => {});
     this.rewardTimeRemaining = 0;
     this.rewardUnlockAt = 0;
     this.bonusTime = 0;
@@ -267,7 +286,6 @@ class TimerManager {
     this.dailyGoal = 0;
     this.dailyProgress = 0;
   }
-
 
   // Get session durations and reward durations from storage
   async getSessionAndRewardDurations() {
@@ -285,22 +303,17 @@ class TimerManager {
   async decrementSession() {
     if (await this.checkActive()) {
       this.sessionElapsed += 1000;
-      
+
       if (this.sessionRemaining > 0) {
         this.sessionRemaining -= 1000;
         this.dailyProgress += 1000;
         await storage.dailyProgress.set(this.dailyProgress);
-        
+
         if (this.sessionRemaining <= 0) {
           this.sessionRemaining = 0;
-          
+
           if (!this.sessionCompleted) {
             this.sessionCompleted = true;
-            
-            // Add 1-second buffer to compensate for checkActive() timing drift
-            this.dailyProgress += 1000;
-            await storage.dailyProgress.set(this.dailyProgress);
-            console.log("[Session] Added 1s timing buffer to daily progress");
             
             if (typeof this.sessionOnComplete === "function") {
               this.sessionOnComplete();
@@ -314,26 +327,34 @@ class TimerManager {
 
   // Start a learning session timer
   async startSessionTimer(durationMs, onComplete) {
+    // Pause the daily timer while a session timer runs.
+    if (this.learningTimeIntervalRef) {
+      clearInterval(this.learningTimeIntervalRef);
+      this.learningTimeIntervalRef = undefined;
+    }
+
     this.stopSessionTimer();
     this.stopSessionRewardTimer();
-    
+
     // Sync daily goal progress from storage before starting
-    const goal = parseTime.toSystem(await storage.timeSettings.learningTime.get());
+    const goal = parseTime.toSystem(
+      await storage.timeSettings.learningTime.get(),
+    );
     const progress = await storage.dailyProgress.get();
     this.dailyGoal = goal;
     this.dailyProgress = progress;
-    
+
     this.sessionGoal = durationMs;
     this.sessionRemaining = durationMs;
     this.sessionElapsed = 0;
     this.sessionCompleted = false;
     this.sessionOnComplete = onComplete;
-    
+
     if (this.sessionRemaining > 0) {
       this.sessionIntervalRef = setInterval(() => {
         this.decrementSession().catch(() => {});
       }, 1000);
-    } else if (typeof onComplete === "function") {
+    } else if (typeof onComplete === 'function') {
       onComplete();
     }
   }
@@ -359,14 +380,14 @@ class TimerManager {
   // Decrement session reward timer
   async decrementSessionReward() {
     this.sessionRewardElapsed += 1000;
-    
+
     if (this.sessionRewardRemaining > 0) {
       this.sessionRewardRemaining -= 1000;
       if (this.sessionRewardRemaining <= 0) {
         this.sessionRewardRemaining = 0;
         clearInterval(this.sessionRewardIntervalRef);
         this.sessionRewardIntervalRef = undefined;
-        if (typeof this.sessionRewardOnComplete === "function") {
+        if (typeof this.sessionRewardOnComplete === 'function') {
           this.sessionRewardOnComplete();
         }
       }
@@ -375,23 +396,28 @@ class TimerManager {
 
   // Start session reward timer
   startSessionRewardTimer(durationMs, onComplete) {
+    // Pause the daily timer while a session timer runs.
+    if (this.learningTimeIntervalRef) {
+      clearInterval(this.learningTimeIntervalRef);
+      this.learningTimeIntervalRef = undefined;
+    }
+
     this.stopSessionTimer();
     this.stopSessionRewardTimer();
-    
+
     this.sessionRewardGoal = durationMs;
     this.sessionRewardRemaining = durationMs;
     this.sessionRewardElapsed = 0;
     this.sessionRewardOnComplete = onComplete;
-    
+
     if (this.sessionRewardRemaining > 0) {
       this.sessionRewardIntervalRef = setInterval(() => {
         this.decrementSessionReward().catch(() => {});
       }, 1000);
-    } else if (typeof onComplete === "function") {
+    } else if (typeof onComplete === 'function') {
       onComplete();
     }
   }
-
 
   // Stop session reward timer
   stopSessionRewardTimer() {
@@ -409,7 +435,6 @@ class TimerManager {
   isSessionRewardActive() {
     return Boolean(this.sessionRewardIntervalRef);
   }
-
 
   getTime() {
     return {

@@ -5,6 +5,10 @@
 <script>
   import storage from "../../../util/storage";
   import { alertStore } from "../../../services/alertService";
+  import { 
+    MESSAGE_API_UPDATE_OPERATING_HOURS_START,
+    MESSAGE_API_UPDATE_OPERATING_HOURS_END
+  } from "../../../values/messageTypeValues"
 
   export let settings;
   export let update;
@@ -31,7 +35,7 @@
 
     // Update "to" time on the backend
     try {
-      const result = await browser.runtime.sendMessage({ type: "api:updateOperatingHoursEnd", to: setting });
+      const result = await browser.runtime.sendMessage({ type: MESSAGE_API_UPDATE_OPERATING_HOURS_END, to: setting });
       const ok = result?.ok;
       alertStore.add({
         type: ok ? 'success' : 'error',
@@ -69,7 +73,7 @@
 
     // Update "from" time on the backend
     try {
-      const result = await browser.runtime.sendMessage({ type: "api:updateOperatingHoursStart", from: setting });
+      const result = await browser.runtime.sendMessage({ type: MESSAGE_API_UPDATE_OPERATING_HOURS_START, from: setting });
       const ok = result?.ok;
       alertStore.add({
         type: ok ? 'success' : 'error',

@@ -3,10 +3,13 @@ import timer from "../services/TimerManager";
 import browser from "webextension-polyfill";
 import { parseTime } from "../util/utilities";
 import { handleApiMessage } from "./apiHandler";
+import redirection from "../redirection";
+import { getLearningUrl } from "../services/siteDetector";
+import { MESSAGE_REDIRECTION_REFRESH_FILTERS } from "../values/messageTypeValues";
 
 /*
 This module handles incoming messages from content scripts and other parts of the extension.
-It processes different message types, such as timer requests, learning session management, and blocker release commands.
+It processes different message types, such as timer requests, learning session management.
 Auth messages are delegated to apiHandler.
 */
 
@@ -19,6 +22,21 @@ if (!message || typeof message !== "object") {
   // Delegate all api:* messages to apiHandler
   if (message.type?.startsWith("api:")) {
     return handleApiMessage(message);
+  }
+
+  
+  if (message.type === "contentScript:ready" && sender?.tab?.id !== undefined) {
+    redirection.onContentScriptReady(sender.tab.id);
+    return;
+  }
+
+  if (message.type === MESSAGE_REDIRECTION_REFRESH_FILTERS) {
+    try {
+      await redirection.navigationListener.restart();
+      return { ok: true };
+    } catch (_) {
+      return { ok: false };
+    }
   }
 
   if (message.type === "timer:get") {
@@ -88,8 +106,14 @@ if (!message || typeof message !== "object") {
             console.log("[Session] Session already running with same duration");
           }
         } else {
+          // Caps session if remaining of daily goal is lower than set session amount
+          const dailyGoal = parseTime.toSystem(await storage.timeSettings.learningTime.get());
+          const dailyProgress = await storage.dailyProgress.get();
+          const remaining = dailyGoal > 0 ? Math.max(0, dailyGoal - dailyProgress) : sessionDuration;
+          const timerDuration = dailyGoal > 0 ? Math.min(sessionDuration, remaining) : sessionDuration;
+
           // Start new session timer
-          await timer.startSessionTimer(sessionDuration, () => {
+          await timer.startSessionTimer(timerDuration, () => {
             console.log("[Session] Session complete!");
             // Timer will stop automatically; user must claim reward via button
           });
@@ -99,11 +123,6 @@ if (!message || typeof message !== "object") {
       }
       return true;
     })();
-  }
-
-  if (message.type === "blocker:release" && sender && sender.tab && sender.tab.id !== undefined) {
-    storage.blockedTabs.remove(sender.tab.id);
-    storage.blockedOrigins.remove(sender.tab.id);
   }
 
   if (message.type === "session:claimReward") {
@@ -155,7 +174,7 @@ if (!message || typeof message !== "object") {
             const tabs = await browser.tabs.query({ active: true, currentWindow: true });
             if (tabs.length > 0 && tabs[0].id && tabs[0].url) {
               const currentUrl = tabs[0].url;
-              const learningUrl = await storage.learningUri.get();
+              const learningUrl = await getLearningUrl();
               
               // Checks if URL matches learning site
               const isOnLearningSite = (url, learningUri) => {
@@ -197,7 +216,7 @@ if (!message || typeof message !== "object") {
                 
                 // Show redirect prompt
                 const response = await browser.tabs.sendMessage(tabs[0].id, {
-                  action: "display: redirectPrompt",
+                  action: "display:redirectPrompt",
                   url: learningUrl,
                   originUrl: timeWastingUrl
                 });

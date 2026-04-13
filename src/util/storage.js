@@ -64,7 +64,7 @@ const activeSessionsStore = createKeyedStore("activeSessions");
  * @function
  * @description Clears all stored data in browser storage. */
 function clearStorage() {
-  storage.clear();
+  return storage.clear();
 }
 
 /**
@@ -73,10 +73,9 @@ function clearStorage() {
  * that determines whether or not a user should be redirected.
  * redirectionToggled is a settings parameter changed by the user. */
 
-function toggleRedirection() {
-  storage.get("toggled").then((data) => {
-    storage.set({ toggled: !data.toggled });
-  });
+async function toggleRedirection() {
+  const data = await storage.get("toggled");
+  await storage.set({ toggled: !data.toggled });
 }
 
 /**
@@ -137,6 +136,15 @@ function setJwt(token) {
 async function getJwt() {
   const result = await storage.get("jwt");
   return result.jwt || "";
+}
+
+function setInviteCode(inviteCode) {
+  storage.set({ inviteCode: inviteCode ?? "" });
+}
+
+async function getInviteCode() {
+  const result = await storage.get("inviteCode");
+  return result.inviteCode || "";
 }
 
 /**
@@ -233,6 +241,9 @@ async function getDailyProgress() {
     "dailyProgressDate",
   ]);
   const today = getTodayKey();
+  if (dailyProgress === undefined && dailyProgressDate === undefined) {
+    return 0;
+  }
   if (dailyProgressDate !== today) {
     await storage.set({ dailyProgress: 0, dailyProgressDate: today });
     await setShouldRedirect(true);
@@ -632,6 +643,7 @@ export default {
   list: { set: setList, get: getList }, // this is list of time-wasting sites defined by the user
   uid: { set: setUid, get: getUid },
   jwt: { set: setJwt, get: getJwt },
+  inviteCode: { get: getInviteCode, set: setInviteCode },
   redirection: { toggle: toggleRedirection, get: getRedirectionToggled },
   stats: {
     storeSession: storeSession,

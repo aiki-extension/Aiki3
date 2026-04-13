@@ -2,7 +2,6 @@
   "manifest_version": 3,
   "name": "Aiki³",
   "description": "Aiki³ browser extension",
-  "version": "3.0.1",
   "browser_specific_settings": {
     "gecko": {
       "id": "aiki3@extension.local",
@@ -37,5 +36,6 @@
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self';"
   },
-  "options_page": "index.html?page=settings"
+  "options_page": "index.html?page=settings",
+  "version": "3.2.0"
 }

@@ -4,9 +4,13 @@
 <script>
   import { onMount } from "svelte";
   import storage from "../../../util/storage";
-  import { SESSION_DURATION_OPTIONS } from '../../../values/defaultSettingValues';
   import browser from "webextension-polyfill";
   import { alertStore } from "../../../services/alertService";
+  import { 
+    MESSAGE_API_UPDATE_LEARNING_TIME,
+    MESSAGE_API_UPDATE_REWARD_TIME,
+    MESSAGE_API_UPDATE_SESSION_DURATION
+  } from "../../../values/messageTypeValues";
 
   export let settings;
   export let update;
@@ -39,7 +43,7 @@
     storage.timeSettings.learningTime.set(learningTime);
 
     try {
-      const result = await browser.runtime.sendMessage({ type: "api:updateLearningTime", learningTimeMinutes: learnMin});
+      const result = await browser.runtime.sendMessage({ type: MESSAGE_API_UPDATE_LEARNING_TIME, learningTimeMinutes: learnMin});
       alertStore.add({
         type: 'success',
         message: "Daily learning goal updated.",
@@ -58,7 +62,7 @@
 
     // Calls API to send the updated session duration to the backend
     try {
-      const result = await browser.runtime.sendMessage({ type: "api:updateSessionDuration", sessionDurationMinutes: sessionMinutes});
+      const result = await browser.runtime.sendMessage({ type: MESSAGE_API_UPDATE_SESSION_DURATION, sessionDurationMinutes: sessionMinutes});
       alertStore.add({
         type: result?.ok ? 'success' : 'error',
         message: result?.ok ? "Session duration updated." : "Failed to update session duration.",
@@ -75,7 +79,7 @@
     await storage.timeSettings.rewardSeconds.set(0); 
 
     try {
-      const result = await browser.runtime.sendMessage({ type: "api:updateRewardTime", rewardTimeMinutes: rewardMinutes });
+      const result = await browser.runtime.sendMessage({ type: MESSAGE_API_UPDATE_REWARD_TIME, rewardTimeMinutes: rewardMinutes });
       alertStore.add({
         type: result?.ok ? 'success' : 'error',
         message: result?.ok ? "Reward time updated." : "Failed to update reward time.",
@@ -129,15 +133,25 @@
       <input class="form-control form-control-sm inline placeholder" disabled />
       <p class="placeholder">:</p>
       <!-- svelte-ignore a11y-no-onchange -->
-      <select
-        bind:value={sessionMinutes}
-        on:change={setSessionTime}
-        class="custom-select custom-select-sm inline"
-      >
-        {#each SESSION_DURATION_OPTIONS as value}
-          <option {value}>{value}</option>
-        {/each}
-      </select>
+      <input
+      type="number"
+      id="session-mins"
+      min="1"
+      title="Enter a session duration in minutes"
+      bind:value={sessionMinutes}
+      on:change={() => {
+        const parsedValue = Math.max(1, parseInt(sessionMinutes) || 1);
+        if (parsedValue > learnMin) {
+          alertStore.add({
+            type: 'warning',
+            message: `Session duration can't exceed daily goal (${learnMin} min). Adjusted to ${learnMin} min.`,
+          });
+        }
+        sessionMinutes = Math.max(1, Math.min(learnMin, parseInt(sessionMinutes) || 1));
+        setSessionTime();
+      }}
+      class="form-control form-control-sm inline"
+      />
       <p><small>Min&nbsp;&nbsp;&nbsp;&nbsp;</small></p>
     </div>
   </div>

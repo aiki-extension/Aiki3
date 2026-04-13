@@ -1,8 +1,13 @@
-import browser from "webextension-polyfill";
-import storage from "../util/storage";
+import browser from 'webextension-polyfill';
+import storage from '../util/storage';
 
 class PromptCoordinator {
-  constructor({ applyPreemptiveHide, removePreemptiveHide, showImmediatePrompt, hideImmediatePrompt }) {
+  constructor({
+    applyPreemptiveHide,
+    removePreemptiveHide,
+    showImmediatePrompt,
+    hideImmediatePrompt,
+  }) {
     this.applyPreemptiveHide = applyPreemptiveHide;
     this.removePreemptiveHide = removePreemptiveHide;
     this.showImmediatePrompt = showImmediatePrompt;
@@ -10,92 +15,77 @@ class PromptCoordinator {
     this.boundRenderContentBlocker = this.renderContentBlocker.bind(this);
   }
 
-  async promptRedirect(tabId, learningUrl, originUrl, callbacks = {}, attempt = 0) {
-    const { onAccept, onContinue } = callbacks;
-
-    // Validate tab still exists and is on the intended time wasting site before retrying
-    if (attempt > 0) {
-      try {
-        const tab = await browser.tabs.get(tabId);
-        if (!tab || !tab.url) {
-          return; // Tab closed or no URL
-        }
-        const currentHost = new URL(tab.url).hostname.replace(/^www\./, "");
-        const intendedHost = new URL(originUrl).hostname.replace(/^www\./, "");
-        if (currentHost !== intendedHost) {
-          // Tab navigated away from the time wasting site, abort retries
-          await this.hideImmediatePrompt(tabId).catch(() => { });
-          await this.removePreemptiveHide(tabId).catch(() => { });
-          return;
-        }
-      } catch (_) {
-        return; // Tab closed or invalid
-      }
-    }
+  async promptRedirect(tabId, learningUrl, originUrl, callbacks = {}) {
+    const { onAccept, onContinue, onConnectionFailed } = callbacks;
 
     try {
       await this.applyPreemptiveHide(tabId);
       await this.showImmediatePrompt(tabId);
-      const result = await browser.tabs.sendMessage(tabId, {
-        action: "display: redirectPrompt",
-        url: learningUrl,
-        originUrl: originUrl,
-      });
-
-      if (!result) {
-        throw new Error("No response from content script");
+      let result;
+      try {
+        result = await browser.tabs.sendMessage(tabId, {
+          action: 'display:redirectPrompt',
+          url: learningUrl,
+          originUrl: originUrl,
+        });
+      } catch (sendError) {
+        if (typeof onConnectionFailed === 'function') onConnectionFailed();
+        throw sendError;
       }
 
-      if (result && result.action === "continue") {
-        if (typeof onContinue === "function") {
-          await onContinue();
-        }
+      if (!result) throw new Error('No response from content script');
+
+      if (result.action === 'continue') {
+        if (typeof onContinue === 'function') await onContinue();
         await this.hideImmediatePrompt(tabId);
         await this.removePreemptiveHide(tabId);
-      } else if (result && result.action === "redirect") {
-        if (typeof onAccept === "function") {
-          await onAccept();
-        }
+      } else if (result.action === 'redirect') {
+        if (typeof onAccept === 'function') await onAccept();
       }
-    } catch (error) {
-      if (attempt < 20) {
-        setTimeout(() => {
-          this.promptRedirect(tabId, learningUrl, originUrl, callbacks, attempt + 1);
-        }, 100);
-      } else {
-        await this.hideImmediatePrompt(tabId);
-        await this.removePreemptiveHide(tabId);
-      }
+    } catch (_) {
+      await this.hideImmediatePrompt(tabId);
+      await this.removePreemptiveHide(tabId);
     }
   }
 
-  async renderContentBlocker(details) {
+  async renderContentBlocker(details, callbacks = {}) {
+    const { onContinue, onConnectionFailed } = callbacks;
     if (details.frameId === 0) {
       // Check if reward timer is active - if so, don't block
       try {
-        const timer = await import("./TimerManager");
-        if (timer.default.isSessionRewardActive()) {
-          console.log("[PromptCoordinator] Skipping blocker - reward mode active");
-          return;
-        }
-      } catch (_) { }
+        const timer = await import('./TimerManager');
+        if (timer.default.isSessionRewardActive()) return;
+      } catch (_) {}
 
       storage.blockedTabs.add(details.tabId);
-      if (details.url) {
-        storage.blockedOrigins.add(details.tabId, details.url);
-      }
+      if (details.url) storage.blockedOrigins.add(details.tabId, details.url);
       storage.promptLocks.remove(details.tabId);
+
       try {
         await this.applyPreemptiveHide(details.tabId);
         await this.showImmediatePrompt(details.tabId);
-        await browser.tabs.sendMessage(details.tabId, {
-          action: "inject blocker",
-        });
-        setTimeout(() => {
-          this.hideImmediatePrompt(details.tabId).catch(() => { });
-          this.removePreemptiveHide(details.tabId).catch(() => { });
-        }, 150);
-      } catch (_) { }
+
+        let result;
+        try {
+          result = await browser.tabs.sendMessage(details.tabId, {
+            action: 'display:contentBlocker', // request/response prompt
+            originUrl: details.url,
+          });
+        } catch (sendError) {
+          if (typeof onConnectionFailed === 'function') onConnectionFailed();
+          throw sendError;
+        }
+
+        if (result?.action === 'continue' && typeof onContinue === 'function') {
+          await onContinue();
+        }
+
+        await this.hideImmediatePrompt(details.tabId);
+        await this.removePreemptiveHide(details.tabId);
+      } catch (_) {
+        await this.hideImmediatePrompt(details.tabId);
+        await this.removePreemptiveHide(details.tabId);
+      }
     }
   }
 
@@ -106,13 +96,17 @@ class PromptCoordinator {
       await storage.blockedOrigins.remove(tabId);
       await storage.blockedTabs.remove(tabId);
       await storage.promptLocks.remove(tabId);
-      return browser.tabs.sendMessage(tabId, { action: "remove blocker" }).catch(() => { });
-    } catch (_) { }
+      return browser.tabs
+        .sendMessage(tabId, { action: 'remove blocker' })
+        .catch(() => {});
+    } catch (_) {}
   }
 
   async removeAllContentBlockers() {
     const blockedTabs = await storage.blockedTabs.get();
-    await Promise.allSettled(blockedTabs.map((tabId) => this.removeContentBlocker(tabId)));
+    await Promise.allSettled(
+      blockedTabs.map((tabId) => this.removeContentBlocker(tabId)),
+    );
     storage.blockedTabs.clear();
     storage.blockedOrigins.clear();
     storage.promptLocks.clear();
@@ -121,11 +115,16 @@ class PromptCoordinator {
   async addProcsiteLoadedListener(createFilter) {
     const filter = await createFilter();
     if (!filter) return;
-    browser.webNavigation.onCompleted.addListener(this.boundRenderContentBlocker, filter);
+    browser.webNavigation.onCompleted.addListener(
+      this.boundRenderContentBlocker,
+      filter,
+    );
   }
 
   removeProcsiteLoadedListener() {
-    browser.webNavigation.onCompleted.removeListener(this.boundRenderContentBlocker);
+    browser.webNavigation.onCompleted.removeListener(
+      this.boundRenderContentBlocker,
+    );
   }
 }
 

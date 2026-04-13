@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - bsc_development_main
   workflow_dispatch:
 
 permissions:
@@ -87,6 +86,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Changelog generation from full git history
 
       - name: Download signed extension artifact
         uses: actions/download-artifact@v4
@@ -107,15 +108,16 @@ jobs:
             --exclude "node_modules/*" \
             --exclude "release-assets/*"
 
-      - name: Create draft release and upload asset
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release create "draft-${{ github.run_number }}" \
-            release-assets/*.xpi \
-            release-assets/aiki3-chrome.zip \
-            release-assets/source-code.zip \
-            --target "${{ github.sha }}" \
-            --title "Signed extension draft ${{ github.run_number }}" \
-            --notes "Automated draft release from ${{ github.ref_name }}" \
-            --draft
+      - name: Create draft release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: draft-${{ github.run_number }}
+          name: Signed extension draft ${{ github.run_number }}
+          generate_release_notes: true
+          draft: true
+          target_commitish: ${{ github.sha }}
+          files: |
+            release-assets/*.xpi
+            release-assets/aiki3-chrome.zip
+            release-assets/source-code.zip
+          token: ${{ secrets.GITHUB_TOKEN }}

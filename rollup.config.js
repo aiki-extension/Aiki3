@@ -1,12 +1,15 @@
-import svelte from "rollup-plugin-svelte";
-import commonjs from "@rollup/plugin-commonjs";
-import resolve from "@rollup/plugin-node-resolve";
-import { terser } from "rollup-plugin-terser";
-import css from "rollup-plugin-css-only";
+import svelte from 'rollup-plugin-svelte';
+import commonjs from '@rollup/plugin-commonjs';
+import resolve from '@rollup/plugin-node-resolve';
+import { terser } from 'rollup-plugin-terser';
+import css from 'rollup-plugin-css-only';
+import replace from '@rollup/plugin-replace';
+import dotenv from 'dotenv';
 
 const production = !process.env.ROLLUP_WATCH;
 // Live reload is not compatible with extension pages (CSP + file scheme)
 const enableLiveReload = false;
+const env = dotenv.config().parsed || {};
 
 function serve() {
   let server;
@@ -18,29 +21,29 @@ function serve() {
   return {
     writeBundle() {
       if (server) return;
-      server = require("child_process").spawn(
-        "npm",
-        ["run", "start", "--", "--dev"],
+      server = require('child_process').spawn(
+        'npm',
+        ['run', 'start', '--', '--dev'],
         {
-          stdio: ["ignore", "inherit", "inherit"],
+          stdio: ['ignore', 'inherit', 'inherit'],
           shell: true,
-        }
+        },
       );
 
-      process.on("SIGTERM", toExit);
-      process.on("exit", toExit);
+      process.on('SIGTERM', toExit);
+      process.on('exit', toExit);
     },
   };
 }
 
 export default [
   {
-    input: "src/main.js",
+    input: 'src/main.js',
     output: {
       sourcemap: true,
-      format: "iife",
-      name: "app",
-      file: "public/build/bundle.js",
+      format: 'iife',
+      name: 'app',
+      file: 'public/build/bundle.js',
     },
     plugins: [
       svelte({
@@ -51,7 +54,7 @@ export default [
       }),
       // we'll extract any component CSS out into
       // a separate file - better for performance
-      css({ output: "bundle.css" }),
+      css({ output: 'bundle.css' }),
 
       // If you have external dependencies installed from
       // npm, you'll most likely need these plugins. In
@@ -60,7 +63,7 @@ export default [
       // https://github.com/rollup/plugins/tree/master/packages/commonjs
       resolve({
         browser: true,
-        dedupe: ["svelte"],
+        dedupe: ['svelte'],
       }),
       commonjs(),
 
@@ -69,7 +72,7 @@ export default [
       // For browser apps we could enable serve/livereload, but extension pages
       // disallow it; keep disabled to avoid broken popup due to missing livereload.js
       !production && enableLiveReload && serve(),
-      !production && enableLiveReload && livereload("public"),
+      !production && enableLiveReload && livereload('public'),
 
       // If we're building for production (npm run build
       // instead of npm run dev), minify
@@ -80,23 +83,34 @@ export default [
     },
   },
   {
-    input: "src/background.js",
+    input: 'src/background.js',
     output: {
       sourcemap: true,
-      format: "iife",
-      file: "public/build/background.js",
+      format: 'iife',
+      file: 'public/build/background.js',
     },
-    plugins: [resolve(), commonjs()],
+    plugins: [
+      resolve(),
+      commonjs(),
+      replace({
+        preventAssignment: true,
+        values: {
+          __API_BASE_URL__: JSON.stringify(
+            env.PUBLIC_API_BASE_URL || 'http://localhost:3000/api/',
+          ), //Fallback value if .env is undefined
+        },
+      }),
+    ],
     watch: {
       clearScreen: false,
     },
   },
   {
-    input: "src/injection.js",
+    input: 'src/injection.js',
     output: {
       sourcemap: true,
-      format: "iife",
-      file: "public/build/injection.js",
+      format: 'iife',
+      file: 'public/build/injection.js',
     },
     plugins: [resolve(), commonjs()],
     watch: {
