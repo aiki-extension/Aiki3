@@ -57,7 +57,6 @@
   }
   setup();
   let addItemValue = "";
-  let selectedSite = "";
   const commonSites = [ // common sites that are used as examples and hardcode so wont have to find
     "www.facebook.com",
     "www.youtube.com",
@@ -170,7 +169,7 @@
   }
 
   function pingSite(site) {
-    return new Promise(function (resolve, reject) {
+    return new Promise(function (resolve) {
       let link = document.createElement("img");
       link.src = `https://${site}/favicon.ico`;
       link.style = "display: none;";

@@ -100,7 +100,7 @@ const makeDraggable = (element) => {
     return { x, y, corner };
   };
 
-  const applySnappedPosition = (x, y) => {
+  const applySnappedPosition = () => {
     const rect = element.getBoundingClientRect();
     const corner = getNearestCorner();
 
@@ -314,10 +314,10 @@ const createTimerPort = (updateCallback) => {
     cleanupCalled = true;
     try {
       if (port) port.disconnect();
-    } catch (_) {}
+    } catch  {}
     try {
       if (intervalRef) clearInterval(intervalRef);
-    } catch (_) {}
+    } catch {}
   };
 
   try {
@@ -333,13 +333,13 @@ const createTimerPort = (updateCallback) => {
     intervalRef = setInterval(() => {
       try {
         port.postMessage('get: timer');
-      } catch (_) {}
+      } catch {}
     }, 1000);
 
     try {
       port.postMessage('get: timer');
-    } catch (_) {}
-  } catch (_) {}
+    } catch {}
+  } catch {}
 
   return { port, intervalRef, cleanup };
 };
@@ -383,7 +383,7 @@ function installOverlayPersistence() {
         scheduleOverlayEnsure();
         return result;
       };
-    } catch (_) {}
+    } catch {}
   };
 
   wrapHistory('pushState');
@@ -411,7 +411,7 @@ const matchesLearningHost = (learningUri) => {
       currentHost.endsWith(`.${targetHost}`) ||
       targetHost.endsWith(`.${currentHost}`)
     );
-  } catch (_) {
+  } catch {
     return false;
   }
 };
@@ -427,9 +427,9 @@ async function bootstrapLearningOverlayIfNeeded() {
     }
     try {
       await browser.runtime.sendMessage({ type: 'learning:autoStart' });
-    } catch (_) {}
+    } catch {}
     await renderLearningContent();
-  } catch (_) {
+  } catch {
     // swallow
   } finally {
     bootstrapAttemptPending = false;
@@ -485,7 +485,7 @@ async function bootstrapRewardOverlayIfNeeded() {
         }, 50);
       }
     }
-  } catch (_) {
+  } catch {
     // Ignore errors - background might not be ready
   }
 }
@@ -516,7 +516,7 @@ browser.runtime.onMessage.addListener((request) => {
     try {
       const rewardOverlay = document.getElementById('aiki-reward-overlay');
       if (rewardOverlay) rewardOverlay.remove();
-    } catch (_) {}
+    } catch {}
     return Promise.resolve({ action: 'end injection' });
   } else if (request.action === 'display:contentBlocker') {
     return renderContentBlocker(request.originUrl);
@@ -571,7 +571,7 @@ function removeOverlay() {
           element.cleanup();
           element.cleanup = undefined;
         }
-      } catch (_) {}
+      } catch {}
       element.remove();
     }
     const elements = document.getElementsByClassName('aiki-overlay');
@@ -585,13 +585,13 @@ function removeOverlay() {
               el.cleanup();
               el.cleanup = undefined;
             }
-          } catch (_) {}
+          } catch {}
           el.remove();
         }
       }
     }
-  } catch (error) {
-    // console.log(error);
+  } catch {
+    
   }
 }
 
@@ -600,7 +600,7 @@ function renderRedirectPrompt(originUrl) {
     let done = false;
     try {
       removeOverlay();
-    } catch (_) {}
+    } catch {}
 
     const overlay = document.createElement('div');
     overlay.id = 'aiki-overlay';
@@ -627,7 +627,7 @@ function renderRedirectPrompt(originUrl) {
       if (!value || typeof value !== 'string') return '';
       try {
         return new URL(value).hostname || '';
-      } catch (_) {
+      } catch {
         return '';
       }
     };
@@ -635,7 +635,7 @@ function renderRedirectPrompt(originUrl) {
     const getCurrentHost = () => {
       try {
         return window.location.hostname || '';
-      } catch (_) {
+      } catch {
         return '';
       }
     };
@@ -695,7 +695,7 @@ function renderRedirectPrompt(originUrl) {
       if (action !== 'redirect') {
         try {
           removeOverlay();
-        } catch (_) {}
+        } catch {}
       }
       resolve({ action });
     };
@@ -727,7 +727,7 @@ function renderRedirectPrompt(originUrl) {
           updateDescription(host);
         }
       }, 400);
-    } catch (_) {}
+    } catch {}
 
     actions.appendChild(continueButton);
     actions.appendChild(redirectButton);
@@ -753,7 +753,7 @@ function renderLearningContent() {
   return new Promise((resolve) => {
     try {
       removeOverlay();
-    } catch (_) {}
+    } catch {}
 
     const overlay = document.createElement('div');
     overlay.id = 'aiki-overlay';
@@ -1061,7 +1061,7 @@ function renderLearningContent() {
       timerPort.cleanup();
       try {
         removeOverlay();
-      } catch (_) {}
+      } catch {}
       // Remove fullscreen listeners when cleaning up to prevent memory leaks
       document.removeEventListener('fullscreenchange', updateOverlayVisibility);
       document.removeEventListener(
@@ -1086,11 +1086,11 @@ function renderLearningContent() {
   });
 }
 
-function renderContentBlocker(originUrl) {
+function renderContentBlocker() {
   return new Promise((resolve) => {
     try {
       removeOverlay();
-    } catch (_) {}
+    } catch {}
 
     const overlay = document.createElement('div');
     overlay.id = 'aiki-overlay';
@@ -1223,7 +1223,7 @@ function renderContentBlocker(originUrl) {
       timerPort.cleanup();
       try {
         overlay.remove();
-      } catch (_) {}
+      } catch {}
     };
 
     overlay.cleanup = cleanup;
@@ -1243,7 +1243,7 @@ function renderContentBlocker(originUrl) {
           location.href = uri;
           return;
         }
-      } catch (_) {}
+      } catch {}
       cleanup();
       resolve({ action: 'return' });
     });
@@ -1290,7 +1290,7 @@ const scheduleRewardOverlayEnsure = () => {
           renderProcrastinationRewardOverlay();
         }
       }
-    } catch (_) {}
+    } catch {}
   }, 120);
 };
 
@@ -1311,7 +1311,7 @@ function installRewardOverlayPersistence() {
       };
       wrapped._aikiRewardWrapped = true;
       history[method] = wrapped;
-    } catch (_) {}
+    } catch {}
   };
 
   wrapHistory('pushState');
@@ -1525,7 +1525,7 @@ function renderProcrastinationRewardOverlay() {
     timerPort.cleanup();
     try {
       overlay.remove();
-    } catch (_) {}
+    } catch {}
   };
 
   overlay.cleanup = cleanup;

@@ -21,7 +21,7 @@ export function parseUrl(site) {
   const tryBuildUrl = (value) => {
     try {
       return new URL(ensureProtocol(value));
-    } catch (_) {
+    } catch {
       return null;
     }
   };

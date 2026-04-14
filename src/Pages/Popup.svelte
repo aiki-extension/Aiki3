@@ -12,17 +12,15 @@
   import Header from "./Components/Popup/Header.svelte";
   import SettingsButton from "./Components/Popup/SettingsButton.svelte";
   import ToggleRedirection from "./Components/Popup/ToggleRedirection.svelte";
-  import ContinueButton from "./Components/Popup/ContinueButton.svelte";
   import LearningTimeLeft from "./Components/Popup/LearningTimeLeft.svelte";
 
   const port = browser.runtime.connect({
   name: "Popup Communication",
   });
 
-  let siteName = "";
   let origin = {};
 
-  let timeValues = new Promise((resolve) => {});
+  let timeValues;
 
   function sync(res) {
     timeValues = new Promise((resolve) => {
@@ -55,24 +53,6 @@
       siteName = parseUrl(origin.url).name;
     }
   }
-
-  /**
-   * @function
-   * @description Sends a message to the background script for intepretation.
-   * Background script will initiate a tab update on the tab that triggered a redirection,
-   * restoring the origin uri.
-   */
-  function gotoOrigin(type) {
-    try {
-      port.postMessage("goto: origin: " + type);
-      origin = {};
-      // port.postMessage("get: timer");
-      location.reload();
-    } catch (error) {
-      console.error(error);
-    }
-  }
-
   setup();
 </script>
 

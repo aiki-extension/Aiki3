@@ -42,7 +42,7 @@ class PromptCoordinator {
       } else if (result.action === 'redirect') {
         if (typeof onAccept === 'function') await onAccept();
       }
-    } catch (_) {
+    } catch {
       await this.hideImmediatePrompt(tabId);
       await this.removePreemptiveHide(tabId);
     }
@@ -55,7 +55,7 @@ class PromptCoordinator {
       try {
         const timer = await import('./TimerManager');
         if (timer.default.isSessionRewardActive()) return;
-      } catch (_) {}
+      } catch {}
 
       storage.blockedTabs.add(details.tabId);
       if (details.url) storage.blockedOrigins.add(details.tabId, details.url);
@@ -82,7 +82,7 @@ class PromptCoordinator {
 
         await this.hideImmediatePrompt(details.tabId);
         await this.removePreemptiveHide(details.tabId);
-      } catch (_) {
+      } catch {
         await this.hideImmediatePrompt(details.tabId);
         await this.removePreemptiveHide(details.tabId);
       }
@@ -99,7 +99,7 @@ class PromptCoordinator {
       return browser.tabs
         .sendMessage(tabId, { action: 'remove blocker' })
         .catch(() => {});
-    } catch (_) {}
+    } catch {}
   }
 
   async removeAllContentBlockers() {

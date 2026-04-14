@@ -116,7 +116,7 @@
        return { ok: false, message: result?.message || "Server error. Please try again.", token: null };
      }
      return result;
-    } catch (error) {
+    } catch {
       return { ok: false, message: "Could not reach the server.", token: null };
     }
   }
