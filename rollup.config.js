@@ -9,7 +9,11 @@ import dotenv from 'dotenv';
 const production = !process.env.ROLLUP_WATCH;
 // Live reload is not compatible with extension pages (CSP + file scheme)
 const enableLiveReload = false;
-const env = dotenv.config().parsed || {};
+// Merge .env with runtime environment variables; runtime vars (e.g. CI) win.
+const env = {
+  ...(dotenv.config().parsed || {}),
+  ...process.env,
+};
 
 function serve() {
   let server;
