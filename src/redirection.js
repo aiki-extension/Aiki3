@@ -72,7 +72,7 @@ async function showImmediatePrompt(tabId) {
       },
       args: [PREPROMPT_ID],
     });
-  } catch (_) { }
+  } catch { }
 }
 
 function scheduleRevealOnLoad(tabId) {
@@ -157,7 +157,7 @@ async function isGlobalPromptLocked() {
       globalPromptLock?.timestamp &&
       Date.now() - globalPromptLock.timestamp < PROMPT_SUPPRESS_DURATION
     );
-  } catch (_) {
+  } catch {
     return false;
   }
 }
@@ -234,7 +234,7 @@ async function redirect(details, immediate = false) {
                 isOriginValid = true;
               }
             }
-          } catch (_) {
+          } catch {
             // Tab doesn't exist - origin is stale
           }
 
@@ -356,28 +356,11 @@ async function addLearningSiteLoadedListener() {
   });
 }
 
-/**
- * Add listener for learning site navigation (controlled variant only).
- * This enables direct learning session start when user navigates to learning site.
- */
-async function addControlledLearningSiteListener() {
-
-  const currentLearning = await getLearningUrl();
-  if (!currentLearning) return;
-  const learningName = parseUrl(currentLearning).name;
-  if (!learningName) return;
-
-  browser.webNavigation.onCompleted.addListener(strategy.onLearningSiteNavigation?.bind(strategy) || (() => { }), {
-    url: [{ hostContains: learningName }],
-  });
-  console.log("[Redirection] Added controlled learning site listener for:", learningName);
-}
-
 // Fallback trigger in case webNavigation timing misses injection readiness
 async function triggerLearningOverlay(tabId) {
   try {
     await messageLearningResource({ tabId });
-  } catch (_) { }
+  } catch { }
 }
 
 function removeLearningSiteLoadedListener() {
@@ -401,7 +384,7 @@ async function getActiveLearningTabs(excludedIds = new Set()) {
         tab.url.includes(learningName) &&
         !excludedIds.has(tab.id)
     );
-  } catch (_) {
+  } catch {
     return [];
   }
 }
@@ -413,7 +396,7 @@ async function setPromptCooldown(tabId, url) {
     await storage.globalPromptLock.set({  
       timestamp: Date.now(),  // Time stored for cooldown
     });
-  } catch (_) { }
+  } catch { }
 }
 
 async function messageLearningResource(details) {
@@ -445,9 +428,7 @@ async function messageLearningResource(details) {
     } else if (action === "end injection") {
       removeLearningSiteLoadedListener();
     }
-  } catch (error) {
-    // console.log(error);
-  }
+  } catch { }
 }
 
 /** #CHECKCURRENTTAB()#
@@ -479,9 +460,7 @@ async function checkActiveTab() {
         console.log("Prompt called from checkActiveTab()") // FLAG for further research, as i do not think this is ever called
       }
     }
-  } catch (error) {
-    // console.log(error.message);
-  }
+  } catch { }
 }
 
 async function checkTabById({ tabId }) {
@@ -535,7 +514,7 @@ async function gotoOrigin(event, sourceContext = {}) {
     sourceContext && typeof sourceContext === "object"
       ? sourceContext
       : { type: sourceContext };
-  const { type: sourceType, tabId: providedTabId, restoreAll } = context;
+  const { tabId: providedTabId, restoreAll } = context;
 
   const origin = await storage.origin.get();
   const blockedTabs = await storage.blockedTabs.get();
@@ -552,7 +531,7 @@ async function gotoOrigin(event, sourceContext = {}) {
     try {
       const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
       targetTabId = activeTab?.id;
-    } catch (_) { }
+    } catch { }
   }
 
   // Read blockedOrigin before removeAllContentBlockers() clears storage.blockedOrigins
@@ -635,7 +614,7 @@ async function gotoOrigin(event, sourceContext = {}) {
             try {
               await browser.tabs.update(tabId, { url });
               await setPromptCooldown(tabId, url);
-            } catch (error) { }
+            } catch { }
           }
           restoredTabIds.add(tabId);
         })
@@ -757,10 +736,6 @@ async function removeContentBlocker(tabId) {
 
 async function removeAllContentBlockers() {
   return promptCoordinator.removeAllContentBlockers();
-}
-
-async function addProcsiteLoadedListener() {
-  return promptCoordinator.addProcsiteLoadedListener(createFilter);
 }
 
 async function removeProcsiteLoadedListener() {

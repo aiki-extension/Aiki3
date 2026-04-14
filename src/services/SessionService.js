@@ -21,7 +21,7 @@ async function getGoalSeconds() {
       lastGoalFetch = now;
       return cachedGoalSeconds;
     }
-  } catch (_) {}
+  } catch {}
   cachedGoalSeconds = 0;
   lastGoalFetch = now;
   return cachedGoalSeconds;
@@ -50,7 +50,7 @@ async function startSession(tabId, sessionType, siteUrl, triggerUrl = null) {
   await storage.activeSessions.set(tabId, sessionData);
 }
 
-async function finalizeSession(tabId, sessionType, reason = 'switch') {
+async function finalizeSession(tabId, sessionType) {
   if (tabId === undefined || tabId === null) return;
 
   const finalizeKey = `${tabId}:${sessionType}`;

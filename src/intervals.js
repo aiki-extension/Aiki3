@@ -102,20 +102,6 @@ async function syncList() {
   list = result ? result.map((item) => item.name) : [];
 }
 
-function calculateCategoryTime(data, siteList) {
-  let totalSeconds = 0;
-  const siteDetails = [];
-
-  Object.entries(data).forEach(([name, seconds]) => {
-    if (typeof seconds === 'number' && siteList.includes(name)) {
-      totalSeconds += seconds;
-      siteDetails.push({ name, seconds });
-    }
-  });
-
-  return { totalSeconds, siteDetails };
-}
-
 function storeData(snapshot) {
   if (!user) return;
 

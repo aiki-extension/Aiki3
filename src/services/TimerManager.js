@@ -69,7 +69,7 @@ class TimerManager {
     await storage.dailyProgress.set(this.dailyProgress);
     try {
       await storage.shouldRedirect.set(false);
-    } catch (_) {}
+    } catch {}
     clearInterval(this.learningTimeIntervalRef);
     this.learningTimeIntervalRef = undefined;
     this.bonusTime = 0;
@@ -267,7 +267,7 @@ class TimerManager {
           ) {
             return true;
           }
-        } catch (_) {}
+        } catch {}
       }
     }
     return false;
