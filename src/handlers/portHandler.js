@@ -70,12 +70,12 @@ export function handlePortConnect(port) {
         (async () => {
           try {
             await timer.sync();
-          } catch (_) {}
+          } catch {}
           if (isDisconnected) return;
           try {
             const timeData = timer.getTime();
             port.postMessage(timeData);
-          } catch (error) {}
+          } catch {}
         })();
         break;
       case 'off':

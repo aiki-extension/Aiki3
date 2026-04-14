@@ -34,7 +34,7 @@ if (!message || typeof message !== "object") {
     try {
       await redirection.navigationListener.restart();
       return { ok: true };
-    } catch (_) {
+    } catch {
       return { ok: false };
     }
   }
@@ -43,7 +43,7 @@ if (!message || typeof message !== "object") {
     return (async () => {
       try {
         await timer.sync();
-      } catch (_) { }
+      } catch { }
       const timeData = timer.getTime();
       return timeData;
     })();
@@ -187,7 +187,7 @@ if (!message || typeof message !== "object") {
                     currentHost.endsWith(`.${learningHost}`) ||
                     learningHost.endsWith(`.${currentHost}`)
                   );
-                } catch (_) {
+                } catch {
                   return false;
                 }
               };
@@ -205,7 +205,7 @@ if (!message || typeof message !== "object") {
                       currentHost.endsWith("." + normalizedHost) ||
                       normalizedHost.endsWith("." + currentHost);
                   });
-                } catch (_) {
+                } catch {
                   return false;
                 }
               };

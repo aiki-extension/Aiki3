@@ -13,7 +13,7 @@ export async function installationSetup() {
   setTheme("dark");
   try {
     await browser.runtime.openOptionsPage();
-  } catch (e) {
+  } catch {
     // Fallback if polyfill is unavailable
     if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.openOptionsPage) {
       chrome.runtime.openOptionsPage();
