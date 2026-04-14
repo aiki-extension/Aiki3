@@ -9,6 +9,9 @@ on:
 permissions:
   contents: write
 
+env:
+  PUBLIC_API_BASE_URL: http://94.130.110.4/api/
+
 jobs:
   build_chrome:
     name: Build Chrome extension
@@ -28,7 +31,7 @@ jobs:
       - name: Build Chrome extension
         run: npm run build:chrome
         env:
-          PUBLIC_API_BASE_URL: http://94.130.110.4/api/
+          PUBLIC_API_BASE_URL: ${{ env.PUBLIC_API_BASE_URL }}
 
       - name: Package Chrome extension
         run: |
@@ -62,7 +65,7 @@ jobs:
       - name: Build Firefox extension
         run: npm run build:firefox
         env:
-          PUBLIC_API_BASE_URL: http://94.130.110.4/api/
+          PUBLIC_API_BASE_URL: ${{ env.PUBLIC_API_BASE_URL }}
 
       - name: Bump dev version
         run: node scripts/bump-dev-version.js
