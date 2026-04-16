@@ -277,6 +277,24 @@ async function redirect(details, immediate = false) {
   }
 }
 
+async function redirectTo(tabId, learningUri, procUrl) {
+    addLearningSiteLoadedListener();
+    navigationGuards.install();
+    await SessionService.startSession(tabId, "learning", learningUri, procUrl);
+    await timer.startLearningSession();
+    storage.origin.set({ url: procUrl})
+    addOriginUpdatedListener(tabId);
+    await storage.globalPromptLock.remove();
+
+    try {
+      scheduleRevealOnLoad(tabId);
+      await browser.tabs.update(tabId, { url: learningUri });
+      setTimeout(() => triggerLearningOverlay(tabId), 1500);
+    } catch (error) {
+      l(error);
+    }
+}
+
 async function checkActiveTime() {
   const fromTime = await storage.operatingHours.from.get();
   const toTime = await storage.operatingHours.to.get();
@@ -674,26 +692,10 @@ async function dispatchPrompt(tabId, learningUri, procUrl) {
   const flags = await storage.featureFlags.get();
   const promptEnabled = !flags.redirectPrompt;
   console.log("promptEnabled is: " + promptEnabled);
-
   if (!promptEnabled) {
     // Skip prompt and instant redirect instead
-    addLearningSiteLoadedListener();
-    navigationGuards.install();
-    await SessionService.startSession(tabId, "learning", learningUri, procUrl);
-    await timer.startLearningSession();
-    storage.origin.set({ url: procUrl})
-    addOriginUpdatedListener(tabId);
-    await storage.globalPromptLock.remove();
-
-    try {
-      scheduleRevealOnLoad(tabId);
-      await browser.tabs.update(tabId, { url: learningUri });
-      setTimeout(() => triggerLearningOverlay(tabId), 1500);
-    } catch (error) {
-      l(error);
-    }
-    return; // Exits early to dismiss prompt
-    
+    redirectTo(tabId, learningUri, procUrl);
+    return;
   }
 
   if (origin) {
@@ -724,24 +726,7 @@ async function promptRedirect(tabId, url, originUrl) {
       await SessionService.startSession(tabId, "procrastination", originUrl);
     },
     onAccept: async () => {
-      addLearningSiteLoadedListener();
-      navigationGuards.install();
-      await SessionService.startSession(tabId, "learning", url, originUrl);
-      await timer.startLearningSession();
-      storage.origin.set({ url: originUrl, tabId: tabId });
-      addOriginUpdatedListener(tabId);
-
-      // Clears the global prompt lock when user accepts
-      await storage.globalPromptLock.remove();
-      try {
-        scheduleRevealOnLoad(tabId);
-        await browser.tabs.update(tabId, {
-          url: url,
-        });
-        setTimeout(() => triggerLearningOverlay(tabId), 1500);
-      } catch (error) {
-        l(error);
-      }
+      redirectTo(tabId, url, originUrl);
     },
   });
 }
