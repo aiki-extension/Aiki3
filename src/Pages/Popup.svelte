@@ -19,8 +19,9 @@
   });
 
   let origin = {};
-
-  let timeValues;
+  
+  // Ignore linter warning for this. Extension window breaks without this promise 
+  let timeValues = new Promise((resolve) => {});
 
   function sync(res) {
     timeValues = new Promise((resolve) => {
