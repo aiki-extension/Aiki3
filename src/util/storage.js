@@ -278,6 +278,15 @@ async function getRewardUnlock() {
   return typeof rewardUnlockAt === "number" ? rewardUnlockAt : 0;
 }
 
+function setFeatureFlags(flags) {
+  storage.set({ featureFlags: flags ?? {} });
+}
+
+async function getFeatureFlags() {
+  const result = await storage.get("featureFlags");
+  return result && typeof result.featureFlags === "object" ? result.featureFlags: {};
+}
+
 /**
  * @description Initializes the time settings in storage upon app installation. */
 function userTimeInit() {
@@ -688,6 +697,10 @@ export default {
     get: activeSessionsStore.get,
     remove: activeSessionsStore.remove,
     clear: activeSessionsStore.clear,
+  },
+  featureFlags: {
+    get: getFeatureFlags,
+    set: setFeatureFlags,
   },
   forgetOrigin: () => storage.remove("origin"),
 };

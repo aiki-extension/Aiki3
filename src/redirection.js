@@ -671,6 +671,31 @@ function onContentScriptReady(tabId) {
 // changes between when the intent is queued and when it fires.
 async function dispatchPrompt(tabId, learningUri, procUrl) {
   const origin = await storage.origin.get();
+  const flags = await storage.featureFlags.get();
+  const promptEnabled = !flags.redirectPrompt;
+  console.log("promptEnabled is: " + promptEnabled);
+
+  if (!promptEnabled) {
+    // Skip prompt and instant redirect instead
+    addLearningSiteLoadedListener();
+    navigationGuards.install();
+    await SessionService.startSession(tabId, "learning", learningUri, procUrl);
+    await timer.startLearningSession();
+    storage.origin.set({ url: procUrl})
+    addOriginUpdatedListener(tabId);
+    await storage.globalPromptLock.remove();
+
+    try {
+      scheduleRevealOnLoad(tabId);
+      await browser.tabs.update(tabId, { url: learningUri });
+      setTimeout(() => triggerLearningOverlay(tabId), 1500);
+    } catch (error) {
+      l(error);
+    }
+    return; // Exits early to dismiss prompt
+    
+  }
+
   if (origin) {
     renderContentBlocker({ tabId, frameId: 0, url: procUrl });
   } else {

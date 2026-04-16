@@ -18,6 +18,7 @@ async function syncDBSettingsToLocalStorage(db) {
         storage.operatingHours.to.set({ hrs: Math.floor(db.operatingEndMinutes / 60), min: db.operatingEndMinutes % 60 }),
         storage.learningUri.set(db.learningSiteDomain || ""),
         storage.list.set((db.timeWastingSites || []).map(domain => parseUrl(domain))), // Stores time-wasting sites into local storage
+        storage.featureFlags.set(db.flags ?? {}), 
     ])
 }
 
