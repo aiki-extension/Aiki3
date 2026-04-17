@@ -71,18 +71,22 @@ export function normalizeUrl(input) {
   const trimmed = input.trim();
 
   const urlPattern =
-    /^(?:https?:\/\/)?(?:www\.)?([a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,})(?:[/?#].*)?$/;
+    /^(?:https?:\/\/)?(?:www\.)?([a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,})(\/.*)?$/;
     
   const match = trimmed.match(urlPattern);
   if (!match) return null;
 
   // Extracts only the domain part and validates
   const domainPart = match[1];
+  const pathPart = match[2] || ''; // Web paths
+
   const host = trimmed.includes('://') || trimmed.startsWith('www.') 
     ? trimmed.split('/')[0] 
     : `www.${domainPart}`;
 
-  return host.startsWith('www.') ? host : `www.${host}`;
+  const normalizedHost = host.startsWith('www.') ? host : `www.${host}`;
+  
+  return normalizedHost + pathPart;
 }
 
 export function makeDate() {
