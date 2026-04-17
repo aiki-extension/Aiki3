@@ -67,12 +67,21 @@ export function parseUrl(site) {
 
 export function normalizeUrl(input) {
   if (!input?.trim()) return null;
-  const { host } = parseUrl(input);
-  if (!host) return null;
+
+  const trimmed = input.trim();
+
   const urlPattern =
-    /(?:https?:\/\/)?(?:www\.)?([a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,})(?:[/?#].*)?$/;
-  const match = host.match(urlPattern);
+    /^(?:https?:\/\/)?(?:www\.)?([a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,})(?:[/?#].*)?$/;
+    
+  const match = trimmed.match(urlPattern);
   if (!match) return null;
+
+  // Extracts only the domain part and validates
+  const domainPart = match[1];
+  const host = trimmed.includes('://') || trimmed.startsWith('www.') 
+    ? trimmed.split('/')[0] 
+    : `www.${domainPart}`;
+
   return host.startsWith('www.') ? host : `www.${host}`;
 }
 

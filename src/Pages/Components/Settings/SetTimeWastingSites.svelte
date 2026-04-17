@@ -113,7 +113,7 @@
     if (!normalized) {
       alertStore.add({
         type: 'warning',
-        message: 'Invalid URL format!'
+        message: 'Invalid URL. Remember to include a tld (.com, .org, .dk etc.)'
       })
       return;
     }
