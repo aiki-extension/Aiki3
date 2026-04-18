@@ -123,7 +123,7 @@
 
     learningUri = parseUrl(await storage.learningUri.get())
     let site = parseUrl(addItemValue);
-    
+    site.host = normalized;
     
     if (learningUri.name === site.name) {
       alertStore.add({
