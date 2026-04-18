@@ -80,13 +80,7 @@ export function normalizeUrl(input) {
   const domainPart = match[1];
   const pathPart = match[2] || ''; // Web paths
 
-  const host = trimmed.includes('://') || trimmed.startsWith('www.') 
-    ? trimmed.split('/')[0] 
-    : `www.${domainPart}`;
-
-  const normalizedHost = host.startsWith('www.') ? host : `www.${host}`;
-  
-  return normalizedHost + pathPart;
+  return `www.${domainPart}${pathPart}`;
 }
 
 export function makeDate() {
