@@ -53,7 +53,7 @@
         isEditing = true;
         alertStore.add({ type: 'success', message: 'Learning platform cleared.' });
       } else {
-        alertStore.add({ type: 'warning', message: 'Invalid URL.' });
+        alertStore.add({ type: 'warning', message: 'Invalid URL. Remember to include a domain ending (.com, .org, .dk etc.)' });
       }
       return;
     }

@@ -113,7 +113,7 @@
     if (!normalized) {
       alertStore.add({
         type: 'warning',
-        message: 'Invalid URL format!'
+        message: 'Invalid URL. Remember to include a domain ending (.com, .org, .dk etc.)'
       })
       return;
     }
@@ -123,7 +123,7 @@
 
     learningUri = parseUrl(await storage.learningUri.get())
     let site = parseUrl(addItemValue);
-    
+    site.host = normalized;
     
     if (learningUri.name === site.name) {
       alertStore.add({
