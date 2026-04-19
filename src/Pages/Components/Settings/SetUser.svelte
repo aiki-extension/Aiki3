@@ -33,6 +33,7 @@
   let confirmPassword = "";
   let inviteCode = "";
   let isSubmitting = false;
+  let isResearchParticipant = false;
   const basicEmailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const dispatch = createEventDispatcher();
 
@@ -103,14 +104,15 @@
     userIsRegistered = false;
   }
 
-  async function authenticateWithBackend({ mode, email, plainTextPassword, inviteCode }) {
+  async function authenticateWithBackend({ mode, email, plainTextPassword, inviteCode, isResearchParticipant }) {
    const type = mode === "register" ? MESSAGE_API_REGISTER : MESSAGE_API_LOGIN;
    try {
      const result = await browser.runtime.sendMessage({
         type,
         email,
         password: plainTextPassword,
-        ...(mode === "register" && inviteCode ? { inviteCode } : {}) // Only include inviteCode if we're in register mode and it's provided
+        ...(mode === "register" && inviteCode ? { inviteCode } : {}), // Only include inviteCode if we're in register mode and it's provided
+        isResearchParticipant: isResearchParticipant,
       });
      if (!result || !result.ok) {
        return { ok: false, message: result?.message || "Server error. Please try again.", token: null };
@@ -175,7 +177,8 @@
         mode: authMode,
         email: normalizedUser,
         plainTextPassword: password,
-        inviteCode
+        inviteCode,
+        isResearchParticipant,
       });
 
       if (!authResult?.ok) {
@@ -279,6 +282,12 @@
             type="text"
             class="form-control auth-input"
             placeholder="Enter your invite code (optional)..."
+          />
+
+          <input
+            type="checkbox"
+            id="research-participant-checkbox"
+            bind:checked={isResearchParticipant}
           />
 
         {/if}
