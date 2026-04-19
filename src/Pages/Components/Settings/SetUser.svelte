@@ -284,11 +284,14 @@
             placeholder="Enter your invite code (optional)..."
           />
 
-          <input
-            type="checkbox"
-            id="research-participant-checkbox"
-            bind:checked={isResearchParticipant}
-          />
+          <div class="checkbox-wrapper">
+            <input
+              type="checkbox"
+              id="research-participant-checkbox"
+              bind:checked={isResearchParticipant}
+            />
+            <label for="research-participant-checkbox">I am a research participant</label>
+          </div>
 
         {/if}
 
@@ -415,5 +418,15 @@
     color: var(--buttonPrimary, #007bff);
     cursor: pointer;
     text-decoration: underline;
+  }
+    .checkbox-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem; /* Space between checkbox and text */
+    cursor: pointer;
+  }
+  
+  .checkbox-wrapper label {
+    cursor: pointer; /* Makes the text show a pointer cursor */
   }
 </style>
