@@ -3,6 +3,7 @@
   import storage from "../../../util/storage";
   import { alertStore } from "../../../services/alertService";
   import { MESSAGE_API_UPDATE_INVITE_CODE } from "../../../values/messageTypeValues";
+  import { fetchAndSyncSettings } from "../../../services/settingsService";
 
   let inviteCode = "";
   let savedInviteCode = "";
@@ -23,6 +24,7 @@
       if (ok) {
         storage.inviteCode.set(inviteCode);
         savedInviteCode = inviteCode; // update the saved value on success
+        await fetchAndSyncSettings();
       } else {
         inviteCode = savedInviteCode; // revert the input
       }
