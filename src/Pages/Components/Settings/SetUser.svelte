@@ -4,7 +4,6 @@
 -->
 <script>
   import { onMount } from "svelte";
-  import Container from "./Container.svelte";
   import storage from "../../../util/storage";
   import { setTheme } from "../../../util/themes";
   import Fa from "svelte-fa";
