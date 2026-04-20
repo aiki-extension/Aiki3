@@ -6,7 +6,7 @@
   // Functional and module imports
   import storage from "../../../util/storage";
   import { onMount, tick } from "svelte";
-  import { parseUrl, normalizeUrl } from "../../../util/utilities";
+  import { normalizeUrl } from "../../../util/utilities";
   import { alertStore } from '../../../services/alertService';
   import browser from "webextension-polyfill";
   import { MESSAGE_API_UPDATE_LEARNING_URI } from '../../../values/messageTypeValues';
@@ -34,7 +34,7 @@
   onMount(async () => {
     try {
       learningUri = await storage.learningUri.get();
-    } catch (e) {
+    } catch {
       learningUri = "";
     }
     hasSaved = !!learningUri;
@@ -53,7 +53,7 @@
         isEditing = true;
         alertStore.add({ type: 'success', message: 'Learning platform cleared.' });
       } else {
-        alertStore.add({ type: 'warning', message: 'Invalid URL.' });
+        alertStore.add({ type: 'warning', message: 'Invalid URL. Remember to include a domain ending (.com, .org, .dk etc.)' });
       }
       return;
     }
@@ -79,7 +79,7 @@
       })
     
     // API Call at the end, to ensure it doesn't block for local storage (focused on guest mode especially)
-    const backendResult = await browser.runtime.sendMessage({
+    await browser.runtime.sendMessage({
       type: MESSAGE_API_UPDATE_LEARNING_URI,
       learningUri: wwwHost,
     });

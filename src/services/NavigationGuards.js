@@ -70,7 +70,7 @@ class NavigationGuards {
         );
         return;
       }
-    } catch (_) {
+    } catch {
       // Tab may have been closed or is otherwise inaccessible
     }
   }
@@ -91,7 +91,7 @@ class NavigationGuards {
           await SessionService.finalizeSession(tab.id, 'learning', reason);
         }
       }
-    } catch (_) {}
+    } catch {}
   }
 
   async handleTabNavigation(tabId, nextUrl) {
@@ -102,7 +102,7 @@ class NavigationGuards {
     const extractName = (value) => {
       try {
         return siteDetector.getSiteName(value || '');
-      } catch (_) {
+      } catch {
         return '';
       }
     };
@@ -162,7 +162,7 @@ class NavigationGuards {
         },
         args: ['__aiki-preprompt'],
       });
-    } catch (_) {}
+    } catch {}
   }
 
   install() {
@@ -255,7 +255,7 @@ class NavigationGuards {
               await this.maybeStartSessionForTab(tab.id);
             }
           }
-        } catch (_) {}
+        } catch {}
       }
     };
     browser.windows.onFocusChanged.addListener(this.onFocusChangedHandler);

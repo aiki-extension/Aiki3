@@ -5,8 +5,8 @@
 :root {
   /* UNIVERSAL RULES */
   /* Fonts */
-  --fontHeaders: 'Roboto', sans-serif;
-  --fontContent: 'Lato', sans-serif;
+  --fontHeaders: 'Montserrat', sans-serif;
+  --fontContent: 'Montserrat', sans-serif;
   --fontSizeSettings: 16px;
   --fontSizePopup: 14px;
 
@@ -39,6 +39,7 @@ body {
   padding: 0;
   margin: 0;
   box-sizing: border-box;
+  font-family: 'Montserrat', sans-serif;
 }
 
 a {

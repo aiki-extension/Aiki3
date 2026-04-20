@@ -21,9 +21,16 @@
 
   let isOpen = false;
   let themePromise = getTheme();
+  let dropdownRef;
 
   function toggleDropdown() {
     isOpen = !isOpen;
+  }
+
+  function handleClickOutside(event) {
+    if (dropdownRef && !dropdownRef.contains(event.target)) {
+      isOpen = false;
+    }
   }
 
   function changeTheme(input) {
@@ -52,7 +59,9 @@
   }
 </script>
 
-<div class="dropdown" class:show={isOpen}>
+<svelte:window on:click={handleClickOutside} />
+
+<div class="dropdown" class:show={isOpen} bind:this={dropdownRef}>
   <button
     class="btn btn-secondary dropdown-toggle"
     type="button"
@@ -106,7 +115,15 @@
 </div>
 
 <style>
+  .dropdown {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
   .dropdown-menu.show {
     display: block;
+    position: static;
+    float: none;
   }
 </style>

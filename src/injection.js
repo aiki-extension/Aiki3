@@ -100,7 +100,7 @@ const makeDraggable = (element) => {
     return { x, y, corner };
   };
 
-  const applySnappedPosition = (x, y) => {
+  const applySnappedPosition = () => {
     const rect = element.getBoundingClientRect();
     const corner = getNearestCorner();
 
@@ -314,10 +314,10 @@ const createTimerPort = (updateCallback) => {
     cleanupCalled = true;
     try {
       if (port) port.disconnect();
-    } catch (_) {}
+    } catch {}
     try {
       if (intervalRef) clearInterval(intervalRef);
-    } catch (_) {}
+    } catch {}
   };
 
   try {
@@ -333,13 +333,13 @@ const createTimerPort = (updateCallback) => {
     intervalRef = setInterval(() => {
       try {
         port.postMessage('get: timer');
-      } catch (_) {}
+      } catch {}
     }, 1000);
 
     try {
       port.postMessage('get: timer');
-    } catch (_) {}
-  } catch (_) {}
+    } catch {}
+  } catch {}
 
   return { port, intervalRef, cleanup };
 };
@@ -383,7 +383,7 @@ function installOverlayPersistence() {
         scheduleOverlayEnsure();
         return result;
       };
-    } catch (_) {}
+    } catch {}
   };
 
   wrapHistory('pushState');
@@ -411,7 +411,7 @@ const matchesLearningHost = (learningUri) => {
       currentHost.endsWith(`.${targetHost}`) ||
       targetHost.endsWith(`.${currentHost}`)
     );
-  } catch (_) {
+  } catch {
     return false;
   }
 };
@@ -427,9 +427,9 @@ async function bootstrapLearningOverlayIfNeeded() {
     }
     try {
       await browser.runtime.sendMessage({ type: 'learning:autoStart' });
-    } catch (_) {}
+    } catch {}
     await renderLearningContent();
-  } catch (_) {
+  } catch {
     // swallow
   } finally {
     bootstrapAttemptPending = false;
@@ -485,7 +485,7 @@ async function bootstrapRewardOverlayIfNeeded() {
         }, 50);
       }
     }
-  } catch (_) {
+  } catch {
     // Ignore errors - background might not be ready
   }
 }
@@ -516,7 +516,7 @@ browser.runtime.onMessage.addListener((request) => {
     try {
       const rewardOverlay = document.getElementById('aiki-reward-overlay');
       if (rewardOverlay) rewardOverlay.remove();
-    } catch (_) {}
+    } catch {}
     return Promise.resolve({ action: 'end injection' });
   } else if (request.action === 'display:contentBlocker') {
     return renderContentBlocker(request.originUrl);
@@ -571,7 +571,7 @@ function removeOverlay() {
           element.cleanup();
           element.cleanup = undefined;
         }
-      } catch (_) {}
+      } catch {}
       element.remove();
     }
     const elements = document.getElementsByClassName('aiki-overlay');
@@ -585,14 +585,12 @@ function removeOverlay() {
               el.cleanup();
               el.cleanup = undefined;
             }
-          } catch (_) {}
+          } catch {}
           el.remove();
         }
       }
     }
-  } catch (error) {
-    // console.log(error);
-  }
+  } catch {}
 }
 
 function renderRedirectPrompt(originUrl) {
@@ -600,7 +598,7 @@ function renderRedirectPrompt(originUrl) {
     let done = false;
     try {
       removeOverlay();
-    } catch (_) {}
+    } catch {}
 
     const overlay = document.createElement('div');
     overlay.id = 'aiki-overlay';
@@ -627,7 +625,7 @@ function renderRedirectPrompt(originUrl) {
       if (!value || typeof value !== 'string') return '';
       try {
         return new URL(value).hostname || '';
-      } catch (_) {
+      } catch {
         return '';
       }
     };
@@ -635,7 +633,7 @@ function renderRedirectPrompt(originUrl) {
     const getCurrentHost = () => {
       try {
         return window.location.hostname || '';
-      } catch (_) {
+      } catch {
         return '';
       }
     };
@@ -645,13 +643,14 @@ function renderRedirectPrompt(originUrl) {
     const description = document.createElement('p');
     const formatDomain = (h) => h.replace(/^www\./, '');
     const updateDescription = (h) => {
-      description.innerHTML = "";
-        description.appendChild(document.createTextNode("You're visiting "));
-        const strong = document.createElement('strong');
-        strong.textContent = formatDomain(h);
-        description.appendChild(strong);
-        description.appendChild(document.createTextNode(" Redirect to your learning platform?"));
-      
+      description.innerHTML = '';
+      description.appendChild(document.createTextNode("You're visiting "));
+      const strong = document.createElement('strong');
+      strong.textContent = formatDomain(h);
+      description.appendChild(strong);
+      description.appendChild(
+        document.createTextNode(' Redirect to your learning platform?'),
+      );
     };
 
     updateDescription(host);
@@ -670,24 +669,29 @@ function renderRedirectPrompt(originUrl) {
     continueButton.textContent = 'Stay here';
     const btnSecStyle = `flex: 1; ${STYLES.btnSecondary} display: flex; justify-content: center; align-items: center; text-align: center;`;
     const btnSecHoverStyle = `flex: 1; ${STYLES.btnSecondaryHover} display: flex; justify-content: center; align-items: center; text-align: center;`;
-    continueButton.setAttribute("style", btnSecStyle);
-    continueButton.onmouseenter = () => continueButton.setAttribute("style", btnSecHoverStyle);
-    continueButton.onmouseleave = () => continueButton.setAttribute("style", btnSecStyle);
-    continueButton.onfocus = () => continueButton.setAttribute("style", btnSecHoverStyle);
-    continueButton.onblur = () => continueButton.setAttribute("style", btnSecStyle);
+    continueButton.setAttribute('style', btnSecStyle);
+    continueButton.onmouseenter = () =>
+      continueButton.setAttribute('style', btnSecHoverStyle);
+    continueButton.onmouseleave = () =>
+      continueButton.setAttribute('style', btnSecStyle);
+    continueButton.onfocus = () =>
+      continueButton.setAttribute('style', btnSecHoverStyle);
+    continueButton.onblur = () =>
+      continueButton.setAttribute('style', btnSecStyle);
 
-
-    const redirectButton = document.createElement("button");
-    redirectButton.textContent = "Redirect";
+    const redirectButton = document.createElement('button');
+    redirectButton.textContent = 'Redirect';
     const btnPriStyle = `flex: 1; ${STYLES.btnPrimary} display: flex; justify-content: center; align-items: center; text-align: center;`;
     const btnPriHoverStyle = `flex: 1; ${STYLES.btnPrimaryHover} display: flex; justify-content: center; align-items: center; text-align: center;`;
-    redirectButton.setAttribute("style", btnPriStyle);
-    redirectButton.onmouseenter = () => redirectButton.setAttribute("style", btnPriHoverStyle);
-    redirectButton.onmouseleave = () => redirectButton.setAttribute("style", btnPriStyle);
-    redirectButton.onfocus = () => redirectButton.setAttribute("style", btnPriHoverStyle);
-    redirectButton.onblur = () => redirectButton.setAttribute("style", btnPriStyle);
-
-    
+    redirectButton.setAttribute('style', btnPriStyle);
+    redirectButton.onmouseenter = () =>
+      redirectButton.setAttribute('style', btnPriHoverStyle);
+    redirectButton.onmouseleave = () =>
+      redirectButton.setAttribute('style', btnPriStyle);
+    redirectButton.onfocus = () =>
+      redirectButton.setAttribute('style', btnPriHoverStyle);
+    redirectButton.onblur = () =>
+      redirectButton.setAttribute('style', btnPriStyle);
 
     const finalize = (action) => {
       if (done) return;
@@ -695,27 +699,25 @@ function renderRedirectPrompt(originUrl) {
       if (action !== 'redirect') {
         try {
           removeOverlay();
-        } catch (_) {}
+        } catch {}
       }
       resolve({ action });
     };
 
     const onPromptKeyDown = (e) => {
       if (done) return;
-      if (e.key === "Escape") {
+      if (e.key === 'Escape') {
         e.preventDefault();
-        finalize("continue");
-      } else if (e.key === "Enter") {
+        finalize('continue');
+      } else if (e.key === 'Enter') {
         e.preventDefault();
-        finalize("redirect");
+        finalize('redirect');
       }
     };
 
-    continueButton.addEventListener("click", () => finalize("continue"));
-    redirectButton.addEventListener("click", () => finalize("redirect"));
-    document.addEventListener("keydown", onPromptKeyDown,true);
-
-
+    continueButton.addEventListener('click', () => finalize('continue'));
+    redirectButton.addEventListener('click', () => finalize('redirect'));
+    document.addEventListener('keydown', onPromptKeyDown, true);
 
     // Keep host label in sync if the user navigates while the prompt is open.
     let hostWatchInterval = null;
@@ -727,7 +729,7 @@ function renderRedirectPrompt(originUrl) {
           updateDescription(host);
         }
       }, 400);
-    } catch (_) {}
+    } catch {}
 
     actions.appendChild(continueButton);
     actions.appendChild(redirectButton);
@@ -753,7 +755,7 @@ function renderLearningContent() {
   return new Promise((resolve) => {
     try {
       removeOverlay();
-    } catch (_) {}
+    } catch {}
 
     const overlay = document.createElement('div');
     overlay.id = 'aiki-overlay';
@@ -897,13 +899,13 @@ function renderLearningContent() {
       if (currentLeft) panel.style.left = currentLeft;
       if (currentTop) panel.style.top = currentTop;
       if (currentTransform) panel.style.transform = currentTransform;
-      
-      heading.style.display = isCollapsed ? "none" : "block";
-      status.style.display = isCollapsed ? "none" : "block";
-      barShell.style.height = isCollapsed ? "6px" : "10px";
-      progressLabel.style.fontSize = isCollapsed ? "0.95em" : "0.9em";
-      progressLabel.style.fontWeight = isCollapsed ? "600" : "400";
-      
+
+      heading.style.display = isCollapsed ? 'none' : 'block';
+      status.style.display = isCollapsed ? 'none' : 'block';
+      barShell.style.height = isCollapsed ? '6px' : '10px';
+      progressLabel.style.fontSize = isCollapsed ? '0.95em' : '0.9em';
+      progressLabel.style.fontWeight = isCollapsed ? '600' : '400';
+
       // Sync the intended position after size change
       setTimeout(() => {
         if (dragHandle && dragHandle.syncIntendedPosition) {
@@ -1061,7 +1063,7 @@ function renderLearningContent() {
       timerPort.cleanup();
       try {
         removeOverlay();
-      } catch (_) {}
+      } catch {}
       // Remove fullscreen listeners when cleaning up to prevent memory leaks
       document.removeEventListener('fullscreenchange', updateOverlayVisibility);
       document.removeEventListener(
@@ -1086,11 +1088,11 @@ function renderLearningContent() {
   });
 }
 
-function renderContentBlocker(originUrl) {
+function renderContentBlocker() {
   return new Promise((resolve) => {
     try {
       removeOverlay();
-    } catch (_) {}
+    } catch {}
 
     const overlay = document.createElement('div');
     overlay.id = 'aiki-overlay';
@@ -1220,20 +1222,16 @@ function renderContentBlocker(originUrl) {
     const cleanup = () => {
       if (cleanupCalled) return;
       cleanupCalled = true;
+      document.removeEventListener('keydown', onBlockerKeyDown, true);
       timerPort.cleanup();
       try {
         overlay.remove();
-      } catch (_) {}
+      } catch {}
     };
 
     overlay.cleanup = cleanup;
 
-    continueButton.addEventListener('click', () => {
-      cleanup();
-      resolve({ action: 'continue' });
-    });
-
-    button.addEventListener('click', async () => {
+    const doReturn = async () => {
       try {
         const result = await getLearningUrl();
         const uri = typeof result === 'string' ? result.trim() : '';
@@ -1243,10 +1241,30 @@ function renderContentBlocker(originUrl) {
           location.href = uri;
           return;
         }
-      } catch (_) {}
+      } catch {}
       cleanup();
       resolve({ action: 'return' });
+    };
+
+    const onBlockerKeyDown = (e) => {
+      if (cleanupCalled) return;
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        cleanup();
+        resolve({ action: 'continue' });
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        doReturn();
+      }
+    };
+
+    continueButton.addEventListener('click', () => {
+      cleanup();
+      resolve({ action: 'continue' });
     });
+
+    button.addEventListener('click', doReturn);
+    document.addEventListener('keydown', onBlockerKeyDown, true);
   }); // end Promise
 }
 
@@ -1290,7 +1308,7 @@ const scheduleRewardOverlayEnsure = () => {
           renderProcrastinationRewardOverlay();
         }
       }
-    } catch (_) {}
+    } catch {}
   }, 120);
 };
 
@@ -1311,7 +1329,7 @@ function installRewardOverlayPersistence() {
       };
       wrapped._aikiRewardWrapped = true;
       history[method] = wrapped;
-    } catch (_) {}
+    } catch {}
   };
 
   wrapHistory('pushState');
@@ -1430,13 +1448,13 @@ function renderProcrastinationRewardOverlay() {
     if (currentTop) panel.style.top = currentTop;
     if (currentBottom) panel.style.bottom = currentBottom;
     if (currentTransform) panel.style.transform = currentTransform;
-    
-    heading.style.display = isCollapsed ? "none" : "block";
-    status.style.display = isCollapsed ? "none" : "block";
-    barShell.style.height = isCollapsed ? "5px" : "8px";
-    progressLabel.style.fontSize = isCollapsed ? "0.9em" : "0.85em";
-    progressLabel.style.fontWeight = isCollapsed ? "600" : "400";
-    
+
+    heading.style.display = isCollapsed ? 'none' : 'block';
+    status.style.display = isCollapsed ? 'none' : 'block';
+    barShell.style.height = isCollapsed ? '5px' : '8px';
+    progressLabel.style.fontSize = isCollapsed ? '0.9em' : '0.85em';
+    progressLabel.style.fontWeight = isCollapsed ? '600' : '400';
+
     // Sync the intended position after size change
     setTimeout(() => {
       if (dragHandle && dragHandle.syncIntendedPosition) {
@@ -1493,25 +1511,25 @@ function renderProcrastinationRewardOverlay() {
     if (remaining <= 5000 && remaining > 0) {
       if (!warningShown) {
         warningShown = true;
-        panel.style.background = "linear-gradient(135deg, #dc2626, #b91c1c)";
+        panel.style.background = 'linear-gradient(135deg, #dc2626, #b91c1c)';
         heading.textContent = "⚠️ Time's almost up!";
       }
       status.textContent = `Returning to learning in ${Math.ceil(remaining / 1000)} seconds...`;
     } else if (remaining <= 0) {
-      status.textContent = "Reward time over! Returning to learning...";
-      panel.style.background = "linear-gradient(135deg, #6366f1, #8b5cf6)";
+      status.textContent = 'Reward time over! Returning to learning...';
+      panel.style.background = 'linear-gradient(135deg, #6366f1, #8b5cf6)';
     } else if (remaining < 30000) {
       status.textContent = 'Almost time to learn again!';
       if (remaining > 5000) {
         warningShown = false;
-        heading.textContent = "🎉 Reward time";
-        panel.style.background = "linear-gradient(135deg, #ADD8E6, #32CD32)";
+        heading.textContent = '🎉 Reward time';
+        panel.style.background = 'linear-gradient(135deg, #ADD8E6, #32CD32)';
       }
     } else {
       status.textContent = 'Enjoy your break!';
       warningShown = false;
-      heading.textContent = "🎉 Reward time";
-      panel.style.background = "linear-gradient(135deg, #ADD8E6, #32CD32)";
+      heading.textContent = '🎉 Reward time';
+      panel.style.background = 'linear-gradient(135deg, #ADD8E6, #32CD32)';
     }
   };
 
@@ -1525,7 +1543,7 @@ function renderProcrastinationRewardOverlay() {
     timerPort.cleanup();
     try {
       overlay.remove();
-    } catch (_) {}
+    } catch {}
   };
 
   overlay.cleanup = cleanup;

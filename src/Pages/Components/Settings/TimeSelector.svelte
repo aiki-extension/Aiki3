@@ -43,7 +43,7 @@
     storage.timeSettings.learningTime.set(learningTime);
 
     try {
-      const result = await browser.runtime.sendMessage({ type: MESSAGE_API_UPDATE_LEARNING_TIME, learningTimeMinutes: learnMin});
+      await browser.runtime.sendMessage({ type: MESSAGE_API_UPDATE_LEARNING_TIME, learningTimeMinutes: learnMin});
       alertStore.add({
         type: 'success',
         message: "Daily learning goal updated.",

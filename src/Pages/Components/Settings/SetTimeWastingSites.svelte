@@ -57,7 +57,6 @@
   }
   setup();
   let addItemValue = "";
-  let selectedSite = "";
   const commonSites = [ // common sites that are used as examples and hardcode so wont have to find
     "www.facebook.com",
     "www.youtube.com",
@@ -114,7 +113,7 @@
     if (!normalized) {
       alertStore.add({
         type: 'warning',
-        message: 'Invalid URL format!'
+        message: 'Invalid URL. Remember to include a domain ending (.com, .org, .dk etc.)'
       })
       return;
     }
@@ -124,7 +123,7 @@
 
     learningUri = parseUrl(await storage.learningUri.get())
     let site = parseUrl(addItemValue);
-    
+    site.host = normalized;
     
     if (learningUri.name === site.name) {
       alertStore.add({
@@ -170,7 +169,7 @@
   }
 
   function pingSite(site) {
-    return new Promise(function (resolve, reject) {
+    return new Promise(function (resolve) {
       let link = document.createElement("img");
       link.src = `https://${site}/favicon.ico`;
       link.style = "display: none;";

@@ -4,7 +4,6 @@
 -->
 <script>
   import { onMount } from "svelte";
-  import Container from "./Container.svelte";
   import storage from "../../../util/storage";
   import { setTheme } from "../../../util/themes";
   import Fa from "svelte-fa";
@@ -33,6 +32,8 @@
   let confirmPassword = "";
   let inviteCode = "";
   let isSubmitting = false;
+  let isResearchParticipant = false;
+  let showPrivacyNotice = false;
   const basicEmailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const dispatch = createEventDispatcher();
 
@@ -103,20 +104,21 @@
     userIsRegistered = false;
   }
 
-  async function authenticateWithBackend({ mode, email, plainTextPassword, inviteCode }) {
+  async function authenticateWithBackend({ mode, email, plainTextPassword, inviteCode, isResearchParticipant }) {
    const type = mode === "register" ? MESSAGE_API_REGISTER : MESSAGE_API_LOGIN;
    try {
      const result = await browser.runtime.sendMessage({
         type,
         email,
         password: plainTextPassword,
-        ...(mode === "register" && inviteCode ? { inviteCode } : {}) // Only include inviteCode if we're in register mode and it's provided
+        ...(mode === "register" && inviteCode ? { inviteCode } : {}), // Only include inviteCode if we're in register mode and it's provided
+        isResearchParticipant: isResearchParticipant,
       });
      if (!result || !result.ok) {
        return { ok: false, message: result?.message || "Server error. Please try again.", token: null };
      }
      return result;
-    } catch (error) {
+    } catch {
       return { ok: false, message: "Could not reach the server.", token: null };
     }
   }
@@ -175,7 +177,8 @@
         mode: authMode,
         email: normalizedUser,
         plainTextPassword: password,
-        inviteCode
+        inviteCode,
+        isResearchParticipant,
       });
 
       if (!authResult?.ok) {
@@ -211,200 +214,359 @@
   onMount(setup);
 </script>
 
-<Container id="user-settings" headline="Account Access">
-  {#if userIsRegistered}
-    <!--
-    We will have to rethink showing the mail,
-    since it will be encrypted in the database.
-    An idea is to make the user input a mail, and
-    make a check upon the hashed mail to see if there's a match.    
-    -->
-    <h5>Signed in email:</h5>
-    <div class="auth-field-wrap">
-      <input
-        id="id-input-field"
-        class="form-control signed-in-input"
-        type="email"
-        value={user}
-        readonly
-      />
-    </div>
-    <button
-      class="btn btn-danger"
-      on:click={resetUid}
-      data-tooltip="Signs you out of Aiki. 
-      WARNING: Aiki cannot log your activity if you are not signed in."
-      ><Fa icon={faUserSlash} /> Sign Out</button
-    >
-  {:else}
-    <h5>
-      {#if authMode === "register"}
-        Create your account
-      {:else}
-        Sign in to continue
-      {/if}
-    </h5>
-    <div class="auth-form-wrap">
-      <form class="auth-form" on:submit|preventDefault={submitAuth}>
-        <input
-          id="id-input-field"
-          bind:value={user}
-          type="email"
-          class="form-control auth-input"
-          placeholder="Enter your email here..."
-          autocomplete="email"
-          on:blur={() => {
-            user = normalizeUser(user);
-          }}
-        />
-        <input
-          type="password"
-          bind:value={password}
-          class="form-control auth-input"
-          placeholder="Enter your password..."
-          autocomplete={authMode === "register" ? "new-password" : "current-password"}
-        />
+{#if userIsRegistered}
+  <div class="auth-card">
+    <img src="/images/AikiLogo.svg" alt="Aiki logo" class="auth-card-icon" />
+    <h2 class="auth-card-title">Account:</h2>
 
-        {#if authMode === "register"}
+    <div class="auth-field-wrap" style="text-align: center;">
+      <label class="auth-label" for="id-input-field">Signed in as <span class="highlighted-text">{user}</span></label>
+    </div>
+
+    <button class="btn btn-danger sign-out-btn" on:click={resetUid}>
+      <Fa icon={faUserSlash} /> Sign Out
+    </button>
+  </div>
+
+{:else}
+  <div class="auth-card">
+    <img src="/images/AikiLogo.svg" alt="Aiki logo" class="auth-card-icon" />
+
+    <h2 class="auth-card-title">
+      {authMode === "register" ? "Create Account" : "Sign In"}
+    </h2>
+
+    <form class="auth-form" on:submit|preventDefault={submitAuth}>
+
+      {#if authMode === "register"}
+        <div class="auth-field-wrap">
+          <label class="auth-label" for="id-input-field">Email</label>
           <input
+            id="id-input-field"
+            bind:value={user}
+            type="email"
+            class="form-control auth-input"
+            placeholder="example@email.com"
+            autocomplete="email"
+            on:blur={() => { user = normalizeUser(user); }}
+          />
+        </div>
+
+        <div class="auth-field-wrap">
+          <label class="auth-label" for="password-field">Password</label>
+          <input
+            id="password-field"
+            type="password"
+            bind:value={password}
+            class="form-control auth-input"
+            placeholder="Enter password"
+            autocomplete="new-password"
+          />
+          <span class="auth-helper-text">Must contain at least 6 characters</span>
+        </div>
+
+        <div class="auth-field-wrap">
+          <label class="auth-label" for="confirm-password-field">
+            Confirm Password <span class="required-star">*</span>
+          </label>
+          <input
+            id="confirm-password-field"
             bind:value={confirmPassword}
             type="password"
             class="form-control auth-input"
-            placeholder="Re-enter your password..."
+            placeholder="Re-enter password"
             autocomplete="new-password"
           />
+        </div>
 
+        <div class="auth-field-wrap">
+          <label class="auth-label" for="confirm-password-field">
+            Invite code (optional)
+          </label>
           <input
             bind:value={inviteCode}
             type="text"
             class="form-control auth-input"
-            placeholder="Enter your invite code (optional)..."
+            placeholder="Invite code (optional)"
           />
+        </div>
 
-        {/if}
-
-        <button class="btn btn-primary submit-button" type="submit" disabled={isSubmitting}>
-          <Fa icon={faUserPlus} />
-          {isSubmitting ? "Please wait..." : authMode === "register" ? "Register" : "Login"}
-        </button>
-
-        <div class="auth-switch-copy">
-          {#if authMode === "register"}
-            <span>Already have an account?
-              <a
-                href="#login"
-                class="auth-switch-link"
-                on:click|preventDefault={() => {
-                  authMode = "login";
-                  resetFormFields({ keepUser: true });
-                }}
-              >
-                Log in here
-              </a>
-            </span>
-          {:else}
-            <span>Don't have an account?
-              <a
-                href="#register"
-                class="auth-switch-link"
-                on:click|preventDefault={() => {
-                  authMode = "register";
-                  resetFormFields({ keepUser: true });
-                }}
-              >
-                Sign up here
-              </a>
-            </span>
-          {/if}
-          <!-- Guest login -->
-          <span>
-            Or continue as a
-            <a
-              href="#guest"
-              class="auth-switch-link"
-              on:click|preventDefault={async () => {
-                await clearSessionLocally({ loadDefaults: true });
-                await persistSessionLocally("guest", null);
-                notifySuccess("You are now signed in as a guest.");
-              }}
-            >
-              guest
-            </a>
+        <div class="checkbox-wrapper">
+          <input
+            type="checkbox"
+            id="research-participant-checkbox"
+            bind:checked={isResearchParticipant}
+            required
+          />
+          <span class="privacy-notice">
+            By checking this box you agree to our
+            <span class="auth-switch-link" role="button" tabindex="0" on:click={() => showPrivacyNotice = true} on:keydown={e => e.key === 'Enter' && (showPrivacyNotice = true)}>Privacy Notice</span>
           </span>
         </div>
-      </form>
-    </div>
 
-    <hr />
-    <h5>Note</h5>
-    <p>
-      Please use the same email you used when signing up for this study.
-    </p>
-    <p>
-      If you clear your cache or browser history, you may need to log in again
-      before we can resume logging your activity.
-    </p>
-    <p>
-      If you have any questions or problems, contact <a
-        href="mailto:wabe@itu.dk">wabe@itu.dk</a
-      >
-      for assistance.
-    </p>
-  {/if}
-</Container>
+      {:else}
+        <!-- LOGIN MODE -->
+        <div class="auth-field-wrap">
+          <label class="auth-label" for="id-input-field">Email</label>
+          <input
+            id="id-input-field"
+            bind:value={user}
+            type="email"
+            class="form-control auth-input"
+            placeholder="example@email.com"
+            autocomplete="email"
+            on:blur={() => { user = normalizeUser(user); }}
+          />
+        </div>
+
+        <div class="auth-field-wrap">
+          <label class="auth-label" for="password-field">Password</label>
+          <input
+            id="password-field"
+            type="password"
+            bind:value={password}
+            class="form-control auth-input"
+            placeholder="Enter password"
+            autocomplete="current-password"
+          />
+        </div>
+      {/if}
+
+      <button class="btn btn-primary submit-button" type="submit" disabled={isSubmitting}>
+        <Fa icon={faUserPlus} />
+        {isSubmitting ? "Please wait..." : authMode === "register" ? "Create Account" : "Login"}
+      </button>
+
+      <div class="auth-switch-copy">
+        {#if authMode === "register"}
+          <span>Already have an account?
+            <a href="#login" class="auth-switch-link"
+              on:click|preventDefault={() => { authMode = "login"; resetFormFields({ keepUser: true }); }}>
+              Log In
+            </a>
+          </span>
+        {:else}
+          <span>Don't have an account?
+            <a href="#register" class="auth-switch-link"
+              on:click|preventDefault={() => { authMode = "register"; resetFormFields({ keepUser: true }); }}>
+              Sign up here
+            </a>
+          </span>
+        {/if}
+
+        <span>Or continue as a
+          <a href="#guest" class="auth-switch-link"
+            on:click|preventDefault={async () => {
+              await clearSessionLocally({ loadDefaults: true });
+              await persistSessionLocally("guest", null);
+              notifySuccess("You are now signed in as a guest.");
+            }}>
+            guest
+          </a>
+        </span>
+      </div>
+
+    </form>
+  </div>
+{/if}
+
+{#if showPrivacyNotice}
+  <!-- svelte-ignore a11y-click-events-have-key-events -->
+  <div class="pn-backdrop" on:click={() => showPrivacyNotice = false}>
+    <div class="pn-modal" on:click|stopPropagation>
+      <h3 class="pn-title">Privacy Notice</h3>
+      <div class="pn-body">
+        <p>
+          Aiki is a research project. Our goal is to discover ways in which we can promote productivity.
+        </p>
+       
+        <p>
+          The only personal information that we store about you is the e-mail you provide on this page. 
+          We need your e-mail to send you a reset password code, important announcements about the extension, and possibly a survey at some point. 
+        </p>
+      
+        <p>
+          We store data about your configuration of the extension e.g. redirection and time wasting sites. 
+          They help us analyze your behaviour, and approximate time spent using the extension.  
+        </p>
+        
+        <p>
+          We might make the anonymized data available for other researchers too. 
+          In research, data can be even more important than algorithms.
+        </p>
+      </div>
+      <button class="btn btn-primary pn-close-btn" on:click={() => showPrivacyNotice = false}>Close</button>
+    </div>
+  </div>
+{/if}
 
 <style>
-  h5 {
-    font-family: var(--fontHeaders),serif;
+  /* Card shell */
+  .auth-card {
+    background-color: var(--backgroundColorSecondary);
+    color: var(--textColor);
+    border-radius: 16px;
+    box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.1);
+    padding: 2rem 2rem 1.75rem;
+    width: 100%;
+    max-width: 26rem;          
+    margin: 0 auto;            /* center it in the settings column */
+    display: flex;
+    flex-direction: column;
+    align-items: center;       /* all children centered */
+    gap: 0;
   }
 
-  p {
-    font-family: var(--fontContent),serif;
-    font-size: var(--fontSizeSettings);
+  /* Logo icon at the top */
+  .auth-card-icon {
+    width: 3rem;
+    height: 3rem;
+    margin-bottom: 0.5rem;
   }
 
-  hr {
-    background-color: var(--hrColor);
+  .auth-card-title {
+    font-family: var(--fontHeaders), serif;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--textColor);
+    margin: 0 0 1.25rem 0;
+    text-align: center;
   }
 
+  /* Form fills the card width */
   .auth-form {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
+    align-items: stretch;      /* fields stretch to card width */
     gap: 0.75rem;
     width: 100%;
   }
 
-  .auth-form-wrap,
+  /* Each label+input pair */
   .auth-field-wrap {
-    width: min(100%, 20rem);
-    max-width: 20rem;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .auth-label {
+    font-family: var(--fontContent), serif;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--textColor);
+  }
+
+  .required-star {
+    color: var(--buttonPrimary, #f97316);
   }
 
   .auth-input,
   .signed-in-input {
     display: block;
-    width: 100% !important;
-    max-width: 20rem !important;
+    width: 100%;
     box-sizing: border-box;
-    flex: 0 0 auto;
   }
 
+  /* Helper text below a field (e.g. "Must contain at least 4 characters") */
+  .auth-helper-text {
+    font-size: 0.75rem;
+    color: var(--textColorSecondary, rgba(255,255,255,0.6));
+    margin-top: 0.1rem;
+  }
+
+  /* Submit button spans the full card width */
   .submit-button {
-    align-self: flex-start;
+    width: 100%;
+    margin-top: 0.5rem;
+    border-radius: 999px;      /* pill shape matching the screenshot */
+    font-weight: 700;
+    padding: 0.65rem 0;
   }
 
+  .sign-out-btn {
+    margin-top: 0.75rem;
+  }
+
+  /* Footer links, centered */
   .auth-switch-copy {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
+    align-items: center;       /* centered, not left-aligned */
     gap: 0.2rem;
-    margin-top: 0.15rem;
+    margin-top: 0.75rem;
+    font-size: 0.85rem;
+    text-align: center;
   }
 
   .auth-switch-link {
     color: var(--buttonPrimary, #007bff);
     cursor: pointer;
     text-decoration: underline;
+  }
+
+  /* Privacy checkbox row */
+  .checkbox-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+  }
+
+  .checkbox-wrapper input[type="checkbox"] {
+    flex-shrink: 0;
+    margin: 0;
+    cursor: pointer;
+  }
+
+  .privacy-notice {
+    font-size: 0.75rem;
+  }
+
+  .pn-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+
+  .pn-modal {
+    background: var(--backgroundColorSecondary);
+    color: var(--textColor);
+    border-radius: 12px;
+    padding: 1.5rem;
+    width: min(92%, 34rem);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .pn-title {
+    font-family: var(--fontHeaders), serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin: 0;
+  }
+
+  .pn-body {
+    font-size: 0.85rem;
+    line-height: 1.6;
+    max-height: 70vh;
+    overflow-y: auto;
+  }
+
+  .pn-close-btn {
+    align-self: flex-end;
+    border-radius: 999px;
+    padding: 0.4rem 1.2rem;
+  }
+
+  .highlighted-text {
+    color: #3378b4;
+    font-weight: 600;
   }
 </style>
