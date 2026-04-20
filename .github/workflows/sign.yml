@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 env:
-  PUBLIC_API_BASE_URL: https://zeeguu.dev/api/
+  PUBLIC_API_BASE_URL: https://aiki.zeeguu.dev/api/
 
 jobs:
   build_chrome:
