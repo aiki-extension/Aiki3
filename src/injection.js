@@ -1220,6 +1220,7 @@ function renderContentBlocker() {
     const cleanup = () => {
       if (cleanupCalled) return;
       cleanupCalled = true;
+      document.removeEventListener('keydown', onBlockerKeyDown, true);
       timerPort.cleanup();
       try {
         overlay.remove();
@@ -1228,12 +1229,7 @@ function renderContentBlocker() {
 
     overlay.cleanup = cleanup;
 
-    continueButton.addEventListener('click', () => {
-      cleanup();
-      resolve({ action: 'continue' });
-    });
-
-    button.addEventListener('click', async () => {
+    const doReturn = async () => {
       try {
         const result = await getLearningUrl();
         const uri = typeof result === 'string' ? result.trim() : '';
@@ -1246,7 +1242,27 @@ function renderContentBlocker() {
       } catch {}
       cleanup();
       resolve({ action: 'return' });
+    };
+
+    const onBlockerKeyDown = (e) => {
+      if (cleanupCalled) return;
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        cleanup();
+        resolve({ action: 'continue' });
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        doReturn();
+      }
+    };
+
+    continueButton.addEventListener('click', () => {
+      cleanup();
+      resolve({ action: 'continue' });
     });
+
+    button.addEventListener('click', doReturn);
+    document.addEventListener('keydown', onBlockerKeyDown, true);
   }); // end Promise
 }
 
