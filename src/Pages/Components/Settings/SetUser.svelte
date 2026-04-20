@@ -262,7 +262,7 @@
             placeholder="Enter password"
             autocomplete="new-password"
           />
-          <span class="auth-helper-text">Must contain at least 4 characters</span>
+          <span class="auth-helper-text">Must contain at least 6 characters</span>
         </div>
 
         <div class="auth-field-wrap">
