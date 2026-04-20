@@ -21,7 +21,7 @@
   let origin = {};
   
   // Ignore linter warning for this. Extension window breaks without this promise 
-  let timeValues = new Promise((resolve) => {});
+  let timeValues = new Promise((resolve) => {}); // eslint-disable-line
 
   function sync(res) {
     timeValues = new Promise((resolve) => {

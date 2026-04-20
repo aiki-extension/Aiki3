@@ -314,8 +314,8 @@ class TimerManager {
 
           if (!this.sessionCompleted) {
             this.sessionCompleted = true;
-            
-            if (typeof this.sessionOnComplete === "function") {
+
+            if (typeof this.sessionOnComplete === 'function') {
               this.sessionOnComplete();
               this.sessionOnComplete = null;
             }

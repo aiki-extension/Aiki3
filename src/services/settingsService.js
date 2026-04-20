@@ -1,34 +1,55 @@
-import browser from "webextension-polyfill";
-import storage from "../util/storage";
-import { MESSAGE_API_GET_USER_SETTINGS, MESSAGE_REDIRECTION_REFRESH_FILTERS } from "../values/messageTypeValues";
-import { parseUrl } from "../util/utilities";
-import { alertStore } from "../services/alertService";
+import browser from 'webextension-polyfill';
+import storage from '../util/storage';
+import {
+  MESSAGE_API_GET_USER_SETTINGS,
+  MESSAGE_REDIRECTION_REFRESH_FILTERS,
+} from '../values/messageTypeValues';
+import { parseUrl } from '../util/utilities';
+import { alertStore } from '../services/alertService';
 
 async function syncDBSettingsToLocalStorage(db) {
-    if (db.inviteCode && !db.inviteCode?.isActive) {
-        alertStore.add({ message: "Your invite code is no longer active", type: "warning" });
-    }
-    
-    await Promise.all([
-        storage.inviteCode.set(db.inviteCode?.code),
-        storage.timeSettings.sessionMinutes.set(db.sessionDurationMinutes),
-        storage.timeSettings.rewardMinutes.set(db.rewardTimeMinutes),
-        storage.timeSettings.learningTime.set({ min: db.dailyLearningGoalMinutes, sec: 0}),
-        storage.operatingHours.from.set({ hrs: Math.floor(db.operatingStartMinutes / 60), min: db.operatingStartMinutes % 60 }),
-        storage.operatingHours.to.set({ hrs: Math.floor(db.operatingEndMinutes / 60), min: db.operatingEndMinutes % 60 }),
-        storage.learningUri.set(db.learningSiteDomain || ""),
-        storage.list.set((db.timeWastingSites || []).map(domain => parseUrl(domain))), // Stores time-wasting sites into local storage
-        storage.featureFlags.set(db.flags ?? {}), 
-    ])
+  if (db.inviteCode && !db.inviteCode?.isActive) {
+    alertStore.add({
+      message: 'Your invite code is no longer active',
+      type: 'warning',
+    });
+  }
+
+  await Promise.all([
+    storage.inviteCode.set(db.inviteCode?.code),
+    storage.timeSettings.sessionMinutes.set(db.sessionDurationMinutes),
+    storage.timeSettings.rewardMinutes.set(db.rewardTimeMinutes),
+    storage.timeSettings.learningTime.set({
+      min: db.dailyLearningGoalMinutes,
+      sec: 0,
+    }),
+    storage.operatingHours.from.set({
+      hrs: Math.floor(db.operatingStartMinutes / 60),
+      min: db.operatingStartMinutes % 60,
+    }),
+    storage.operatingHours.to.set({
+      hrs: Math.floor(db.operatingEndMinutes / 60),
+      min: db.operatingEndMinutes % 60,
+    }),
+    storage.learningUri.set(db.learningSiteDomain || ''),
+    storage.list.set(
+      (db.timeWastingSites || []).map((domain) => parseUrl(domain)),
+    ), // Stores time-wasting sites into local storage
+    storage.featureFlags.set(db.flags ?? {}),
+  ]);
 }
 
 // Fetches and syncs without checking (used when logging in)
 export async function fetchAndSyncSettings() {
-    const result = await browser.runtime.sendMessage({ type: MESSAGE_API_GET_USER_SETTINGS });
-    if (!result.ok) return { ok: false, message: result.message };
+  const result = await browser.runtime.sendMessage({
+    type: MESSAGE_API_GET_USER_SETTINGS,
+  });
+  if (!result.ok) return { ok: false, message: result.message };
 
-    await syncDBSettingsToLocalStorage(result.data);
-    await browser.runtime.sendMessage({ type: MESSAGE_REDIRECTION_REFRESH_FILTERS });
-    console.log("[Settings] Synced DB settings to local storage:", result.data);
-    return { ok: true };
+  await syncDBSettingsToLocalStorage(result.data);
+  await browser.runtime.sendMessage({
+    type: MESSAGE_REDIRECTION_REFRESH_FILTERS,
+  });
+  console.log('[Settings] Synced DB settings to local storage:', result.data);
+  return { ok: true };
 }
