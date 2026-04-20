@@ -230,7 +230,6 @@
 
 {:else}
   <div class="auth-card">
-    <!-- Logo / Icon -->
     <img src="/images/AikiLogo.svg" alt="Aiki logo" class="auth-card-icon" />
 
     <h2 class="auth-card-title">
@@ -385,7 +384,7 @@
     gap: 0;
   }
 
-  /* ── Logo icon at the top ── */
+  /* Logo icon at the top */
   .auth-card-icon {
     width: 3rem;
     height: 3rem;
@@ -401,7 +400,7 @@
     text-align: center;
   }
 
-  /* ── Form fills the card width ── */
+  /* Form fills the card width */
   .auth-form {
     display: flex;
     flex-direction: column;
@@ -410,11 +409,10 @@
     width: 100%;
   }
 
-  /* ── Each label+input pair ── */
+  /* Each label+input pair */
   .auth-field-wrap {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
     width: 100%;
   }
 
@@ -443,7 +441,7 @@
     margin-top: 0.1rem;
   }
 
-  /* ── Submit button spans the full card width ── */
+  /* Submit button spans the full card width */
   .submit-button {
     width: 100%;
     margin-top: 0.5rem;
@@ -456,7 +454,7 @@
     margin-top: 0.75rem;
   }
 
-  /* ── Footer links, centered ── */
+  /* Footer links, centered */
   .auth-switch-copy {
     display: flex;
     flex-direction: column;
@@ -473,7 +471,7 @@
     text-decoration: underline;
   }
 
-  /* ── Privacy checkbox row ── */
+  /* Privacy checkbox row */
   .checkbox-wrapper {
     display: flex;
     align-items: center;
