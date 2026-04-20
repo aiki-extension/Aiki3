@@ -248,7 +248,6 @@
             class="form-control auth-input"
             placeholder="example@email.com"
             autocomplete="email"
-            required
             on:blur={() => { user = normalizeUser(user); }}
           />
         </div>
@@ -262,7 +261,6 @@
             class="form-control auth-input"
             placeholder="Enter password"
             autocomplete="new-password"
-            required
           />
           <span class="auth-helper-text">Must contain at least 4 characters</span>
         </div>
@@ -278,7 +276,6 @@
             class="form-control auth-input"
             placeholder="Re-enter password"
             autocomplete="new-password"
-            required
           />
         </div>
 
