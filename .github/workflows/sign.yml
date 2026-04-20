@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 env:
-  PUBLIC_API_BASE_URL: http://94.130.110.4/api/
+  PUBLIC_API_BASE_URL: https://zeeguu.dev/api/
 
 jobs:
   build_chrome:
