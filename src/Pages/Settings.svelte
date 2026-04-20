@@ -11,7 +11,6 @@
   /*Components import*/
   import Footer from "./Components/Settings/Footer.svelte";
   import Header from "./Components/Settings/Header.svelte";
-  import Privacy from "./Components/Settings/Privacy.svelte";
   import SetUser from "./Components/Settings/SetUser.svelte";
   import SetWebsites from "./Components/Settings/SetTimeWastingSites.svelte";
   import SetRedirection from "./Components/Settings/SetRedirection.svelte";
@@ -64,11 +63,6 @@
   <Alerts />
   <Header />
   <main>
-    {#if !userIsRegistered}
-      <div class="container">
-        <Privacy />
-      </div>
-    {/if}
     <div class="container">
       <!-- Listens for the "authenticated" event in SetUser.svelte. Thus triggering the function to trigger, to refresh values on the page-->
       <SetUser bind:user bind:userIsRegistered on:authenticated={handleAuthenticated} />

@@ -214,7 +214,7 @@
   onMount(setup);
 </script>
 
-<Container id="user-settings" headline="Account Access">
+<Container id="user-settings" headline="">
   {#if userIsRegistered}
     <!--
     We will have to rethink showing the mail,
@@ -289,8 +289,12 @@
               type="checkbox"
               id="research-participant-checkbox"
               bind:checked={isResearchParticipant}
+              required
             />
-            <label for="research-participant-checkbox">I am a research participant</label>
+            <label class="privacy-notice" for="research-participant-checkbox">
+              By checking this box you agree to our
+              <span class="link-style">Privacy Notice</span>
+            </label>
           </div>
 
         {/if}
@@ -346,22 +350,6 @@
         </div>
       </form>
     </div>
-
-    <hr />
-    <h5>Note</h5>
-    <p>
-      Please use the same email you used when signing up for this study.
-    </p>
-    <p>
-      If you clear your cache or browser history, you may need to log in again
-      before we can resume logging your activity.
-    </p>
-    <p>
-      If you have any questions or problems, contact <a
-        href="mailto:wabe@itu.dk">wabe@itu.dk</a
-      >
-      for assistance.
-    </p>
   {/if}
 </Container>
 
@@ -428,5 +416,9 @@
   
   .checkbox-wrapper label {
     cursor: pointer; /* Makes the text show a pointer cursor */
+  }
+
+  .privacy-notice {
+    font-size: 12px;
   }
 </style>
