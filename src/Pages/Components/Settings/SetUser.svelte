@@ -33,6 +33,7 @@
   let inviteCode = "";
   let isSubmitting = false;
   let isResearchParticipant = false;
+  let showPrivacyNotice = false;
   const basicEmailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const dispatch = createEventDispatcher();
 
@@ -300,10 +301,10 @@
             bind:checked={isResearchParticipant}
             required
           />
-          <label class="privacy-notice" for="research-participant-checkbox">
+          <span class="privacy-notice">
             By checking this box you agree to our
-            <span class="auth-switch-link">Privacy Notice</span>
-          </label>
+            <span class="auth-switch-link" role="button" tabindex="0" on:click={() => showPrivacyNotice = true} on:keydown={e => e.key === 'Enter' && (showPrivacyNotice = true)}>Privacy Notice</span>
+          </span>
         </div>
 
       {:else}
@@ -369,6 +370,36 @@
       </div>
 
     </form>
+  </div>
+{/if}
+
+{#if showPrivacyNotice}
+  <!-- svelte-ignore a11y-click-events-have-key-events -->
+  <div class="pn-backdrop" on:click={() => showPrivacyNotice = false}>
+    <div class="pn-modal" on:click|stopPropagation>
+      <h3 class="pn-title">Privacy Notice</h3>
+      <div class="pn-body">
+        <p>
+          Aiki is a research project. Our goal is to discover ways in which we can promote productivity.
+        </p>
+       
+        <p>
+          The only personal information that we store about you is the e-mail you provide on this page. 
+          We need your e-mail to send you a reset password code, important announcements about the extension, and possibly a survey at some point. 
+        </p>
+      
+        <p>
+          We store data about your configuration of the extension e.g. redirection and time wasting sites. 
+          They help us analyze your behaviour, and approximate time spent using the extension.  
+        </p>
+        
+        <p>
+          We might make the anonymized data available for other researchers too. 
+          In research, data can be even more important than algorithms.
+        </p>
+      </div>
+      <button class="btn btn-primary pn-close-btn" on:click={() => showPrivacyNotice = false}>Close</button>
+    </div>
   </div>
 {/if}
 
@@ -480,16 +511,61 @@
   .checkbox-wrapper {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 0.5rem;
-    cursor: pointer;
+    width: 100%;
   }
 
-  .checkbox-wrapper label {
+  .checkbox-wrapper input[type="checkbox"] {
+    flex-shrink: 0;
+    margin: 0;
     cursor: pointer;
   }
 
   .privacy-notice {
+    font-size: 0.75rem;
+  }
+
+  .pn-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+
+  .pn-modal {
+    background: var(--backgroundColorSecondary);
+    color: var(--textColor);
+    border-radius: 12px;
+    padding: 1.5rem;
+    width: min(92%, 34rem);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .pn-title {
+    font-family: var(--fontHeaders), serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin: 0;
+  }
+
+  .pn-body {
     font-size: 0.85rem;
+    line-height: 1.6;
+    max-height: 70vh;
+    overflow-y: auto;
+  }
+
+  .pn-close-btn {
+    align-self: flex-end;
+    border-radius: 999px;
+    padding: 0.4rem 1.2rem;
   }
 
   .highlighted-text {
