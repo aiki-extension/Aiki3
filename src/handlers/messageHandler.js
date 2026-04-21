@@ -260,23 +260,12 @@ export async function handleMessage(message, sender) {
                 console.log(
                   '[Session] On time wasting site, showing redirect prompt',
                 );
-
-                // Show redirect prompt
-                const response = await browser.tabs.sendMessage(tabs[0].id, {
-                  action: 'display:redirectPrompt',
-                  url: learningUrl,
-                  originUrl: timeWastingUrl,
-                });
-
-                // If user clicks "Redirect", navigate to learning site
-                if (response && response.action === 'redirect') {
-                  console.log('[Session] User chose to redirect to learning');
-                  await browser.tabs.update(tabs[0].id, { url: learningUrl });
-                } else {
-                  console.log(
-                    '[Session] User chose to stay on time wasting site',
-                  );
-                }
+                await storage.origin.remove(); // clear stale origin so dispatchPrompt uses promptRedirect
+                await redirection.dispatchPrompt(
+                  tabs[0].id,
+                  learningUrl,
+                  currentUrl,
+                );
               } else if (isOnLearningSite(currentUrl, learningUrl)) {
                 console.log('[Session] On learning site, starting new session');
                 // Trigger session start on learning site
