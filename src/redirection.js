@@ -846,4 +846,5 @@ export default {
   checkActiveTab,
   finalizeAllActiveSessions,
   onContentScriptReady,
+  dispatchPrompt,
 };
