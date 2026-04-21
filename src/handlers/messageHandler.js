@@ -261,7 +261,11 @@ export async function handleMessage(message, sender) {
                   '[Session] On time wasting site, showing redirect prompt',
                 );
                 await storage.origin.remove(); // clear stale origin so dispatchPrompt uses promptRedirect
-                await redirection.dispatchPrompt(tabs[0].id, learningUrl, currentUrl);
+                await redirection.dispatchPrompt(
+                  tabs[0].id,
+                  learningUrl,
+                  currentUrl,
+                );
               } else if (isOnLearningSite(currentUrl, learningUrl)) {
                 console.log('[Session] On learning site, starting new session');
                 // Trigger session start on learning site
