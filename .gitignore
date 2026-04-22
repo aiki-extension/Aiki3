@@ -13,3 +13,7 @@ back4app.secret
 .env
 
 web-ext-artifacts/
+
+# Local Chrome "Pack extension" artifacts — never commit
+*.pem
+*.crx
