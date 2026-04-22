@@ -4,7 +4,7 @@
   "description": "Aiki³ browser extension",
   "browser_specific_settings": {
     "gecko": {
-      "id": "aiki3@extension.local",
+      "id": "aiki3@aiki-extension.github.io",
       "strict_min_version": "109.0",
       "data_collection_permissions": {
         "required": ["authenticationInfo", "personallyIdentifyingInfo", "websiteContent"]
