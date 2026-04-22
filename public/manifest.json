@@ -10,7 +10,7 @@
         "required": [
           "authenticationInfo",
           "personallyIdentifyingInfo",
-          "websiteContent"
+          "websiteActivity"
         ]
       }
     }
