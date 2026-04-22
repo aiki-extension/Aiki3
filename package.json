@@ -7,6 +7,7 @@
     "start": "sirv public",
     "build:firefox": "node scripts/buildFirefox.js && npm run build",
     "build:chrome": "node scripts/buildChrome.js && npm run build",
+    "package:firefox": "npm run build:firefox && web-ext build --source-dir=public --artifacts-dir=web-ext-artifacts --filename=aiki3-firefox.xpi --overwrite-dest --ignore-files=\"**/*.map\"",
     "dev:firefox": "node scripts/buildFirefox.js && npm run dev",
     "dev:chrome": "node scripts/buildChrome.js && npm run dev",
     "sign": "node scripts/sign.js",

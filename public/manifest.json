@@ -5,15 +5,28 @@
   "browser_specific_settings": {
     "gecko": {
       "id": "aiki3@extension.local",
-      "strict_min_version": "109.0"
+      "strict_min_version": "109.0",
+      "data_collection_permissions": {
+        "required": [
+          "authenticationInfo",
+          "personallyIdentifyingInfo",
+          "websiteContent"
+        ]
+      }
     }
   },
   "icons": {
     "128": "images/AikiLogo.png"
   },
-  "permissions": ["storage", "tabs", "webNavigation"],
+  "permissions": [
+    "storage",
+    "tabs",
+    "webNavigation"
+  ],
   "background": {
-    "scripts": ["build/background.js"]
+    "scripts": [
+      "build/background.js"
+    ]
   },
   "action": {
     "default_title": "Aiki",
@@ -22,20 +35,28 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["build/injection.js"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "build/injection.js"
+      ],
       "run_at": "document_start"
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["images/AikiLogo.png"],
-      "matches": ["<all_urls>"]
+      "resources": [
+        "images/AikiLogo.png"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self';"
   },
   "options_page": "index.html?page=settings",
-  "version": "4.0.0"
+  "version": "4.0.2"
 }
