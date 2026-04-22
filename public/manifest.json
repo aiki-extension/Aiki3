@@ -1,18 +1,32 @@
 {
   "manifest_version": 3,
   "name": "Aiki",
-  "description": "A browser extension that helps you stay focused by redirecting you from distractions to what you yourself previously declared actually matters.",
+  "description": "Stay focused by redirecting you from distractions to what you yourself previously declared actually matters.",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "aiki3@aiki-extension.github.io",
+      "strict_min_version": "109.0",
+      "data_collection_permissions": {
+        "required": [
+          "authenticationInfo",
+          "personallyIdentifyingInfo",
+          "websiteActivity"
+        ]
+      }
+    }
+  },
   "icons": {
     "128": "images/AikiLogo.png"
   },
   "permissions": [
     "storage",
     "tabs",
-    "windows",
     "webNavigation"
   ],
   "background": {
-    "service_worker": "build/background.js"
+    "scripts": [
+      "build/background.js"
+    ]
   },
   "action": {
     "default_title": "Aiki",
