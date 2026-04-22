@@ -58,5 +58,5 @@
     "extension_pages": "script-src 'self'; object-src 'self';"
   },
   "options_page": "index.html?page=settings",
-  "version": "4.0.2"
+  "version": "3.0.0"
 }
