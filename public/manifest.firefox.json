@@ -1,11 +1,18 @@
 {
   "manifest_version": 3,
-  "name": "Aiki³",
-  "description": "Aiki³ browser extension",
+  "name": "Aiki",
+  "description": "Stay focused by redirecting you from distractions to what you yourself previously declared actually matters.",
   "browser_specific_settings": {
     "gecko": {
-      "id": "aiki3@extension.local",
-      "strict_min_version": "109.0"
+      "id": "aiki3@aiki-extension.github.io",
+      "strict_min_version": "109.0",
+      "data_collection_permissions": {
+        "required": [
+          "authenticationInfo",
+          "personallyIdentifyingInfo",
+          "websiteActivity"
+        ]
+      }
     }
   },
   "icons": {

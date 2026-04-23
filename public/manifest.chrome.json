@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Aiki³",
-  "description": "Aiki³ browser extension",
+  "name": "Aiki",
+  "description": "Stay focused by redirecting you from distractions to what you yourself previously declared actually matters.",
   "icons": {
     "128": "images/AikiLogo.png"
   },
