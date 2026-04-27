@@ -460,14 +460,14 @@ async function bootstrapRewardOverlayIfNeeded() {
     if (timerData && timerData.sessionRewardGoal > 0) {
       // Get time wasting sites list
       const result = await browser.storage.local.get('list');
-      const procList = result?.list || [];
-      const procHosts = procList
+      const timeWasteList = result?.list || [];
+      const timeWasteHosts = timeWasteList
         .map((item) => item?.host || item?.name || '')
         .filter(Boolean);
 
       // Check if current page matches any time wasting site
       const currentHost = location.hostname.replace(/^www\./, '');
-      const isOnProcrastinationSite = procHosts.some((host) => {
+      const isOnTimeWastingSite = timeWasteHosts.some((host) => {
         const normalizedHost = host.replace(/^www\./, '');
         return (
           currentHost === normalizedHost ||
@@ -476,11 +476,11 @@ async function bootstrapRewardOverlayIfNeeded() {
         );
       });
 
-      if (isOnProcrastinationSite) {
+      if (isOnTimeWastingSite) {
         // Small delay to ensure DOM is ready
         setTimeout(() => {
           if (!document.getElementById('aiki-reward-overlay')) {
-            renderProcrastinationRewardOverlay();
+            renderTimeWastingRewardOverlay();
           }
         }, 50);
       }
@@ -508,7 +508,7 @@ browser.runtime.onMessage.addListener((request) => {
   } else if (request.action === 'display: encouragement') {
     return renderLearningContent(request.shouldShowWelcome);
   } else if (request.action === 'display: rewardOverlay') {
-    renderProcrastinationRewardOverlay();
+    renderTimeWastingRewardOverlay();
     return Promise.resolve({ action: 'reward overlay shown' });
   } else if (request.action === 'kill aiki') {
     removeOverlay();
@@ -1289,13 +1289,13 @@ const scheduleRewardOverlayEnsure = () => {
       ) {
         // Also check if we're on a time wasting site
         const result = await browser.storage.local.get('list');
-        const procList = result?.list || [];
-        const procHosts = procList
+        const timeWasteList = result?.list || [];
+        const timeWasteHosts = timeWasteList
           .map((item) => item?.host || item?.name || '')
           .filter(Boolean);
 
         const currentHost = location.hostname.replace(/^www\./, '');
-        const isOnProcrastinationSite = procHosts.some((host) => {
+        const isOnTimeWastingSite = timeWasteHosts.some((host) => {
           const normalizedHost = host.replace(/^www\./, '');
           return (
             currentHost === normalizedHost ||
@@ -1304,8 +1304,8 @@ const scheduleRewardOverlayEnsure = () => {
           );
         });
 
-        if (isOnProcrastinationSite) {
-          renderProcrastinationRewardOverlay();
+        if (isOnTimeWastingSite) {
+          renderTimeWastingRewardOverlay();
         }
       }
     } catch {}
@@ -1349,7 +1349,7 @@ function installRewardOverlayPersistence() {
  * Render a reward time overlay for controlled variant on time wasting sites.
  * Non-blocking panel showing countdown until learning resumes.
  */
-function renderProcrastinationRewardOverlay() {
+function renderTimeWastingRewardOverlay() {
   // Install persistence guards on first render
   installRewardOverlayPersistence();
 
@@ -1498,7 +1498,7 @@ function renderProcrastinationRewardOverlay() {
     if (!document.getElementById('aiki-reward-overlay')) {
       console.log('[Aiki] Reward overlay missing from DOM, re-rendering...');
       cleanup();
-      renderProcrastinationRewardOverlay();
+      renderTimeWastingRewardOverlay();
       return;
     }
 
@@ -1552,8 +1552,7 @@ function renderProcrastinationRewardOverlay() {
 
 // Export for potential use from background
 if (typeof window !== 'undefined') {
-  window.renderProcrastinationRewardOverlay =
-    renderProcrastinationRewardOverlay;
+  window.renderTimeWastingRewardOverlay = renderTimeWastingRewardOverlay;
 }
 
 // Check if we're in reward mode when content script loads
@@ -1587,7 +1586,7 @@ if (typeof window !== 'undefined') {
       // If in reward mode and on a time wasting site, show overlay
       if (isOnTimeWastingSite) {
         console.log('[Aiki] Auto-restoring reward overlay on page load');
-        renderProcrastinationRewardOverlay();
+        renderTimeWastingRewardOverlay();
       }
     }
   } catch (e) {

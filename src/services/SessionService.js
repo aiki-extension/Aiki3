@@ -42,9 +42,9 @@ async function startSession(tabId, sessionType, siteUrl, triggerUrl = null) {
 
   if (sessionType === 'learning') {
     sessionData.learningUrl = siteUrl;
-    sessionData.procrastinationUrl = triggerUrl;
+    sessionData.timeWastingUrl = triggerUrl;
   } else {
-    sessionData.procrastinationUrl = siteUrl;
+    sessionData.timeWastingUrl = siteUrl;
   }
 
   await storage.activeSessions.set(tabId, sessionData);
@@ -72,7 +72,7 @@ async function finalizeSession(tabId, sessionType) {
     const logData = {
       participantId: session.participantId,
       sessionType,
-      procrastinationSite: session.procrastinationUrl,
+      timeWastingSite: session.timeWastingUrl,
       sessionStart: new Date(startedAt),
       sessionEnd: new Date(now),
       actualDurationSeconds: durationSeconds,

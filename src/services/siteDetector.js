@@ -11,7 +11,7 @@ import { parseUrl } from '../util/utilities';
  * @param {string[]} hosts - List of time wasting host names
  * @returns {boolean}
  */
-export function isProcrastinationSite(url, hosts) {
+export function isTimeWastingSite(url, hosts) {
   if (!url || !hosts || hosts.length === 0) return false;
   try {
     const urlHost = new URL(url).hostname.replace(/^www\./, '').toLowerCase();
@@ -47,9 +47,9 @@ export function isLearningSite(url, learningUrl) {
  * Get time wasting hosts from storage.
  * @returns {Promise<string[]>}
  */
-export async function getProcrastinationHosts() {
-  const procList = await storage.list.get();
-  return (procList || [])
+export async function getTimeWastingHosts() {
+  const TimeWasteList = await storage.list.get();
+  return (TimeWasteList || [])
     .map((item) => item?.host || item?.name || '')
     .filter(Boolean);
 }
@@ -70,9 +70,9 @@ export async function getLearningUrl() {
  * @param {string} url - URL to check
  * @returns {Promise<boolean>}
  */
-export async function checkIfProcrastination(url) {
-  const hosts = await getProcrastinationHosts();
-  return isProcrastinationSite(url, hosts);
+export async function checkIfTimeWastingSite(url) {
+  const hosts = await getTimeWastingHosts();
+  return isTimeWastingSite(url, hosts);
 }
 
 /**
@@ -95,11 +95,11 @@ export function getSiteName(url) {
 }
 
 export default {
-  isProcrastinationSite,
+  isTimeWastingSite,
   isLearningSite,
-  getProcrastinationHosts,
+  getTimeWastingHosts,
   getLearningUrl,
-  checkIfProcrastination,
+  checkIfTimeWastingSite,
   checkIfLearning,
   getSiteName,
 };
