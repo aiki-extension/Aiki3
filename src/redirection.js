@@ -83,8 +83,8 @@ async function removePreemptiveHide(tabId) {
 }
 
 async function createFilter() {
-  const procList = await storage.list.get();
-  const url = buildProcrastinationUrlFilters(procList || []);
+  const timeWasteList = await storage.list.get();
+  const url = buildProcrastinationUrlFilters(timeWasteList || []);
   if (!url.length) return null;
   return { url };
 }
@@ -182,18 +182,18 @@ async function redirect(details, immediate = false) {
         return;
       }
 
-      const procList = await storage.list.get();
+      const timeWasteList = await storage.list.get();
 
       // The hostSuffix URL filter is broad (e.g. "youtube.com" also matches
       // "accounts.youtube.com"). Guard here so auth/redirect subdomains never
       // queue a pending intent or overwrite a legitimate one.
       const tabSiteName = parseUrl(details.url).name;
-      const procListNames = (procList || []).map((site) => site.name);
-      if (!procListNames.includes(tabSiteName)) {
+      const timeWasteListNames = (timeWasteList || []).map((site) => site.name);
+      if (!timeWasteListNames.includes(tabSiteName)) {
         return;
       }
 
-      const procHosts = (procList || [])
+      const timeWasteHosts = (timeWasteList || [])
         .map((item) => item?.host || item?.name || '')
         .filter(Boolean);
       const learningUrl = await getLearningUrl();
@@ -203,7 +203,7 @@ async function redirect(details, immediate = false) {
           navigationGuards.applyPreemptiveHide(tabId),
         removePreemptiveHide: (tabId) =>
           navigationGuards.removePreemptiveHide(tabId),
-        procrastinationHosts: procHosts,
+        procrastinationHosts: timeWasteHosts,
         learningUrl,
       });
       if (handled) return;
@@ -492,18 +492,18 @@ async function checkActiveTab() {
     if (tabs.length > 0) {
       const tab = tabs[0];
       const tabSiteName = parseUrl(tab.url).name;
-      const procList = await storage.list.get();
-      const procListNames = procList.map((site) => site.name);
-      if (procListNames.includes(tabSiteName)) {
+      const timeWasteList = await storage.list.get();
+      const timeWasteListNames = timeWasteList.map((site) => site.name);
+      if (timeWasteListNames.includes(tabSiteName)) {
         const learningUri = await getLearningUrl();
         if (!learningUri) return; // no learning site set; do nothing
 
-        const procHosts = procList
+        const timeWasteHosts = timeWasteList
           .map((item) => item?.host || item?.name || '')
           .filter(Boolean);
         const handled = await strategy.handleNavigation(
           { tabId: tab.id, url: tab.url },
-          { procrastinationHosts: procHosts, learningUrl: learningUri }, // fixed name
+          { procrastinationHosts: timeWasteHosts, learningUrl: learningUri }, // fixed name
         );
         if (handled) return;
 

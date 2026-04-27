@@ -238,11 +238,11 @@ export async function handleMessage(message, sender) {
                     '',
                   );
                   const timeWasteList = await storage.list.get();
-                  const procHosts = (timeWasteList || [])
+                  const timeWasteHosts = (timeWasteList || [])
                     .map((item) => item?.host || item?.name || '')
                     .filter(Boolean);
 
-                  return procHosts.some((host) => {
+                  return timeWasteHosts.some((host) => {
                     const normalizedHost = host.replace(/^www\./, '');
                     return (
                       currentHost === normalizedHost ||

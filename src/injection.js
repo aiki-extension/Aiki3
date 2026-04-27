@@ -460,14 +460,14 @@ async function bootstrapRewardOverlayIfNeeded() {
     if (timerData && timerData.sessionRewardGoal > 0) {
       // Get time wasting sites list
       const result = await browser.storage.local.get('list');
-      const procList = result?.list || [];
-      const procHosts = procList
+      const timeWasteList = result?.list || [];
+      const timeWasteHosts = timeWasteList
         .map((item) => item?.host || item?.name || '')
         .filter(Boolean);
 
       // Check if current page matches any time wasting site
       const currentHost = location.hostname.replace(/^www\./, '');
-      const isOnProcrastinationSite = procHosts.some((host) => {
+      const isOnTimeWastingSite = timeWasteHosts.some((host) => {
         const normalizedHost = host.replace(/^www\./, '');
         return (
           currentHost === normalizedHost ||
@@ -476,7 +476,7 @@ async function bootstrapRewardOverlayIfNeeded() {
         );
       });
 
-      if (isOnProcrastinationSite) {
+      if (isOnTimeWastingSite) {
         // Small delay to ensure DOM is ready
         setTimeout(() => {
           if (!document.getElementById('aiki-reward-overlay')) {
@@ -1289,13 +1289,13 @@ const scheduleRewardOverlayEnsure = () => {
       ) {
         // Also check if we're on a time wasting site
         const result = await browser.storage.local.get('list');
-        const procList = result?.list || [];
-        const procHosts = procList
+        const timeWasteList = result?.list || [];
+        const timeWasteHosts = timeWasteList
           .map((item) => item?.host || item?.name || '')
           .filter(Boolean);
 
         const currentHost = location.hostname.replace(/^www\./, '');
-        const isOnProcrastinationSite = procHosts.some((host) => {
+        const isOnTimeWastingSite = timeWasteHosts.some((host) => {
           const normalizedHost = host.replace(/^www\./, '');
           return (
             currentHost === normalizedHost ||
@@ -1304,7 +1304,7 @@ const scheduleRewardOverlayEnsure = () => {
           );
         });
 
-        if (isOnProcrastinationSite) {
+        if (isOnTimeWastingSite) {
           renderProcrastinationRewardOverlay();
         }
       }
