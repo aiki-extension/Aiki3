@@ -17,7 +17,7 @@
 <p>
 	•	Daily goal (total time you aim to spend on the redirected site each day)<br>
 	•	Session duration (time per learning session)<br>
-	•	Reward time (time allowed on the procrastination site)<br>
+	•	Reward time (time allowed on the time wasting site)<br>
 </p>
 {#await timeSettings}
   LOADING...

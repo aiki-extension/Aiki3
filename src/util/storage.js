@@ -332,14 +332,14 @@ async function storeSession(data) {
   const learningName = learningUri ? parseUrl(learningUri).name : null;
 
   let newData = sessionData || {
-    procrastinationDuration: 0,
+    timeWastingDuration: 0,
     learningDuration: 0,
   };
   if (
-    !newData.hasOwnProperty('procrastinationDuration') ||
-    newData.procrastinationDuration === NaN
+    !newData.hasOwnProperty('timeWastingDuration') ||
+    newData.timeWastingDuration === NaN
   ) {
-    newData.procrastinationDuration = 0;
+    newData.timeWastingDuration = 0;
   }
   if (
     !newData.hasOwnProperty('learningDuration') ||
@@ -355,7 +355,7 @@ async function storeSession(data) {
       newData[key] = newData.hasOwnProperty(key)
         ? newData[key] + data[key]
         : data[key];
-      newData.procrastinationDuration += data[key];
+      newData.timeWastingDuration += data[key];
     }
   }
   storage.set({ sessionData: newData });
@@ -368,7 +368,7 @@ async function checkDate(statsDate) {
     console.log('Rolling over date');
     await overWriteYesterday();
     await storage.set({
-      sessionData: { procrastinationDuration: 0, learningDuration: 0 },
+      sessionData: { timeWastingDuration: 0, learningDuration: 0 },
     });
     await storage.set({ statsDate: date });
   }
@@ -377,7 +377,7 @@ async function checkDate(statsDate) {
 async function getAllStats() {
   const result = await storage.get(['sessionData', 'yesterday', 'history']);
 
-  const defaultSession = { procrastinationDuration: 0, learningDuration: 0 };
+  const defaultSession = { timeWastingDuration: 0, learningDuration: 0 };
   const today =
     result.sessionData && typeof result.sessionData === 'object'
       ? { ...defaultSession, ...result.sessionData }
@@ -410,16 +410,16 @@ async function getAllStats() {
 
 function initializeStats() {
   storage.set({
-    sessionData: { procrastinationDuration: 0, learningDuration: 0 },
+    sessionData: { timeWastingDuration: 0, learningDuration: 0 },
   });
   storage.set({
     history: {
-      sessionData: { procrastinationDuration: 0, learningDuration: 0 },
+      sessionData: { timeWastingDuration: 0, learningDuration: 0 },
     },
   });
   storage.set({
     yesterday: {
-      sessionData: { procrastinationDuration: 0, learningDuration: 0 },
+      sessionData: { timeWastingDuration: 0, learningDuration: 0 },
     },
   });
 }
@@ -429,7 +429,7 @@ async function overWriteYesterday() {
   const y = await storage.get(['sessionData']);
   const yesterday = {
     sessionData: y.sessionData || {
-      procrastinationDuration: 0,
+      timeWastingDuration: 0,
       learningDuration: 0,
     },
   };
@@ -440,23 +440,23 @@ async function addToHistory() {
   let { yesterday, history } = await storage.get(['yesterday', 'history']);
   if (!history || typeof history !== 'object') {
     history = {
-      sessionData: { procrastinationDuration: 0, learningDuration: 0 },
+      sessionData: { timeWastingDuration: 0, learningDuration: 0 },
     };
   }
   if (!yesterday || typeof yesterday !== 'object') {
     yesterday = {
-      sessionData: { procrastinationDuration: 0, learningDuration: 0 },
+      sessionData: { timeWastingDuration: 0, learningDuration: 0 },
     };
   }
   if (!history.sessionData || typeof history.sessionData !== 'object') {
-    history.sessionData = { procrastinationDuration: 0, learningDuration: 0 };
+    history.sessionData = { timeWastingDuration: 0, learningDuration: 0 };
   }
   if (!yesterday.sessionData || typeof yesterday.sessionData !== 'object') {
-    yesterday.sessionData = { procrastinationDuration: 0, learningDuration: 0 };
+    yesterday.sessionData = { timeWastingDuration: 0, learningDuration: 0 };
   }
 
-  history.sessionData.procrastinationDuration +=
-    yesterday.sessionData.procrastinationDuration || 0;
+  history.sessionData.timeWastingDuration +=
+    yesterday.sessionData.timeWastingDuration || 0;
   history.sessionData.learningDuration +=
     yesterday.sessionData.learningDuration || 0;
   storage.set({ history });

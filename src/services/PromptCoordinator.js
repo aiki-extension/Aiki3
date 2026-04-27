@@ -112,7 +112,7 @@ class PromptCoordinator {
     storage.promptLocks.clear();
   }
 
-  async addProcsiteLoadedListener(createFilter) {
+  async addTimeWastingSiteLoadedListener(createFilter) {
     const filter = await createFilter();
     if (!filter) return;
     browser.webNavigation.onCompleted.addListener(
@@ -121,7 +121,7 @@ class PromptCoordinator {
     );
   }
 
-  removeProcsiteLoadedListener() {
+  removeTimeWastingLoadedListener() {
     browser.webNavigation.onCompleted.removeListener(
       this.boundRenderContentBlocker,
     );

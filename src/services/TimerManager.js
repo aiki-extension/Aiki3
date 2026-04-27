@@ -163,7 +163,7 @@ class TimerManager {
     }
   }
 
-  async startProcrastinationSession(callback, rewardTime) {
+  async startTimeWastingSession(callback, rewardTime) {
     this.stopLearningSession();
     this.stopBonusTime();
     this.clearRewardTimer();
@@ -186,7 +186,7 @@ class TimerManager {
     }, 1000);
   }
 
-  async stopProcrastinationSession(callback) {
+  async stopTimeWastingSession(callback) {
     this.clearRewardTimer();
     this.rewardTimeRemaining = 0;
     this.rewardUnlockAt = 0;

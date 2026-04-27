@@ -32,7 +32,7 @@ const strategy = {
 let shouldShowWelcome = true;
 const PREPROMPT_ID = '__aiki-preprompt';
 
-function buildProcrastinationUrlFilters(list = []) {
+function buildTimeWastingUrlFilters(list = []) {
   const seen = new Set();
   return list
     .map((item) => {
@@ -84,7 +84,7 @@ async function removePreemptiveHide(tabId) {
 
 async function createFilter() {
   const timeWasteList = await storage.list.get();
-  const url = buildProcrastinationUrlFilters(timeWasteList || []);
+  const url = buildTimeWastingUrlFilters(timeWasteList || []);
   if (!url.length) return null;
   return { url };
 }
@@ -203,7 +203,7 @@ async function redirect(details, immediate = false) {
           navigationGuards.applyPreemptiveHide(tabId),
         removePreemptiveHide: (tabId) =>
           navigationGuards.removePreemptiveHide(tabId),
-        procrastinationHosts: timeWasteHosts,
+        timeWastingHosts: timeWasteHosts,
         learningUrl,
       });
       if (handled) return;
@@ -288,7 +288,7 @@ async function redirect(details, immediate = false) {
           rewardDuration = 60 * 1000;
         }
         await storage.shouldRedirect.set(false);
-        await timer.startProcrastinationSession(checkActiveTab, rewardDuration);
+        await timer.startTimeWastingSession(checkActiveTab, rewardDuration);
         return;
       }
     }
@@ -503,7 +503,7 @@ async function checkActiveTab() {
           .filter(Boolean);
         const handled = await strategy.handleNavigation(
           { tabId: tab.id, url: tab.url },
-          { procrastinationHosts: timeWasteHosts, learningUrl: learningUri }, // fixed name
+          { timeWastingHosts: timeWasteHosts, learningUrl: learningUri }, // fixed name
         );
         if (handled) return;
 
@@ -602,7 +602,7 @@ async function gotoOrigin(event, sourceContext = {}) {
   }
 
   removeOriginUpdatedListener();
-  removeProcsiteLoadedListener();
+  removeTimeWastingLoadedListener();
   await removeAllContentBlockers();
 
   if (origin && origin.tabId !== undefined) {
@@ -685,7 +685,7 @@ async function gotoOrigin(event, sourceContext = {}) {
   if (destinationUrl && targetTabId !== undefined) {
     await SessionService.startSession(
       targetTabId,
-      'procrastination',
+      'timeWasting',
       destinationUrl,
     );
   }
@@ -704,7 +704,7 @@ async function gotoOrigin(event, sourceContext = {}) {
     }
 
     await storage.shouldRedirect.set(false);
-    await timer.startProcrastinationSession(checkActiveTab, rewardDuration);
+    await timer.startTimeWastingSession(checkActiveTab, rewardDuration);
   } else if (hasRemainingLearningTabs) {
     await storage.shouldRedirect.set(true);
   }
@@ -761,7 +761,7 @@ async function promptRedirect(tabId, url, originUrl) {
 
       // Start tracking procastination session
       navigationGuards.install();
-      await SessionService.startSession(tabId, 'procrastination', originUrl);
+      await SessionService.startSession(tabId, 'timeWasting', originUrl);
     },
     onAccept: async () => {
       redirectTo(tabId, url, originUrl);
@@ -791,8 +791,8 @@ async function removeAllContentBlockers() {
   return promptCoordinator.removeAllContentBlockers();
 }
 
-async function removeProcsiteLoadedListener() {
-  return promptCoordinator.removeProcsiteLoadedListener();
+async function removeTimeWastingLoadedListener() {
+  return promptCoordinator.removeTimeWastingLoadedListener();
 }
 
 export default {

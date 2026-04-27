@@ -47,7 +47,7 @@ export function isLearningSite(url, learningUrl) {
  * Get time wasting hosts from storage.
  * @returns {Promise<string[]>}
  */
-export async function getProcrastinationHosts() {
+export async function getTimeWastingHosts() {
   const TimeWasteList = await storage.list.get();
   return (TimeWasteList || [])
     .map((item) => item?.host || item?.name || '')
@@ -70,8 +70,8 @@ export async function getLearningUrl() {
  * @param {string} url - URL to check
  * @returns {Promise<boolean>}
  */
-export async function checkIfProcrastination(url) {
-  const hosts = await getProcrastinationHosts();
+export async function checkIfTimeWastingSite(url) {
+  const hosts = await getTimeWastingHosts();
   return isTimeWastingSite(url, hosts);
 }
 
@@ -97,9 +97,9 @@ export function getSiteName(url) {
 export default {
   isTimeWastingSite,
   isLearningSite,
-  getProcrastinationHosts,
+  getTimeWastingHosts,
   getLearningUrl,
-  checkIfProcrastination,
+  checkIfTimeWastingSite,
   checkIfLearning,
   getSiteName,
 };

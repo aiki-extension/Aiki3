@@ -15,7 +15,7 @@ class NavigationGuards {
   constructor(strategy) {
     this.strategy = strategy;
     this.lastActiveTabByWindow = new Map();
-    this.procrastinationGuardsRegistered = false;
+    this.timeWastingGuardsRegistered = false;
     this.onActivatedHandler = null;
     this.onRemovedHandler = null;
     this.onUpdatedHandler = null;
@@ -55,8 +55,8 @@ class NavigationGuards {
       const tab = await browser.tabs.get(tabId);
       if (!tab || !tab.url) return;
 
-      if (await siteDetector.checkIfProcrastination(tab.url)) {
-        await SessionService.startSession(tabId, 'procrastination', tab.url);
+      if (await siteDetector.checkIfTimeWastingSite(tab.url)) {
+        await SessionService.startSession(tabId, 'timeWasting', tab.url);
         return;
       }
 
@@ -85,7 +85,7 @@ class NavigationGuards {
         if (tab?.id !== undefined) {
           await SessionService.finalizeSession(
             tab.id,
-            'procrastination',
+            'timeWasting',
             reason,
           );
           await SessionService.finalizeSession(tab.id, 'learning', reason);
@@ -109,18 +109,18 @@ class NavigationGuards {
 
     const nextName = extractName(nextUrl);
 
-    if (session.sessionType === 'procrastination') {
-      const currentName = extractName(session.procrastinationUrl);
+    if (session.sessionType === 'timeWasting') {
+      const currentName = extractName(session.timeWastingUrl);
       if (currentName && nextName && currentName === nextName) {
         await storage.activeSessions.set(tabId, {
           ...session,
-          procrastinationUrl: nextUrl,
+          timeWastingUrl: nextUrl,
         });
         return;
       }
       await SessionService.finalizeSession(
         tabId,
-        'procrastination',
+        'timeWasting',
         'navigation',
       );
       return;
@@ -166,8 +166,8 @@ class NavigationGuards {
   }
 
   install() {
-    if (this.procrastinationGuardsRegistered) return;
-    this.procrastinationGuardsRegistered = true;
+    if (this.timeWastingGuardsRegistered) return;
+    this.timeWastingGuardsRegistered = true;
 
     this.onActivatedHandler = async ({ tabId, windowId }) => {
       const previousTabId = this.lastActiveTabByWindow.get(windowId);
@@ -179,7 +179,7 @@ class NavigationGuards {
             await browser.tabs.get(previousTabId);
             await SessionService.finalizeSession(
               previousTabId,
-              'procrastination',
+              'timeWasting',
               'tab_switch',
             );
             await SessionService.finalizeSession(
@@ -203,7 +203,7 @@ class NavigationGuards {
       } else {
         await SessionService.finalizeSession(
           tabId,
-          'procrastination',
+          'timeWasting',
           'tab_closed',
         );
         await SessionService.finalizeSession(tabId, 'learning', 'tab_closed');
@@ -262,8 +262,8 @@ class NavigationGuards {
   }
 
   teardown() {
-    if (!this.procrastinationGuardsRegistered) return;
-    this.procrastinationGuardsRegistered = false;
+    if (!this.timeWastingGuardsRegistered) return;
+    this.timeWastingGuardsRegistered = false;
     if (this.onActivatedHandler)
       browser.tabs.onActivated.removeListener(this.onActivatedHandler);
     if (this.onRemovedHandler)
