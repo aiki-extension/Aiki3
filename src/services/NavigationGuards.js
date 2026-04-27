@@ -83,11 +83,7 @@ class NavigationGuards {
       });
       for (const tab of tabs) {
         if (tab?.id !== undefined) {
-          await SessionService.finalizeSession(
-            tab.id,
-            'timeWasting',
-            reason,
-          );
+          await SessionService.finalizeSession(tab.id, 'timeWasting', reason);
           await SessionService.finalizeSession(tab.id, 'learning', reason);
         }
       }
@@ -118,11 +114,7 @@ class NavigationGuards {
         });
         return;
       }
-      await SessionService.finalizeSession(
-        tabId,
-        'timeWasting',
-        'navigation',
-      );
+      await SessionService.finalizeSession(tabId, 'timeWasting', 'navigation');
       return;
     }
 

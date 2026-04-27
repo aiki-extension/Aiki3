@@ -1552,8 +1552,7 @@ function renderTimeWastingRewardOverlay() {
 
 // Export for potential use from background
 if (typeof window !== 'undefined') {
-  window.renderTimeWastingRewardOverlay =
-    renderTimeWastingRewardOverlay;
+  window.renderTimeWastingRewardOverlay = renderTimeWastingRewardOverlay;
 }
 
 // Check if we're in reward mode when content script loads
