@@ -23,7 +23,7 @@ async function fetchTimerState() {
 export async function bootstrapRewardOverlayIfNeeded() {
   try {
     const timerData = await fetchTimerState();
-    if (!timerData || !(timerData.sessionRewardGoal > 0)) return;
+    if (!timerData || !(timerData.sessionRewardGoal > 0) || !(timerData.sessionRewardRemaining > 0)) return;
 
     if (!(await checkCurrentPageIsTimeWastingSite())) return;
 
