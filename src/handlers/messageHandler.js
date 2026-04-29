@@ -7,6 +7,16 @@ import redirection from '../redirection';
 import { getLearningUrl } from '../services/siteDetector';
 import { MESSAGE_REDIRECTION_REFRESH_FILTERS } from '../values/messageTypeValues';
 
+// Helper function to retrieve the first time wasting URL from storage
+async function getFirstTimeWastingUrl() {
+  const timeWasteList = await storage.list.get();
+  const firstTimeWaste = Array.isArray(timeWasteList) ? timeWasteList[0] : null;
+  const host = firstTimeWaste?.host || firstTimeWaste?.name;
+  if (!host) return null;
+
+  return host.startsWith('http') ? host : `https://${host}`;
+}
+
 /*
 This module handles incoming messages from content scripts and other parts of the extension.
 It processes different message types, such as timer requests, learning session management.
@@ -55,7 +65,13 @@ export async function handleMessage(message, sender) {
         if (sender?.tab?.id) {
           const existingOrigin = await storage.origin.get();
           if (!existingOrigin) {
-            await storage.origin.set({ url: 'https://www.reddit.com', tabId: sender.tab.id });
+            const firstTimeWastingUrl = await getFirstTimeWastingUrl();
+            if (firstTimeWastingUrl) {
+              await storage.origin.set({
+                url: firstTimeWastingUrl,
+                tabId: sender.tab.id,
+              });
+            }
           }
         }
 
