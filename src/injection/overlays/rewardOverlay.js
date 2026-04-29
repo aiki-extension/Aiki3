@@ -200,6 +200,7 @@ export function renderTimeWastingRewardOverlay() {
     } else if (remaining <= 0) {
       status.textContent = 'Reward time over! Returning to learning...';
       panel.style.background = 'linear-gradient(135deg, #6366f1, #8b5cf6)';
+      cleanup();
     } else if (remaining < 30000) {
       status.textContent = 'Almost time to learn again!';
       if (remaining > 5000) {
