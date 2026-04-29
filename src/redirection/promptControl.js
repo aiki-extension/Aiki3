@@ -34,6 +34,7 @@ async function showImmediatePrompt(tabId) {
 async function isGlobalPromptLocked() {
   try {
     const globalPromptLock = await storage.globalPromptLock.get();
+    // console.log("Is Global Prompt Lock Enabled? ", Boolean(globalPromptLock?.timestamp && Date.now() - globalPromptLock.timestamp < PROMPT_SUPPRESS_DURATION));
     return Boolean(
       globalPromptLock?.timestamp &&
         Date.now() - globalPromptLock.timestamp < PROMPT_SUPPRESS_DURATION,
@@ -88,7 +89,8 @@ export function createPromptControl({ navigationGuards }) {
     }
   }
 
-  function promptRedirect(tabId, url, originUrl, callbacks = {}) {
+  async function promptRedirect(tabId, url, originUrl, callbacks = {}) {
+    if (await isGlobalPromptLocked()) return;
     return promptCoordinator.promptRedirect(tabId, url, originUrl, callbacks);
   }
 
