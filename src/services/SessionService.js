@@ -29,20 +29,20 @@ async function getGoalSeconds() {
 
 async function startSession(tabId, sessionType, siteUrl, triggerUrl = null) {
   if (tabId === undefined || tabId === null || !siteUrl) return;
-  setOriginIfMissing(tabId);
-
+  
   const participantId = await storage.uid.get();
   if (!participantId) return;
-
+  
   await storage.activeSessions.remove(tabId);
-
+  
   const sessionData = {
     participantId,
     sessionType,
     startedAt: Date.now(),
   };
-
+  
   if (sessionType === 'learning') {
+    await setOriginIfMissing(tabId);
     sessionData.learningUrl = siteUrl;
     sessionData.timeWastingUrl = triggerUrl;
   } else {
@@ -123,7 +123,7 @@ async function transferActiveSession(oldTabId, newTabId) {
 // if not then the user has probably navigated directly to redirection site 
 // and we therefore retrieve and set their first timwasting site in origin
 async function setOriginIfMissing(tabId) {
-  if (await storage.origin.get() == null) return;
+  if (await storage.origin.get() != null) return;
   const timeWasteList = await storage.list.get();
   const firstTimeWaste = Array.isArray(timeWasteList) ? timeWasteList[0] : null;
   const host = firstTimeWaste?.host || firstTimeWaste?.name;
