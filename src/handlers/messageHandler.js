@@ -50,6 +50,17 @@ export async function handleMessage(message, sender) {
   if (message.type === 'learning:autoStart') {
     return (async () => {
       try {
+        // Ensure we have an origin set when user navigates directly to the learning site
+        if (sender?.tab?.id) {
+          const existingOrigin = await storage.origin.get();
+          if (!existingOrigin) {
+            await storage.origin.set({
+              url: 'https://www.reddit.com',
+              tabId: sender.tab.id,
+            });
+          }
+        }
+
         // Get information on the daily goal
         const dailyGoal = parseTime.toSystem(
           await storage.timeSettings.learningTime.get(),
@@ -238,11 +249,11 @@ export async function handleMessage(message, sender) {
                     '',
                   );
                   const timeWasteList = await storage.list.get();
-                  const procHosts = (timeWasteList || [])
+                  const timeWasteHosts = (timeWasteList || [])
                     .map((item) => item?.host || item?.name || '')
                     .filter(Boolean);
 
-                  return procHosts.some((host) => {
+                  return timeWasteHosts.some((host) => {
                     const normalizedHost = host.replace(/^www\./, '');
                     return (
                       currentHost === normalizedHost ||

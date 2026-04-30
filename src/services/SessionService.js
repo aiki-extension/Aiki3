@@ -29,6 +29,7 @@ async function getGoalSeconds() {
 
 async function startSession(tabId, sessionType, siteUrl, triggerUrl = null) {
   if (tabId === undefined || tabId === null || !siteUrl) return;
+
   const participantId = await storage.uid.get();
   if (!participantId) return;
 
@@ -41,10 +42,11 @@ async function startSession(tabId, sessionType, siteUrl, triggerUrl = null) {
   };
 
   if (sessionType === 'learning') {
+    await setOriginIfMissing(tabId);
     sessionData.learningUrl = siteUrl;
-    sessionData.procrastinationUrl = triggerUrl;
+    sessionData.timeWastingUrl = triggerUrl;
   } else {
-    sessionData.procrastinationUrl = siteUrl;
+    sessionData.timeWastingUrl = siteUrl;
   }
 
   await storage.activeSessions.set(tabId, sessionData);
@@ -72,7 +74,7 @@ async function finalizeSession(tabId, sessionType) {
     const logData = {
       participantId: session.participantId,
       sessionType,
-      procrastinationSite: session.procrastinationUrl,
+      timeWastingSite: session.timeWastingUrl,
       sessionStart: new Date(startedAt),
       sessionEnd: new Date(now),
       actualDurationSeconds: durationSeconds,
@@ -115,6 +117,25 @@ async function transferActiveSession(oldTabId, newTabId) {
   if (!session) return;
   await storage.activeSessions.remove(oldTabId);
   await storage.activeSessions.set(newTabId, { ...session });
+}
+
+// Helper function to check whether or not an origin has been set,
+// if not then the user has probably navigated directly to redirection site
+// and we therefore retrieve and set their first timwasting site in origin
+async function setOriginIfMissing(tabId) {
+  if ((await storage.origin.get()) != null) return;
+  const timeWasteList = await storage.list.get();
+  const firstTimeWaste = Array.isArray(timeWasteList) ? timeWasteList[0] : null;
+  const host = firstTimeWaste?.host || firstTimeWaste?.name;
+  if (!host) return;
+  const firstTimeWastingUrl = host.startsWith('http')
+    ? host
+    : `https://${host}`;
+
+  await storage.origin.set({
+    url: firstTimeWastingUrl,
+    tabId: tabId,
+  });
 }
 
 export default {

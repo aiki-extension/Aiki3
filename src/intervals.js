@@ -44,10 +44,10 @@ async function counter() {
 
     const { name } = parseUrl(activeTab.url);
 
-    const isProcrastinationSite = list.includes(name);
+    const isTimeWastingSite = list.includes(name);
     const isLearningSite = learningName && name === learningName;
 
-    if (isProcrastinationSite || isLearningSite) {
+    if (isTimeWastingSite || isLearningSite) {
       data[name] = (data[name] ?? 0) + 1;
     }
   } else {
