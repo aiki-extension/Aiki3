@@ -9,7 +9,7 @@
     "build:chrome": "node scripts/buildChrome.js && npm run build",
     "package:firefox": "npm run build:firefox && web-ext build --source-dir=public --artifacts-dir=web-ext-artifacts --filename=aiki3-firefox.xpi --overwrite-dest --ignore-files=\"**/*.map\" && npm run package:sources",
     "package:chrome": "npm run build:chrome && web-ext build --source-dir=public --artifacts-dir=web-ext-artifacts --filename=aiki3-chrome.zip --overwrite-dest --ignore-files=\"**/*.map\"",
-    "package:sources": "rm -f web-ext-artifacts/aiki3-sources.zip && zip -rq web-ext-artifacts/aiki3-sources.zip . -x '.git/*' '.git' 'node_modules/*' 'web-ext-artifacts/*' 'public/build/*' '.env*' '*.pem' '*.crx' '.DS_Store' '*/.DS_Store' '.claude/*'",
+    "package:sources": "mkdir -p web-ext-artifacts && rm -f web-ext-artifacts/aiki3-sources.zip && zip -rq web-ext-artifacts/aiki3-sources.zip . -x '.git/*' '.git' 'node_modules/*' 'web-ext-artifacts/*' 'public/build/*' '.env*' '*.pem' '*.crx' '.DS_Store' '*/.DS_Store' '.claude/*'",
     "dev:firefox": "node scripts/buildFirefox.js && npm run dev",
     "dev:chrome": "node scripts/buildChrome.js && npm run dev",
     "sign": "node scripts/sign.js",
