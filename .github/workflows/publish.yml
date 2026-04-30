@@ -47,18 +47,17 @@ jobs:
         with:
           node-version: '20'
       - run: npm ci
-      - name: Build + package Firefox xpi (and sources zip)
-        run: npm run package:firefox
-      - name: Submit to AMO listed channel via API
+      - name: Build Firefox source dir + sources zip
+        run: npm run build:firefox && npm run package:sources
+      - name: Submit to AMO listed channel
         env:
           AMO_API_KEY: ${{ secrets.AMO_API_KEY }}
           AMO_API_SECRET: ${{ secrets.AMO_API_SECRET }}
-          FIREFOX_ADDON_ID: ${{ secrets.FIREFOX_ADDON_ID }}
         run: npm run publish:firefox
       - uses: actions/upload-artifact@v4
         with:
           name: firefox-xpi
-          path: web-ext-artifacts/aiki3-firefox.xpi
+          path: web-ext-artifacts/*.xpi
           if-no-files-found: error
 
   publish_chrome:
