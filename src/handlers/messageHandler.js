@@ -50,6 +50,17 @@ export async function handleMessage(message, sender) {
   if (message.type === 'learning:autoStart') {
     return (async () => {
       try {
+        // Ensure we have an origin set when user navigates directly to the learning site
+        if (sender?.tab?.id) {
+          const existingOrigin = await storage.origin.get();
+          if (!existingOrigin) {
+            await storage.origin.set({
+              url: 'https://www.reddit.com',
+              tabId: sender.tab.id,
+            });
+          }
+        }
+
         // Get information on the daily goal
         const dailyGoal = parseTime.toSystem(
           await storage.timeSettings.learningTime.get(),
