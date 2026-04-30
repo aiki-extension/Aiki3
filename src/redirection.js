@@ -14,12 +14,22 @@ const learningResource = createLearningResource({
   navigationGuards,
   gotoOrigin: (event, context) => gotoOrigin(event, context),
 });
-const { addLearningSiteLoadedListener, removeLearningSiteLoadedListener, triggerLearningOverlay } =
-  learningResource;
+const {
+  addLearningSiteLoadedListener,
+  removeLearningSiteLoadedListener,
+  triggerLearningOverlay,
+} = learningResource;
 
-const originTracking = createOriginTracking({ promptControl, triggerLearningOverlay });
-const { addOriginUpdatedListener, removeOriginUpdatedListener, addOriginTabCloseListener, removeOriginTabCloseListener } =
-  originTracking;
+const originTracking = createOriginTracking({
+  promptControl,
+  triggerLearningOverlay,
+});
+const {
+  addOriginUpdatedListener,
+  removeOriginUpdatedListener,
+  addOriginTabCloseListener,
+  removeOriginTabCloseListener,
+} = originTracking;
 
 const restoreFlow = createRestoreFlow({
   promptControl,

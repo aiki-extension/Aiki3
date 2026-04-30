@@ -37,7 +37,7 @@ async function isGlobalPromptLocked() {
     // console.log("Is Global Prompt Lock Enabled? ", Boolean(globalPromptLock?.timestamp && Date.now() - globalPromptLock.timestamp < PROMPT_SUPPRESS_DURATION));
     return Boolean(
       globalPromptLock?.timestamp &&
-        Date.now() - globalPromptLock.timestamp < PROMPT_SUPPRESS_DURATION,
+      Date.now() - globalPromptLock.timestamp < PROMPT_SUPPRESS_DURATION,
     );
   } catch {
     return false;

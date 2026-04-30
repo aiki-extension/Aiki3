@@ -7,9 +7,9 @@ const l = console.log;
 export function isFullScreen() {
   return Boolean(
     document.fullscreenElement ||
-      document.webkitFullscreenElement ||
-      document.mozFullScreenElement ||
-      document.msFullscreenElement,
+    document.webkitFullscreenElement ||
+    document.mozFullScreenElement ||
+    document.msFullscreenElement,
   );
 }
 

@@ -68,7 +68,8 @@ export function createRestoreFlow({
         ? await storage.blockedOrigins.get(targetTabId)
         : null;
 
-    const sessionTabId = targetTabId !== undefined ? targetTabId : origin?.tabId;
+    const sessionTabId =
+      targetTabId !== undefined ? targetTabId : origin?.tabId;
     if (sessionTabId !== undefined) {
       await SessionService.finalizeSession(
         sessionTabId,
@@ -87,7 +88,10 @@ export function createRestoreFlow({
       try {
         const learningTab = await browser.tabs.get(origin.tabId);
         const configuredLearning = await getLearningUrl();
-        if (configuredLearning && isLearningSite(learningTab.url, configuredLearning)) {
+        if (
+          configuredLearning &&
+          isLearningSite(learningTab.url, configuredLearning)
+        ) {
           storage.learningUri.set(learningTab.url);
         }
       } catch (error) {

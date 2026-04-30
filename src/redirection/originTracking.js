@@ -19,7 +19,10 @@ import { getActiveLearningTabs } from './shared/learningTabs';
  * @param {(tabId: number) => void} deps.triggerLearningOverlay - Schedules
  *   the learning overlay on the replacement tab after migration.
  */
-export function createOriginTracking({ promptControl, triggerLearningOverlay }) {
+export function createOriginTracking({
+  promptControl,
+  triggerLearningOverlay,
+}) {
   // tabs.onUpdated fires with (tabId, changeInfo, tab).
   // The first arg is a numeric tabId, not a details object.
   async function originUpdatedListener(tabId) {

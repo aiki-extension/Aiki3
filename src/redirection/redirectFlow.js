@@ -159,7 +159,12 @@ export function createRedirectFlow({
         const progress = await storage.dailyProgress.get();
         const goalMet = goal > 0 && progress >= goal;
 
-        if (toggled && shouldRedirect && !goalMet && !timer.isSessionRewardActive()) {
+        if (
+          toggled &&
+          shouldRedirect &&
+          !goalMet &&
+          !timer.isSessionRewardActive()
+        ) {
           console.log('ShouldRedirect', shouldRedirect);
           const origin = await storage.origin.get();
           console.log('Checking against this: ', origin);
