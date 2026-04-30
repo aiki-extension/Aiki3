@@ -18,6 +18,7 @@ execFileSync(
     `--api-secret=${apiSecret}`,
     '--channel=listed',
     '--upload-source-code=web-ext-artifacts/aiki3-sources.zip',
+    '--approval-timeout=0',
   ],
   { stdio: 'inherit' },
 );
