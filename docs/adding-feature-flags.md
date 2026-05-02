@@ -1,10 +1,10 @@
 # How to Add a New Feature Flag
 
-Feature flags in Aiki lets you gate behaviour behind invite codes or other user properties without the user having to download new versions. The flag is computed on the backend once per settings fetch, stored in `browser.storage.local`, and read locally from that point on.
+Feature flags in Aiki lets you gate behaviour behind invite codes or other user properties without the user having to download new versions. The active state of the flag is computed on the backend once per settings fetch, stored in `browser.storage.local`, and read locally from that point on.
 
 This document explains how to add a new feature flag to Aiki from scratch, covering both the backend (Fastify/TypeScript) and the frontend (Svelte/JS extension). Follow every step in order, otherwise things will silently break and you'll spend an hour wondering why nothing changed... 
 
-The existing `redirectPrompt` flag is used throughout as a reference example, since it's the only one we currently have and the pattern is already working end-to-end.
+We will work through how a new feature flag `myNewFeature`, could be implemented by using the existing `redirectPrompt` flag as a reference example, since it's the only one we currently have and the pattern is already working end-to-end.
 
 ---
 
@@ -151,7 +151,7 @@ async function dispatchPrompt(tabId, learningUri, procUrl) {
 }
 ```
 
-Since `storage.featureFlags.get()` is async (it reads from `browser.storage.local`, not `localStorage`), you always need to `await` it. In Svelte components, handle this with `onMount` or an `{#await}` block:
+Since `storage.featureFlags.get()` is async, you always need to `await` it. In Svelte components, handle this with `onMount` or an `{#await}` block:
 
 ```svelte
 <!-- In a Svelte component -->
