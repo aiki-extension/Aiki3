@@ -11,12 +11,12 @@ class TimerManager {
     this.dailyGoal = 0;
     this.dailyProgress = 0;
 
-    // Reward timers (experimental variant)
+    // Reward timers 
     this.rewardTimeRemaining = 0;
     this.rewardTimeIntervalRef = undefined;
     this.rewardUnlockAt = 0;
 
-    // Bonus timer (experimental variant)
+    // Bonus timer 
     this.bonusTime = 0;
     this.bonusTimeIntervalRef = undefined;
 
