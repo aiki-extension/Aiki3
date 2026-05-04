@@ -65,25 +65,6 @@ class TimerManager {
     this.learningTimeIntervalRef = undefined;
   }
 
-  async startLearningSession() {
-    if (this.learningTimeIntervalRef)
-      clearInterval(this.learningTimeIntervalRef);
-    const goal = parseTime.toSystem(
-      await storage.timeSettings.learningTime.get(),
-    );
-    const progress = await storage.dailyProgress.get();
-    this.dailyGoal = goal;
-    this.dailyProgress = progress; // Allow progress to exceed goal
-    this.learningTimeRemaining = Math.max(goal - this.dailyProgress, 0);
-    if (this.learningTimeRemaining > 0) {
-      this.learningTimeIntervalRef = setInterval(() => {
-        this.decrementLearningTime().catch(() => {});
-      }, 1000);
-    } else {
-      await this.handleGoalCompletion();
-    }
-  }
-
   async syncDailyState() {
     const goal = parseTime.toSystem(
       await storage.timeSettings.learningTime.get(),
