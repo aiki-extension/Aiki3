@@ -32,7 +32,6 @@ async function killAiki() {
     // Tab may not have content script or context invalidated
   }
   timer.stopLearningSession();
-  timer.stopBonusTime();
   timer.killAiki();
 }
 

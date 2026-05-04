@@ -179,7 +179,6 @@ export function createRedirectFlow({
               await storage.origin.remove();
               removeOriginUpdatedListener();
               promptControl.removeAllContentBlockers();
-              timer.stopBonusTime();
               timer.stopLearningSession();
             }
           }
