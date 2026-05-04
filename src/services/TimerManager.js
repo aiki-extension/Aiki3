@@ -164,6 +164,8 @@ class TimerManager {
   }
 
   killAiki() {
+    this.stopSessionRewardTimer();
+    this.stopSessionTimer();
     storage.shouldRedirect.set(true);
     this.learningTimeRemaining = 0;
     this.dailyGoal = 0;
