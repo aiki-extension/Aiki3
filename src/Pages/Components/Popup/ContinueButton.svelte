@@ -3,13 +3,6 @@
   Used in / Parent components: /src/Pages/Popup.svelte
  -->
 <script>
-  /* Functional and module imports */
-  // Old code that might be removed.
-  // import storage from "../../../util/storage";
-  // import Fa from "svelte-fa";
-  // import { faArrowAltCircleRight } from "@fortawesome/free-solid-svg-icons";
-  //<Fa icon={faArrowAltCircleRight} />
-
   //export let siteName;
   export let gotoOrigin;
 
