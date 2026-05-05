@@ -125,11 +125,6 @@ export function createRedirectFlow({
           return;
         }
 
-        const timeWasteHosts = (timeWasteList || [])
-          .map((item) => item?.host || item?.name || '')
-          .filter(Boolean);
-        const learningUrl = await getLearningUrl();
-
         let shouldRedirect = await storage.shouldRedirect.get();
         if (!shouldRedirect) {
           const unlockAt = await storage.rewardUnlock.get();
