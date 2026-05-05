@@ -24,7 +24,7 @@ workspace "Aiki3 (Current)" "C4 Level 2 - Container Diagram: Aiki3 extension + c
                 tags "Core"
             }
 
-            apiHandler = container "API Handler" "Translates typed extension messages into HTTP calls to the backend API." "JavaScript module" {
+            apiHandler = container "API Handler" "Translates typed extension messages into HTTP calls to the backend API." "JavaScript" {
                 tags "Core"
             }
 
@@ -48,7 +48,7 @@ workspace "Aiki3 (Current)" "C4 Level 2 - Container Diagram: Aiki3 extension + c
                 tags "Backend"
             }
 
-            postgresDB = container "PostgreSQL Database" "Relational store managed via Prisma. Tables: User, InviteCode, Website, UserTimeWastingSite, UserLearningSite, SiteSession, UserBehaviorLog." "PostgreSQL 15" {
+            postgresDB = container "PostgreSQL Database" "Relational store managed via Prisma. Tables: User, InviteCode, Website, UserTimeWastingSite, UserLearningSite, SiteSession, UserBehaviorLog." "PostgreSQL" {
                 tags "Storage"
             }
 
