@@ -1,5 +1,7 @@
 <!-- 
-  TODO: Description goes here
+  Settings panel for managing the time-wasting site list. Handles adding sites (with URL
+  normalization and a favicon reachability check) and removing them, syncing all changes to
+  local storage and the backend.
   Used in / Parent components: /src/Pages/Settings.svelte
  -->
 <script>

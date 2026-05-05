@@ -1,5 +1,5 @@
 <!-- 
-  TODO: Description goes here
+  Loads time settings from storage and renders TimeSelector.
   Used in / Parent components: /src/Pages/Settings.svelte
  -->
 <script>
