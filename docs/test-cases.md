@@ -13,6 +13,7 @@ To inspect stored state during testing: open the browser's extension DevTools, g
 ## Setup reference
 
 Throughout this document:
+
 - **Learning site**: whatever you have set as your redirection platform (e.g. `www.duolingo.com`)
 - **Time wasting site**: a site you have added to the list (e.g. `www.youtube.com`)
 - **Session**: the countdown timer that runs while you're on the learning site
@@ -268,16 +269,19 @@ Open the extension's background service worker in DevTools (in Chrome: `chrome:/
 
 ```javascript
 // Read all storage
-chrome.storage.local.get(null, console.log)
+chrome.storage.local.get(null, console.log);
 
 // Manually set daily progress to simulate goal completion
-chrome.storage.local.set({ dailyProgress: 1800000, dailyProgressDate: new Date().toDateString() })
+chrome.storage.local.set({
+  dailyProgress: 1800000,
+  dailyProgressDate: new Date().toDateString(),
+});
 
 // Clear the global prompt lock (lets you trigger prompts again immediately)
-chrome.storage.local.remove('globalPromptLock')
+chrome.storage.local.remove('globalPromptLock');
 
 // Simulate yesterday's date to test the midnight reset
-chrome.storage.local.set({ dailyProgressDate: 'Mon Apr 28 2025' })
+chrome.storage.local.set({ dailyProgressDate: 'Mon Apr 28 2025' });
 ```
 
 You can also open the settings page's DevTools separately, since it runs in a different context from the service worker.

@@ -2,7 +2,7 @@
 
 Feature flags in Aiki lets you gate behaviour behind invite codes or other user properties without the user having to download new versions. The active state of the flag is computed on the backend once per settings fetch, stored in `browser.storage.local`, and read locally from that point on.
 
-This document explains how to add a new feature flag to Aiki from scratch, covering both the backend (Fastify/TypeScript) and the frontend (Svelte/JS extension). Follow every step in order, otherwise things will silently break and you'll spend an hour wondering why nothing changed... 
+This document explains how to add a new feature flag to Aiki from scratch, covering both the backend (Fastify/TypeScript) and the frontend (Svelte/JS extension). Follow every step in order, otherwise things will silently break and you'll spend an hour wondering why nothing changed...
 
 We will work through how a new feature flag `myNewFeature`, could be implemented by using the existing `redirectPrompt` flag as a reference example, since it's the only one we currently have and the pattern is already working end-to-end.
 
@@ -38,20 +38,20 @@ Add your new detector function, then register it in `featureMap`:
 ```typescript
 // src/services/FeatureToggles.ts
 
-type InviteCode = { code: string, isActive: boolean } | null;
+type InviteCode = { code: string; isActive: boolean } | null;
 
 const redirectPrompt = (inviteCode: InviteCode): boolean => {
-    return inviteCode?.code === 'AIKI-STUDY-1' && inviteCode?.isActive === true;
-}
+  return inviteCode?.code === 'AIKI-STUDY-1' && inviteCode?.isActive === true;
+};
 
 // NEW: only enable for users with the beta invite code
 const myNewFeature = (inviteCode: InviteCode): boolean => {
-    return inviteCode?.code === 'BETA-2025' && inviteCode?.isActive === true;
-}
+  return inviteCode?.code === 'BETA-2025' && inviteCode?.isActive === true;
+};
 
 export const featureMap = (inviteCode: InviteCode) => ({
-    redirectPrompt: redirectPrompt(inviteCode),
-    myNewFeature: myNewFeature(inviteCode),   // <-- add this line
+  redirectPrompt: redirectPrompt(inviteCode),
+  myNewFeature: myNewFeature(inviteCode), // <-- add this line
 });
 ```
 
@@ -80,14 +80,14 @@ export interface UserSettingsDto {
   learningSiteDomain?: string;
   flags: {
     redirectPrompt: boolean;
-    myNewFeature: boolean;   // <-- add this
+    myNewFeature: boolean; // <-- add this
   };
 }
 ```
 
 You don't need to touch `toUserSettingsDto` itself because it already calls `featureMap(user.inviteCode ?? null)` which will now include your new key automatically. The TypeScript type just needs to match.
 
-If you forget to add the type here, TypeScript will complain when you try to read `flags.myNewFeature` anywhere, which is actually useful. 
+If you forget to add the type here, TypeScript will complain when you try to read `flags.myNewFeature` anywhere, which is actually useful.
 
 ---
 
@@ -129,9 +129,9 @@ Anywhere in the extension that needs to branch on your flag, read it from storag
 const flags = await storage.featureFlags.get();
 
 if (flags.myNewFeature) {
-    // do the new thing
+  // do the new thing
 } else {
-    // do the old thing
+  // do the old thing
 }
 ```
 
@@ -140,14 +140,14 @@ Look at how `redirectPrompt` is used in `src/redirection/redirectFlow.js` as a c
 ```javascript
 // src/redirection/redirectFlow.js
 async function dispatchPrompt(tabId, learningUri, procUrl) {
-    const flags = await storage.featureFlags.get();
-    const promptEnabled = !flags.redirectPrompt;  // note: inverted because the flag means "show prompt"
+  const flags = await storage.featureFlags.get();
+  const promptEnabled = !flags.redirectPrompt; // note: inverted because the flag means "show prompt"
 
-    if (!promptEnabled) {
-        redirectTo(tabId, learningUri, procUrl);
-        return;
-    }
-    // ... rest of prompt logic
+  if (!promptEnabled) {
+    redirectTo(tabId, learningUri, procUrl);
+    return;
+  }
+  // ... rest of prompt logic
 }
 ```
 
