@@ -10,14 +10,14 @@ Releases are fully automated via GitHub Actions. Once a version tag is pushed, t
 
 The following GitHub repository secrets must be configured before the pipeline can run. These are one-time setup steps; once in place they do not need to be changed between releases.
 
-| Secret | Where to find it |
-|---|---|
-| `AMO_API_KEY` | [addons.mozilla.org/developers/addon/api/key/](https://addons.mozilla.org/en-US/developers/addon/api/key/) |
-| `AMO_API_SECRET` | Same page as above |
-| `CHROME_EXTENSION_ID` | Chrome Web Store Developer Console - the 32-character extension ID |
-| `CHROME_CLIENT_ID` | Google Cloud Console - OAuth 2.0 credentials (Desktop app type) |
-| `CHROME_CLIENT_SECRET` | Same Google Cloud OAuth credential |
-| `CHROME_REFRESH_TOKEN` | Obtained by completing the Google OAuth flow with the credentials above |
+| Secret                 | Where to find it                                                                                           |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `AMO_API_KEY`          | [addons.mozilla.org/developers/addon/api/key/](https://addons.mozilla.org/en-US/developers/addon/api/key/) |
+| `AMO_API_SECRET`       | Same page as above                                                                                         |
+| `CHROME_EXTENSION_ID`  | Chrome Web Store Developer Console - the 32-character extension ID                                         |
+| `CHROME_CLIENT_ID`     | Google Cloud Console - OAuth 2.0 credentials (Desktop app type)                                            |
+| `CHROME_CLIENT_SECRET` | Same Google Cloud OAuth credential                                                                         |
+| `CHROME_REFRESH_TOKEN` | Obtained by completing the Google OAuth flow with the credentials above                                    |
 
 > **Important:** The AMO credentials must belong to the Mozilla account that owns the AMO listing. Using credentials from a different Mozilla account will fail with a 403 error.
 
