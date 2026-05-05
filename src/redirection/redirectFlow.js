@@ -23,7 +23,6 @@ import { isTrackedTimeWastingUrl } from './shared/siteFilter';
  * @param {object} deps
  * @param {object} deps.navigationGuards
  * @param {object} deps.promptControl
- * @param {{ handleNavigation: Function }} deps.strategy
  * @param {() => Promise<void>} deps.addLearningSiteLoadedListener
  * @param {() => void} deps.addOriginUpdatedListener
  * @param {() => void} deps.removeOriginUpdatedListener
@@ -33,7 +32,6 @@ import { isTrackedTimeWastingUrl } from './shared/siteFilter';
 export function createRedirectFlow({
   navigationGuards,
   promptControl,
-  strategy,
   addLearningSiteLoadedListener,
   addOriginUpdatedListener,
   removeOriginUpdatedListener,
@@ -131,16 +129,6 @@ export function createRedirectFlow({
           .map((item) => item?.host || item?.name || '')
           .filter(Boolean);
         const learningUrl = await getLearningUrl();
-
-        const handled = await strategy.handleNavigation(details, {
-          applyPreemptiveHide: (tabId) =>
-            navigationGuards.applyPreemptiveHide(tabId),
-          removePreemptiveHide: (tabId) =>
-            navigationGuards.removePreemptiveHide(tabId),
-          timeWastingHosts: timeWasteHosts,
-          learningUrl,
-        });
-        if (handled) return;
 
         let shouldRedirect = await storage.shouldRedirect.get();
         if (!shouldRedirect) {
