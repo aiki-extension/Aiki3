@@ -11,15 +11,6 @@ class TimerManager {
     this.dailyGoal = 0;
     this.dailyProgress = 0;
 
-    // Reward timers (experimental variant)
-    this.rewardTimeRemaining = 0;
-    this.rewardTimeIntervalRef = undefined;
-    this.rewardUnlockAt = 0;
-
-    // Bonus timer (experimental variant)
-    this.bonusTime = 0;
-    this.bonusTimeIntervalRef = undefined;
-
     // Session duration timers
     this.sessionRemaining = 0;
     this.sessionIntervalRef = undefined;
@@ -72,31 +63,6 @@ class TimerManager {
     } catch {}
     clearInterval(this.learningTimeIntervalRef);
     this.learningTimeIntervalRef = undefined;
-    this.bonusTime = 0;
-  }
-
-  async startLearningSession() {
-    if (this.bonusTimeIntervalRef) this.stopBonusTime();
-    if (this.learningTimeIntervalRef)
-      clearInterval(this.learningTimeIntervalRef);
-    this.clearRewardTimer();
-    this.rewardTimeRemaining = 0;
-    this.rewardUnlockAt = 0;
-    storage.rewardUnlock.set(0).catch(() => {});
-    const goal = parseTime.toSystem(
-      await storage.timeSettings.learningTime.get(),
-    );
-    const progress = await storage.dailyProgress.get();
-    this.dailyGoal = goal;
-    this.dailyProgress = progress; // Allow progress to exceed goal
-    this.learningTimeRemaining = Math.max(goal - this.dailyProgress, 0);
-    if (this.learningTimeRemaining > 0) {
-      this.learningTimeIntervalRef = setInterval(() => {
-        this.decrementLearningTime().catch(() => {});
-      }, 1000);
-    } else {
-      await this.handleGoalCompletion();
-    }
   }
 
   async syncDailyState() {
@@ -108,17 +74,6 @@ class TimerManager {
     this.dailyProgress = progress; // Allow progress to exceed goal
     if (!this.learningTimeIntervalRef) {
       this.learningTimeRemaining = Math.max(goal - this.dailyProgress, 0);
-    }
-    this.rewardUnlockAt = await storage.rewardUnlock.get();
-    if (this.rewardUnlockAt) {
-      this.rewardTimeRemaining = Math.max(0, this.rewardUnlockAt - Date.now());
-      if (this.rewardTimeRemaining === 0) {
-        this.rewardUnlockAt = 0;
-        storage.rewardUnlock.set(0).catch(() => {});
-        storage.shouldRedirect.set(true);
-      }
-    } else {
-      this.rewardTimeRemaining = 0;
     }
   }
 
@@ -134,90 +89,6 @@ class TimerManager {
       storage.dailyProgress.set(consumed).catch(() => {});
     }
     this.learningTimeRemaining = 0;
-  }
-
-  clearRewardTimer() {
-    if (this.rewardTimeIntervalRef) {
-      clearInterval(this.rewardTimeIntervalRef);
-      this.rewardTimeIntervalRef = undefined;
-    }
-  }
-
-  async decrementRewardTime(callback) {
-    if (!this.rewardUnlockAt) {
-      this.rewardTimeRemaining = 0;
-      this.clearRewardTimer();
-      await storage.rewardUnlock.set(0);
-      await storage.shouldRedirect.set(true);
-      if (typeof callback === 'function') callback();
-      return;
-    }
-
-    this.rewardTimeRemaining = Math.max(0, this.rewardUnlockAt - Date.now());
-    if (this.rewardTimeRemaining === 0) {
-      this.clearRewardTimer();
-      this.rewardUnlockAt = 0;
-      await storage.rewardUnlock.set(0);
-      await storage.shouldRedirect.set(true);
-      if (typeof callback === 'function') callback();
-    }
-  }
-
-  async startTimeWastingSession(callback, rewardTime) {
-    this.stopLearningSession();
-    this.stopBonusTime();
-    this.clearRewardTimer();
-
-    this.rewardTimeRemaining = rewardTime;
-
-    if (this.rewardTimeRemaining <= 0) {
-      this.rewardUnlockAt = 0;
-      await storage.rewardUnlock.set(0);
-      await storage.shouldRedirect.set(true);
-      return;
-    }
-
-    this.rewardUnlockAt = Date.now() + this.rewardTimeRemaining;
-    await storage.rewardUnlock.set(this.rewardUnlockAt);
-    await storage.shouldRedirect.set(false);
-
-    this.rewardTimeIntervalRef = setInterval(() => {
-      this.decrementRewardTime(callback).catch(() => {});
-    }, 1000);
-  }
-
-  async stopTimeWastingSession(callback) {
-    this.clearRewardTimer();
-    this.rewardTimeRemaining = 0;
-    this.rewardUnlockAt = 0;
-    await storage.rewardUnlock.set(0);
-    await storage.shouldRedirect.set(true);
-    if (typeof callback === 'function') callback();
-  }
-
-  async incrementBonusTime() {
-    if (await this.checkActive()) {
-      if (this.bonusTime >= 0) {
-        this.bonusTime += 1000;
-      } else {
-        this.bonusTime = 0;
-      }
-    }
-  }
-
-  startBonusTime() {
-    if (this.bonusTimeIntervalRef) this.stopBonusTime();
-    clearInterval(this.learningTimeIntervalRef);
-    this.learningTimeIntervalRef = undefined;
-    this.bonusTimeIntervalRef = setInterval(() => {
-      this.incrementBonusTime().catch(() => {});
-    }, 1000);
-  }
-
-  stopBonusTime() {
-    clearInterval(this.bonusTimeIntervalRef);
-    this.bonusTime = 0;
-    this.bonusTimeIntervalRef = undefined;
   }
 
   isLearningSessionActive() {
@@ -274,14 +145,9 @@ class TimerManager {
   }
 
   killAiki() {
-    clearInterval(this.rewardTimeIntervalRef);
-    this.rewardTimeIntervalRef = undefined;
-    this.stopBonusTime();
+    this.stopSessionRewardTimer();
+    this.stopSessionTimer();
     storage.shouldRedirect.set(true);
-    storage.rewardUnlock.set(0).catch(() => {});
-    this.rewardTimeRemaining = 0;
-    this.rewardUnlockAt = 0;
-    this.bonusTime = 0;
     this.learningTimeRemaining = 0;
     this.dailyGoal = 0;
     this.dailyProgress = 0;
@@ -438,12 +304,9 @@ class TimerManager {
 
   getTime() {
     return {
-      bonusTime: this.bonusTime,
       learningTimeRemaining: this.learningTimeRemaining,
-      rewardTimeRemaining: this.rewardTimeRemaining,
       dailyGoal: this.dailyGoal,
       dailyProgress: this.dailyProgress,
-      rewardUnlockAt: this.rewardUnlockAt,
       // Session Duration and Reward relevant code
       sessionRemaining: this.sessionRemaining,
       sessionGoal: this.sessionGoal,

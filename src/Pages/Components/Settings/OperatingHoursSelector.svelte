@@ -1,5 +1,6 @@
 <!-- 
-  TODO: Description goes here
+  Paired hour/minute inputs for setting Aiki's active time window (ON/OFF times). Enforces that
+  the end time is always after the start time, and persists each change to local storage and the backend.
   Used in / Parent components: /src/Pages/Settings.svelte
  -->
 <script>
