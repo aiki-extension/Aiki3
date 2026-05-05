@@ -189,7 +189,6 @@ This one is worth testing carefully since the behaviour is not immediately obvio
 
 ---
 
-
 ## 4. Multi-tab and window edge cases
 
 ### 4a. Switching browser windows during a session
