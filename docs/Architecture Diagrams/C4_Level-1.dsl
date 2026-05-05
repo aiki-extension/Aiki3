@@ -6,7 +6,7 @@ workspace "Aiki" "C4 Level 1 - System Context Diagram" {
         user = person "User" "A person who wants to stay focused. Installs the Aiki browser extension on Firefox or Chrome."
 
         # Aiki System
-        aiki = softwareSystem "Aiki" "Browser extension and backend that intercepts visits to time-wasting sites and redirects users to learning activities. Runs partly inside the user's browser (extension) and partly on a VPS (REST API + database)."
+        aiki = softwareSystem "Aiki" "Browser extension and backend that intercepts visits to time-wasting sites and redirects users to learning activities. Runs partly inside the user's browser (extension) and partly on a VPS (API + database)."
 
         # External Systems
         dockerHub   = softwareSystem "Docker Hub"     "Container image registry. Stores built backend images pushed by the CI/CD pipeline." "External"

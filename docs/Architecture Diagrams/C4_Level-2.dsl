@@ -20,7 +20,7 @@ workspace "Aiki3 (Current)" "C4 Level 2 - Container Diagram: Aiki3 extension + c
                 tags "Frontend"
             }
 
-            backgroundWorker = container "Background Worker" "MV3 service worker. Handles all messages and port connections. Coordinates redirection, timers, and API calls." "JavaScript" {
+            backgroundWorker = container "Background Worker" "Service worker. Handles all messages and port connections. Coordinates redirection, timers, and API calls." "JavaScript" {
                 tags "Core"
             }
 
@@ -40,19 +40,19 @@ workspace "Aiki3 (Current)" "C4 Level 2 - Container Diagram: Aiki3 extension + c
                 tags "Infrastructure"
             }
 
-            fastifyAPI = container "Fastify REST API" "Core backend. Exposes auth, user, and invite-code routes. JWT auth, AJV validation, rate limiting." "Node.js / Fastify / TypeScript" {
+            fastifyAPI = container "Fastify API" "Core backend. Exposes auth, user, and invite-code routes. JWT auth, AJV validation, rate limiting." "Node.js / TypeScript" {
                 tags "Backend"
             }
 
-            featureToggleService = container "Feature Toggles" "Evaluates a user's invite code and returns a feature-flag map (e.g. redirect-prompt variant)." "TypeScript module" {
+            featureToggleService = container "Feature Toggles" "Evaluates a user's invite code and returns a feature-flag map (e.g. redirect-prompt variant)." "TypeScript" {
                 tags "Backend"
             }
 
-            postgresDB = container "PostgreSQL Database" "Relational store managed via Prisma. Tables: User, InviteCode, Website, UserTimeWastingSite, UserLearningSite, SiteSession, UserBehaviorLog." "PostgreSQL" {
+            postgresDB = container "Database" "Relational store managed via Prisma. Tables: User, InviteCode, Website, UserTimeWastingSite, UserLearningSite, SiteSession, UserBehaviorLog." "PostgreSQL" {
                 tags "Storage"
             }
 
-            inviteCodeManager = container "Invite Code Manager" "Admin SPA. Lists, creates, updates, and deactivates invite codes via the Fastify API." "React / Vite" {
+            inviteCodeManager = container "Invite Code Manager" "Lists, creates, updates, and deactivates invite codes via the Fastify API." "React / Vite" {
                 tags "AdminUI"
             }
         }
@@ -63,33 +63,33 @@ workspace "Aiki3 (Current)" "C4 Level 2 - Container Diagram: Aiki3 extension + c
 
         // Relationships
 
-        user -> popupUI "Toggle redirection; view timer"
+        user -> popupUI "Toggle redirection: view timer"
         user -> settingsUI "Register, log in, configure settings"
         admin -> inviteCodeManager "Manage invite codes"
 
         popupUI -> backgroundWorker "timer / on / off / originTab" "Runtime Port"
-        popupUI -> extensionStorage "Read timer state"
+        popupUI -> extensionStorage "Read/write session state and redirection toggle"
 
         settingsUI -> backgroundWorker "api:* and refreshFilters messages" "runtime.sendMessage"
-        settingsUI -> extensionStorage "Read cached settings"
+        settingsUI -> extensionStorage "Read/write config (sites, timers, operating hours, auth)"
 
-        backgroundWorker -> apiHandler "Delegate api:* messages"
+        backgroundWorker -> apiHandler "Delegate api messages"
         backgroundWorker -> extensionStorage "Read / write runtime state"
         backgroundWorker -> contentScript "Overlay commands" "tabs.sendMessage"
         backgroundWorker -> learningPlatform "Redirect tab" "tabs.update"
 
-        apiHandler -> nginxProxy "auth, user, settings, site endpoints" "HTTPS / JSON"
+        apiHandler -> nginxProxy "auth, user, settings, site endpoints" 
 
         contentScript -> backgroundWorker "User actions; timer poll" "Runtime Port"
         contentScript -> extensionStorage "Read site list and learning URI"
 
-        nginxProxy -> fastifyAPI "Proxy /api/* traffic" "HTTP"
-        nginxProxy -> inviteCodeManager "Proxy /ic-manager/* traffic" "HTTP"
+        nginxProxy -> fastifyAPI "Proxy /api/* traffic" 
+        nginxProxy -> inviteCodeManager "Proxy /ic-manager/* traffic" 
 
         fastifyAPI -> featureToggleService "Build feature-flag map"
-        fastifyAPI -> postgresDB "Read / write via Prisma" "SQL"
+        fastifyAPI -> postgresDB "Read / write via Prisma"
 
-        inviteCodeManager -> nginxProxy "CRUD invite codes; login" "HTTPS / JSON"
+        inviteCodeManager -> nginxProxy "CRUD invite codes: login" 
     }
 
     views {
