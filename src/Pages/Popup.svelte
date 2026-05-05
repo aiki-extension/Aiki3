@@ -4,7 +4,6 @@
  -->
 <script>
   /* Functional and module imports */
-  import { parseUrl } from "../util/utilities";
   import storage from "../util/storage";
   import browser from "webextension-polyfill";
 
@@ -49,11 +48,6 @@
     origin = await storage.origin.get();
   }
 
-  $: if (origin) {
-    if (origin.url) {
-      siteName = parseUrl(origin.url).name;
-    }
-  }
   setup();
 </script>
 
