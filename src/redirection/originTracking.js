@@ -76,7 +76,6 @@ export function createOriginTracking({
         'learning',
         'tab_closed',
       );
-      timer.stopBonusTime();
       timer.stopLearningSession();
 
       // Don't re-enable redirects if a session reward is currently active —

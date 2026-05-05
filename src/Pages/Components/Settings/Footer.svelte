@@ -1,5 +1,5 @@
 <!-- 
-  TODO: Description goes here
+  Static footer displaying the university credit at the bottom of the Settings page.
   Used in / Parent components: /src/Pages/Settings.svelte
  -->
 <footer>IT University of Copenhagen 2026</footer>

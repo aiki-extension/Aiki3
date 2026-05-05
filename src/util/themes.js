@@ -1,7 +1,6 @@
 // Controls themes for the application. This is achieved by switching out global CSS variables in global.css
 // Currently offers four themes.
 
-// TODO: Put storage functions in storage
 import browser from 'webextension-polyfill';
 const storage = browser.storage.local;
 
