@@ -1,5 +1,6 @@
 <!-- 
-  TODO: Description goes here
+  Loads operating hours from storage and renders OperatingHoursSelector. Re-reads storage after
+  each update to keep local state in sync.
   Used in / Parent components: /src/Pages/Settings.svelte
  -->
 <script>
