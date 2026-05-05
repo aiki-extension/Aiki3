@@ -189,18 +189,6 @@ This one is worth testing carefully since the behaviour is not immediately obvio
 
 ---
 
-### 3d. What happens at midnight (known unknown)
-
-**Context:** The daily progress resets inside `getDailyProgress()` when the stored `dailyProgressDate` doesn't match today's date string. This check only fires when something actually calls `getDailyProgress()`, which includes `startSessionTimer()`, `decrementSession()`, and `syncDailyState()`.
-
-**What this means in practice:** If a session is running across midnight, `decrementSession()` increments `dailyProgress` by calling `storage.dailyProgress.set()` directly with the in-memory value, it does NOT go through `getDailyProgress()`. So the reset probably does not happen mid-session. The timer in memory just keeps going.
-
-The next call to `getDailyProgress()` after midnight (which would happen when a new session tries to start, or on the next popup poll) should trigger the reset and return 0, treating it as a fresh day.
-
-**To test:** This is genuinely hard to reproduce without waiting until midnight or mocking the system clock. What you can do is manually set `dailyProgressDate` in extension storage to yesterday's date string (e.g. `"Mon Apr 28 2025"`) and then trigger a new session. The reset should fire and `dailyProgress` should go back to 0.
-
----
-
 ## 4. Multi-tab and window edge cases
 
 ### 4a. Switching browser windows during a session

@@ -4,16 +4,8 @@ import siteDetector from './siteDetector';
 import storage from '../util/storage';
 import PreemptiveHide from './PreemptiveHide';
 
-/**
- * NavigationGuards centralizes tab/window listeners and delegates session handling.
- * A strategy object must be provided with:
- * - handleNavigation(tabId, url): boolean (true if handled)
- * - handleTabClose?(tabId): optional async hook
- * - onLearningSiteNavigation?(details): optional async hook
- */
 class NavigationGuards {
-  constructor(strategy) {
-    this.strategy = strategy;
+  constructor() {
     this.lastActiveTabByWindow = new Map();
     this.timeWastingGuardsRegistered = false;
     this.onActivatedHandler = null;
@@ -190,16 +182,8 @@ class NavigationGuards {
     browser.tabs.onActivated.addListener(this.onActivatedHandler);
 
     this.onRemovedHandler = async (tabId, removeInfo) => {
-      if (this.strategy?.handleTabClose) {
-        await this.strategy.handleTabClose(tabId);
-      } else {
-        await SessionService.finalizeSession(
-          tabId,
-          'timeWasting',
-          'tab_closed',
-        );
-        await SessionService.finalizeSession(tabId, 'learning', 'tab_closed');
-      }
+      await SessionService.finalizeSession(tabId, 'timeWasting', 'tab_closed');
+      await SessionService.finalizeSession(tabId, 'learning', 'tab_closed');
 
       if (removeInfo?.windowId !== undefined) {
         const tracked = this.lastActiveTabByWindow.get(removeInfo.windowId);
@@ -229,9 +213,6 @@ class NavigationGuards {
         details.tabId,
         this.hideImmediatePrompt.bind(this),
       );
-      if (this.strategy?.onLearningSiteNavigation && details.url) {
-        await this.strategy.onLearningSiteNavigation(details);
-      }
     };
     browser.webNavigation.onCommitted.addListener(this.onCommittedHandler);
 
