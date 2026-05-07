@@ -4,7 +4,7 @@ import browser from 'webextension-polyfill';
 import { parseTime } from '../util/utilities';
 import { handleApiMessage } from './apiHandler';
 import redirection from '../redirection';
-import { getLearningUrl } from '../services/siteDetector';
+import { getLearningUrl, isLearningSite } from '../services/siteDetector';
 import { MESSAGE_REDIRECTION_REFRESH_FILTERS } from '../values/messageTypeValues';
 
 /*
@@ -12,6 +12,47 @@ This module handles incoming messages from content scripts and other parts of th
 It processes different message types, such as timer requests, learning session management.
 Auth messages are delegated to apiHandler.
 */
+
+// Tracks direct-navigation learning tabs and ticks dailyProgress in real time.
+const passiveLearningTabs = new Map(); // tabId -> removeListeners
+
+function stopPassiveLearning(tabId) {
+  const removeListeners = passiveLearningTabs.get(tabId);
+  if (!removeListeners) return;
+  passiveLearningTabs.delete(tabId);
+  removeListeners();
+}
+
+function startPassiveLearning(tabId) {
+  if (passiveLearningTabs.has(tabId)) return;
+
+  const intervalRef = setInterval(() => {
+    storage.dailyProgress
+      .get()
+      .then((current) => storage.dailyProgress.set((current || 0) + 1000))
+      .catch(() => {});
+  }, 1000);
+
+  function onRemoved(closedTabId) {
+    if (closedTabId === tabId) stopPassiveLearning(tabId);
+  }
+
+  async function onUpdated(updatedTabId, changeInfo) {
+    if (updatedTabId !== tabId || !changeInfo.url) return;
+    const learningUri = await getLearningUrl();
+    if (learningUri && isLearningSite(changeInfo.url, learningUri)) return;
+    stopPassiveLearning(tabId);
+  }
+
+  browser.tabs.onRemoved.addListener(onRemoved);
+  browser.tabs.onUpdated.addListener(onUpdated);
+
+  passiveLearningTabs.set(tabId, () => {
+    clearInterval(intervalRef);
+    browser.tabs.onRemoved.removeListener(onRemoved);
+    browser.tabs.onUpdated.removeListener(onUpdated);
+  });
+}
 
 export async function handleMessage(message, sender) {
   if (!message || typeof message !== 'object') {
@@ -56,8 +97,11 @@ export async function handleMessage(message, sender) {
         // was retained for content-blocker purposes only.
         const existingOrigin = await storage.origin.get();
         if (!existingOrigin || existingOrigin.tabId !== sender?.tab?.id) {
+          if (sender?.tab?.id !== undefined) startPassiveLearning(sender.tab.id);
           return { redirected: false };
         }
+        // Stop any passive tracking for this tab when full redirect session takes over 
+        stopPassiveLearning(sender?.tab?.id);
 
         // Get information on the daily goal
         const dailyGoal = parseTime.toSystem(
