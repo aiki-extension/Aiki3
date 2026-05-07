@@ -21,7 +21,9 @@ export async function bootstrapLearningOverlayIfNeeded() {
     }
     let response;
     try {
-      response = await browser.runtime.sendMessage({ type: 'learning:autoStart' });
+      response = await browser.runtime.sendMessage({
+        type: 'learning:autoStart',
+      });
     } catch {}
     if (response?.redirected === false) {
       bootstrapAttemptPending = false;
