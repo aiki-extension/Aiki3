@@ -97,10 +97,11 @@ export async function handleMessage(message, sender) {
         // was retained for content-blocker purposes only.
         const existingOrigin = await storage.origin.get();
         if (!existingOrigin || existingOrigin.tabId !== sender?.tab?.id) {
-          if (sender?.tab?.id !== undefined) startPassiveLearning(sender.tab.id);
+          if (sender?.tab?.id !== undefined)
+            startPassiveLearning(sender.tab.id);
           return { redirected: false };
         }
-        // Stop any passive tracking for this tab when full redirect session takes over 
+        // Stop any passive tracking for this tab when full redirect session takes over
         stopPassiveLearning(sender?.tab?.id);
 
         // Get information on the daily goal
