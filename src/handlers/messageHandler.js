@@ -50,10 +50,12 @@ export async function handleMessage(message, sender) {
   if (message.type === 'learning:autoStart') {
     return (async () => {
       try {
-        // Only start a session if the user arrived via a redirect (origin is set).
-        // Direct navigation to the learning site should not count time or show the overlay.
+        // Only start a session if the user arrived via a redirect (origin is set
+        // and its tabId matches the sender tab). A tab-ID mismatch means either
+        // a direct navigation or the original learning tab was closed and origin
+        // was retained for content-blocker purposes only.
         const existingOrigin = await storage.origin.get();
-        if (!existingOrigin) {
+        if (!existingOrigin || existingOrigin.tabId !== sender?.tab?.id) {
           return { redirected: false };
         }
 

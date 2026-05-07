@@ -42,7 +42,7 @@ async function startSession(tabId, sessionType, siteUrl, triggerUrl = null) {
   };
 
   if (sessionType === 'learning') {
-    await setOriginIfMissing(tabId);
+    if (triggerUrl) await setOriginIfMissing(tabId);
     sessionData.learningUrl = siteUrl;
     sessionData.timeWastingUrl = triggerUrl;
   } else {

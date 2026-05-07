@@ -114,24 +114,12 @@ class TimerManager {
           const learningUri = await getLearningUrl();
           const learningName = learningUri ? parseUrl(learningUri).name : '';
 
-          // Only count as active if the current tab is both the origin tab AND still on the learning host
+          // Only count time when the active tab is the redirected learning tab
+          // and it's still on the learning site.
           if (
             origin &&
             origin.tabId !== undefined &&
-            current.id === origin.tabId
-          ) {
-            if (
-              learningName &&
-              current.url &&
-              current.url.includes(learningName)
-            ) {
-              return true;
-            }
-            return false;
-          }
-
-          // Otherwise allow active if current tab is on the learning site
-          if (
+            current.id === origin.tabId &&
             learningName &&
             current.url &&
             current.url.includes(learningName)

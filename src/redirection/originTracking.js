@@ -67,16 +67,20 @@ export function createOriginTracking({
     }
 
     if (!migrated) {
-      console.log('Origin killed');
+      console.log('Learning tab closed');
       removeOriginUpdatedListener();
       promptControl.removeAllContentBlockers();
-      storage.origin.remove();
+      // Strip tabId so a direct navigation to the learning site in a new tab
+      // won't trigger the overlay, but keep origin set so the content blocker
+      // still fires if the user visits a time-wasting site.
+      storage.origin.set({ url: origin.url });
       await SessionService.finalizeSession(
         closedTabId,
         'learning',
         'tab_closed',
       );
       timer.stopLearningSession();
+      timer.stopSessionTimer();
 
       // Don't re-enable redirects if a session reward is currently active —
       // closing the origin tab while on reward time should not cancel the reward.

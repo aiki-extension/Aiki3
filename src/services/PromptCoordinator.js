@@ -78,6 +78,8 @@ class PromptCoordinator {
 
         if (result?.action === 'continue' && typeof onContinue === 'function') {
           await onContinue();
+        } else if (result?.action === 'return' && typeof callbacks.onReturn === 'function') {
+          await callbacks.onReturn();
         }
 
         await this.hideImmediatePrompt(details.tabId);
