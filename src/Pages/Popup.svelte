@@ -4,7 +4,6 @@
  -->
 <script>
   /* Functional and module imports */
-  import storage from "../util/storage";
   import browser from "webextension-polyfill";
 
   /* Components import */
@@ -17,7 +16,6 @@
   name: "Popup Communication",
   });
 
-  let origin = {};
   
   // Ignore linter warning for this. Extension window breaks without this promise 
   let timeValues = new Promise((resolve) => {}); // eslint-disable-line
@@ -44,11 +42,7 @@
     }
   }, 1000);
 
-  async function setup() {
-    origin = await storage.origin.get();
-  }
 
-  setup();
 </script>
 
 <main>
