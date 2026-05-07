@@ -42,7 +42,7 @@ export function createRedirectFlow({
     addLearningSiteLoadedListener();
     navigationGuards.install();
     await SessionService.startSession(tabId, 'learning', learningUri, procUrl);
-    storage.origin.set({ url: procUrl });
+    storage.origin.set({ url: procUrl, tabId: tabId });
     addOriginUpdatedListener();
     await storage.globalPromptLock.remove();
 
