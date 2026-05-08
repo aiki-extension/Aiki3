@@ -1,4 +1,56 @@
 import storage from '../util/storage';
+import browser from 'webextension-polyfill';
+import timer from './TimerManager';
+import { getLearningUrl, isLearningSite } from './siteDetector';
+
+// Voluntary learning: tracks direct-navigation learning tabs (no redirect origin)
+const voluntaryLearningTabs = new Map(); // tabId -> removeListeners
+
+function stopVoluntaryLearning(tabId) {
+  const removeListeners = voluntaryLearningTabs.get(tabId);
+  if (!removeListeners) return;
+  voluntaryLearningTabs.delete(tabId);
+  removeListeners();
+  timer.stopVoluntaryLearningTimer(tabId);
+}
+
+function startVoluntaryLearning(tabId) {
+  if (voluntaryLearningTabs.has(tabId)) return;
+
+  timer.startVoluntaryLearningTimer(tabId);
+
+  function onRemoved(closedTabId) {
+    if (closedTabId === tabId) stopVoluntaryLearning(tabId);
+  }
+
+  async function onUpdated(updatedTabId, changeInfo) {
+    if (updatedTabId !== tabId || !changeInfo.url) return;
+    const learningUri = await getLearningUrl();
+    if (learningUri && isLearningSite(changeInfo.url, learningUri)) return;
+    stopVoluntaryLearning(tabId);
+  }
+
+  browser.tabs.onRemoved.addListener(onRemoved);
+  browser.tabs.onUpdated.addListener(onUpdated);
+
+  voluntaryLearningTabs.set(tabId, () => {
+    browser.tabs.onRemoved.removeListener(onRemoved);
+    browser.tabs.onUpdated.removeListener(onUpdated);
+  });
+}
+
+// Checks origin: if the tab did not arrive via a redirect, starts voluntary learning.
+// Returns true if voluntary learning was started (caller should return { redirected: false }).
+async function maybeStartVoluntaryLearning(tabId) {
+  if (tabId === undefined) return false;
+  const existingOrigin = await storage.origin.get();
+  if (!existingOrigin || existingOrigin.tabId !== tabId) {
+    startVoluntaryLearning(tabId);
+    return true;
+  }
+  return false;
+}
+
 let cachedGoalSeconds = null;
 let lastGoalFetch = 0;
 
@@ -143,6 +195,9 @@ export default {
   finalizeSession,
   transferActiveSession,
   getGoalSeconds,
+  startVoluntaryLearning,
+  stopVoluntaryLearning,
+  maybeStartVoluntaryLearning,
   logEventAsync: () => {},
   logControlledSession: async () => {},
 };

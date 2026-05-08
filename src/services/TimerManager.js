@@ -24,6 +24,8 @@ class TimerManager {
     this.sessionRewardGoal = 0;
     this.sessionRewardElapsed = 0;
     this.sessionRewardOnComplete = null;
+
+    this.voluntaryLearningIntervals = new Map();
   }
 
   computeProgressPercent() {
@@ -288,6 +290,23 @@ class TimerManager {
   // Check if session reward timer is running
   isSessionRewardActive() {
     return Boolean(this.sessionRewardIntervalRef);
+  }
+
+  // Voluntary learning timer for direct-navigation tabs (no checkActive gate)
+  startVoluntaryLearningTimer(tabId) {
+    if (this.voluntaryLearningIntervals.has(tabId)) return;
+    const ref = setInterval(() => {
+      this.dailyProgress += 1000;
+      storage.dailyProgress.set(this.dailyProgress).catch(() => {});
+    }, 1000);
+    this.voluntaryLearningIntervals.set(tabId, ref);
+  }
+
+  stopVoluntaryLearningTimer(tabId) {
+    const ref = this.voluntaryLearningIntervals.get(tabId);
+    if (!ref) return;
+    clearInterval(ref);
+    this.voluntaryLearningIntervals.delete(tabId);
   }
 
   getTime() {

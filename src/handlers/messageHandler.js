@@ -4,7 +4,8 @@ import browser from 'webextension-polyfill';
 import { parseTime } from '../util/utilities';
 import { handleApiMessage } from './apiHandler';
 import redirection from '../redirection';
-import { getLearningUrl, isLearningSite } from '../services/siteDetector';
+import { getLearningUrl } from '../services/siteDetector';
+import SessionService from '../services/SessionService';
 import { MESSAGE_REDIRECTION_REFRESH_FILTERS } from '../values/messageTypeValues';
 
 /*
@@ -12,47 +13,6 @@ This module handles incoming messages from content scripts and other parts of th
 It processes different message types, such as timer requests, learning session management.
 Auth messages are delegated to apiHandler.
 */
-
-// Tracks direct-navigation learning tabs and ticks dailyProgress in real time.
-const passiveLearningTabs = new Map(); // tabId -> removeListeners
-
-function stopPassiveLearning(tabId) {
-  const removeListeners = passiveLearningTabs.get(tabId);
-  if (!removeListeners) return;
-  passiveLearningTabs.delete(tabId);
-  removeListeners();
-}
-
-function startPassiveLearning(tabId) {
-  if (passiveLearningTabs.has(tabId)) return;
-
-  const intervalRef = setInterval(() => {
-    storage.dailyProgress
-      .get()
-      .then((current) => storage.dailyProgress.set((current || 0) + 1000))
-      .catch(() => {});
-  }, 1000);
-
-  function onRemoved(closedTabId) {
-    if (closedTabId === tabId) stopPassiveLearning(tabId);
-  }
-
-  async function onUpdated(updatedTabId, changeInfo) {
-    if (updatedTabId !== tabId || !changeInfo.url) return;
-    const learningUri = await getLearningUrl();
-    if (learningUri && isLearningSite(changeInfo.url, learningUri)) return;
-    stopPassiveLearning(tabId);
-  }
-
-  browser.tabs.onRemoved.addListener(onRemoved);
-  browser.tabs.onUpdated.addListener(onUpdated);
-
-  passiveLearningTabs.set(tabId, () => {
-    clearInterval(intervalRef);
-    browser.tabs.onRemoved.removeListener(onRemoved);
-    browser.tabs.onUpdated.removeListener(onUpdated);
-  });
-}
 
 export async function handleMessage(message, sender) {
   if (!message || typeof message !== 'object') {
@@ -91,18 +51,12 @@ export async function handleMessage(message, sender) {
   if (message.type === 'learning:autoStart') {
     return (async () => {
       try {
-        // Only start a session if the user arrived via a redirect (origin is set
-        // and its tabId matches the sender tab). A tab-ID mismatch means either
-        // a direct navigation or the original learning tab was closed and origin
-        // was retained for content-blocker purposes only.
-        const existingOrigin = await storage.origin.get();
-        if (!existingOrigin || existingOrigin.tabId !== sender?.tab?.id) {
-          if (sender?.tab?.id !== undefined)
-            startPassiveLearning(sender.tab.id);
+        // SessionService decides: direct-nav tab -> voluntary learning, redirected tab -> full session.
+        if (await SessionService.maybeStartVoluntaryLearning(sender?.tab?.id)) {
           return { redirected: false };
         }
-        // Stop any passive tracking for this tab when full redirect session takes over
-        stopPassiveLearning(sender?.tab?.id);
+        // Stop any voluntary tracking for this tab when full redirect session takes over
+        SessionService.stopVoluntaryLearning(sender?.tab?.id);
 
         // Get information on the daily goal
         const dailyGoal = parseTime.toSystem(
