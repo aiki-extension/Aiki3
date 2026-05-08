@@ -56,7 +56,7 @@ export async function handleMessage(message, sender) {
           return { redirected: false };
         }
         // Stop any voluntary tracking for this tab when full redirect session takes over
-        SessionService.stopVoluntaryLearning(sender?.tab?.id);
+        SessionService.stopVoluntaryLearning();
 
         // Get information on the daily goal
         const dailyGoal = parseTime.toSystem(

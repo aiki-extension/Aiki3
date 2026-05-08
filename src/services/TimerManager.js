@@ -25,7 +25,8 @@ class TimerManager {
     this.sessionRewardElapsed = 0;
     this.sessionRewardOnComplete = null;
 
-    this.voluntaryLearningIntervals = new Map();
+    this.voluntaryLearningIntervalRef = undefined;
+    this.voluntaryLearningTabId = undefined;
   }
 
   computeProgressPercent() {
@@ -299,22 +300,23 @@ class TimerManager {
   }
 
   startVoluntaryLearningTimer(tabId) {
-    if (this.voluntaryLearningIntervals.has(tabId)) return;
-    const ref = setInterval(() => {
+    this.stopVoluntaryLearningTimer();
+    this.voluntaryLearningTabId = tabId;
+    this.voluntaryLearningIntervalRef = setInterval(() => {
       this.checkActive(tabId).then((active) => {
         if (!active) return;
         this.dailyProgress += 1000;
         storage.dailyProgress.set(this.dailyProgress).catch(() => {});
       }).catch(() => {});
     }, 1000);
-    this.voluntaryLearningIntervals.set(tabId, ref);
   }
 
-  stopVoluntaryLearningTimer(tabId) {
-    const ref = this.voluntaryLearningIntervals.get(tabId);
-    if (!ref) return;
-    clearInterval(ref);
-    this.voluntaryLearningIntervals.delete(tabId);
+  stopVoluntaryLearningTimer() {
+    if (this.voluntaryLearningIntervalRef) {
+      clearInterval(this.voluntaryLearningIntervalRef);
+      this.voluntaryLearningIntervalRef = undefined;
+    }
+    this.voluntaryLearningTabId = undefined;
   }
 
   getTime() {

@@ -3,40 +3,42 @@ import browser from 'webextension-polyfill';
 import timer from './TimerManager';
 import { getLearningUrl, isLearningSite } from './siteDetector';
 
-// Voluntary learning: tracks direct-navigation learning tabs (no redirect origin)
-const voluntaryLearningTabs = new Map(); // tabId -> removeListeners
+// Voluntary learning: tracks a single direct-navigation learning tab (no redirect origin)
+let voluntaryLearningTabId = null;
+let removeVoluntaryListeners = null;
 
-function stopVoluntaryLearning(tabId) {
-  const removeListeners = voluntaryLearningTabs.get(tabId);
-  if (!removeListeners) return;
-  voluntaryLearningTabs.delete(tabId);
-  removeListeners();
-  timer.stopVoluntaryLearningTimer(tabId);
+function stopVoluntaryLearning() {
+  if (!removeVoluntaryListeners) return;
+  removeVoluntaryListeners();
+  removeVoluntaryListeners = null;
+  voluntaryLearningTabId = null;
+  timer.stopVoluntaryLearningTimer();
 }
 
 function startVoluntaryLearning(tabId) {
-  if (voluntaryLearningTabs.has(tabId)) return;
+  stopVoluntaryLearning();
 
+  voluntaryLearningTabId = tabId;
   timer.startVoluntaryLearningTimer(tabId);
 
   function onRemoved(closedTabId) {
-    if (closedTabId === tabId) stopVoluntaryLearning(tabId);
+    if (closedTabId === tabId) stopVoluntaryLearning();
   }
 
   async function onUpdated(updatedTabId, changeInfo) {
     if (updatedTabId !== tabId || !changeInfo.url) return;
     const learningUri = await getLearningUrl();
     if (learningUri && isLearningSite(changeInfo.url, learningUri)) return;
-    stopVoluntaryLearning(tabId);
+    stopVoluntaryLearning();
   }
 
   browser.tabs.onRemoved.addListener(onRemoved);
   browser.tabs.onUpdated.addListener(onUpdated);
 
-  voluntaryLearningTabs.set(tabId, () => {
+  removeVoluntaryListeners = () => {
     browser.tabs.onRemoved.removeListener(onRemoved);
     browser.tabs.onUpdated.removeListener(onUpdated);
-  });
+  };
 }
 
 // Returns true if the tab arrived via direct navigation (no redirect origin match).
