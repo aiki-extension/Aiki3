@@ -26,7 +26,6 @@ class TimerManager {
     this.sessionRewardOnComplete = null;
 
     this.voluntaryLearningIntervalRef = undefined;
-    this.voluntaryLearningTabId = undefined;
   }
 
   computeProgressPercent() {
@@ -165,7 +164,7 @@ class TimerManager {
   // Increments dailyProgress by one second if the relevant tab is active.
   // Returns true if active (callers can run their own logic on top).
   async tickDailyProgress(tabId = undefined) {
-    if (!await this.checkActive(tabId)) return false;
+    if (!(await this.checkActive(tabId))) return false;
     this.dailyProgress += 1000;
     await storage.dailyProgress.set(this.dailyProgress);
     return true;
@@ -173,7 +172,7 @@ class TimerManager {
 
   // Decrement session timer
   async decrementSession() {
-    if (!await this.tickDailyProgress()) return;
+    if (!(await this.tickDailyProgress())) return;
 
     this.sessionElapsed += 1000;
 
@@ -309,7 +308,6 @@ class TimerManager {
   async startVoluntaryLearningTimer(tabId) {
     this.stopVoluntaryLearningTimer();
     this.dailyProgress = await storage.dailyProgress.get();
-    this.voluntaryLearningTabId = tabId;
     this.voluntaryLearningIntervalRef = setInterval(() => {
       this.tickDailyProgress(tabId).catch(() => {});
     }, 1000);
@@ -320,7 +318,6 @@ class TimerManager {
       clearInterval(this.voluntaryLearningIntervalRef);
       this.voluntaryLearningIntervalRef = undefined;
     }
-    this.voluntaryLearningTabId = undefined;
   }
 
   getTime() {

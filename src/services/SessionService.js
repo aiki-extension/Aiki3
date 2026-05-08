@@ -3,22 +3,18 @@ import browser from 'webextension-polyfill';
 import timer from './TimerManager';
 import { getLearningUrl, isLearningSite } from './siteDetector';
 
-// Voluntary learning: tracks a single direct-navigation learning tab (no redirect origin)
-let voluntaryLearningTabId = null;
 let removeVoluntaryListeners = null;
 
 function stopVoluntaryLearning() {
   if (!removeVoluntaryListeners) return;
   removeVoluntaryListeners();
   removeVoluntaryListeners = null;
-  voluntaryLearningTabId = null;
   timer.stopVoluntaryLearningTimer();
 }
 
 async function startVoluntaryLearning(tabId) {
   stopVoluntaryLearning();
 
-  voluntaryLearningTabId = tabId;
   await timer.startVoluntaryLearningTimer(tabId);
 
   function onRemoved(closedTabId) {
