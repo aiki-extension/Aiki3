@@ -299,8 +299,9 @@ class TimerManager {
     return Boolean(this.sessionRewardIntervalRef);
   }
 
-  startVoluntaryLearningTimer(tabId) {
+  async startVoluntaryLearningTimer(tabId) {
     this.stopVoluntaryLearningTimer();
+    this.dailyProgress = await storage.dailyProgress.get();
     this.voluntaryLearningTabId = tabId;
     this.voluntaryLearningIntervalRef = setInterval(() => {
       this.checkActive(tabId).then((active) => {

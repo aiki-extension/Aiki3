@@ -52,7 +52,7 @@ export async function handleMessage(message, sender) {
     return (async () => {
       try {
         if (await SessionService.checkVoluntaryLearning(sender?.tab?.id)) {
-          SessionService.startVoluntaryLearning(sender?.tab?.id);
+          await SessionService.startVoluntaryLearning(sender?.tab?.id);
           return { redirected: false };
         }
         // Stop any voluntary tracking for this tab when full redirect session takes over

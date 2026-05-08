@@ -15,11 +15,11 @@ function stopVoluntaryLearning() {
   timer.stopVoluntaryLearningTimer();
 }
 
-function startVoluntaryLearning(tabId) {
+async function startVoluntaryLearning(tabId) {
   stopVoluntaryLearning();
 
   voluntaryLearningTabId = tabId;
-  timer.startVoluntaryLearningTimer(tabId);
+  await timer.startVoluntaryLearningTimer(tabId);
 
   function onRemoved(closedTabId) {
     if (closedTabId === tabId) stopVoluntaryLearning();
