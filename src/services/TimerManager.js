@@ -162,26 +162,33 @@ class TimerManager {
     };
   }
 
+  // Increments dailyProgress by one second if the relevant tab is active.
+  // Returns true if active (callers can run their own logic on top).
+  async tickDailyProgress(tabId = undefined) {
+    if (!await this.checkActive(tabId)) return false;
+    this.dailyProgress += 1000;
+    await storage.dailyProgress.set(this.dailyProgress);
+    return true;
+  }
+
   // Decrement session timer
   async decrementSession() {
-    if (await this.checkActive()) {
-      this.sessionElapsed += 1000;
+    if (!await this.tickDailyProgress()) return;
 
-      if (this.sessionRemaining > 0) {
-        this.sessionRemaining -= 1000;
-        this.dailyProgress += 1000;
-        await storage.dailyProgress.set(this.dailyProgress);
+    this.sessionElapsed += 1000;
 
-        if (this.sessionRemaining <= 0) {
-          this.sessionRemaining = 0;
+    if (this.sessionRemaining > 0) {
+      this.sessionRemaining -= 1000;
 
-          if (!this.sessionCompleted) {
-            this.sessionCompleted = true;
+      if (this.sessionRemaining <= 0) {
+        this.sessionRemaining = 0;
 
-            if (typeof this.sessionOnComplete === 'function') {
-              this.sessionOnComplete();
-              this.sessionOnComplete = null;
-            }
+        if (!this.sessionCompleted) {
+          this.sessionCompleted = true;
+
+          if (typeof this.sessionOnComplete === 'function') {
+            this.sessionOnComplete();
+            this.sessionOnComplete = null;
           }
         }
       }
@@ -304,11 +311,7 @@ class TimerManager {
     this.dailyProgress = await storage.dailyProgress.get();
     this.voluntaryLearningTabId = tabId;
     this.voluntaryLearningIntervalRef = setInterval(() => {
-      this.checkActive(tabId).then((active) => {
-        if (!active) return;
-        this.dailyProgress += 1000;
-        storage.dailyProgress.set(this.dailyProgress).catch(() => {});
-      }).catch(() => {});
+      this.tickDailyProgress(tabId).catch(() => {});
     }, 1000);
   }
 
