@@ -51,8 +51,8 @@ export async function handleMessage(message, sender) {
   if (message.type === 'learning:autoStart') {
     return (async () => {
       try {
-        // SessionService decides: direct-nav tab -> voluntary learning, redirected tab -> full session.
-        if (await SessionService.maybeStartVoluntaryLearning(sender?.tab?.id)) {
+        if (await SessionService.checkVoluntaryLearning(sender?.tab?.id)) {
+          SessionService.startVoluntaryLearning(sender?.tab?.id);
           return { redirected: false };
         }
         // Stop any voluntary tracking for this tab when full redirect session takes over

@@ -39,16 +39,11 @@ function startVoluntaryLearning(tabId) {
   });
 }
 
-// Checks origin: if the tab did not arrive via a redirect, starts voluntary learning.
-// Returns true if voluntary learning was started (caller should return { redirected: false }).
-async function maybeStartVoluntaryLearning(tabId) {
+// Returns true if the tab arrived via direct navigation (no redirect origin match).
+async function checkVoluntaryLearning(tabId) {
   if (tabId === undefined) return false;
   const existingOrigin = await storage.origin.get();
-  if (!existingOrigin || existingOrigin.tabId !== tabId) {
-    startVoluntaryLearning(tabId);
-    return true;
-  }
-  return false;
+  return !existingOrigin || existingOrigin.tabId !== tabId;
 }
 
 let cachedGoalSeconds = null;
@@ -195,9 +190,9 @@ export default {
   finalizeSession,
   transferActiveSession,
   getGoalSeconds,
+  checkVoluntaryLearning,
   startVoluntaryLearning,
   stopVoluntaryLearning,
-  maybeStartVoluntaryLearning,
   logEventAsync: () => {},
   logControlledSession: async () => {},
 };
