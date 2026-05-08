@@ -97,7 +97,7 @@ class TimerManager {
     return Boolean(this.learningTimeIntervalRef);
   }
 
-  async checkActive() {
+  async checkActive(tabId = undefined) {
     const window = await browser.windows.getCurrent();
     const views =
       typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.getViews
@@ -110,6 +110,12 @@ class TimerManager {
       });
       if (currentTabs.length > 0) {
         const current = currentTabs[0];
+
+        // Voluntary learning: just check the specific tab is active.
+        if (tabId !== undefined) {
+          return current.id === tabId;
+        }
+
         const origin = await storage.origin.get();
 
         try {
@@ -292,12 +298,14 @@ class TimerManager {
     return Boolean(this.sessionRewardIntervalRef);
   }
 
-  // Voluntary learning timer for direct-navigation tabs (no checkActive gate)
   startVoluntaryLearningTimer(tabId) {
     if (this.voluntaryLearningIntervals.has(tabId)) return;
     const ref = setInterval(() => {
-      this.dailyProgress += 1000;
-      storage.dailyProgress.set(this.dailyProgress).catch(() => {});
+      this.checkActive(tabId).then((active) => {
+        if (!active) return;
+        this.dailyProgress += 1000;
+        storage.dailyProgress.set(this.dailyProgress).catch(() => {});
+      }).catch(() => {});
     }, 1000);
     this.voluntaryLearningIntervals.set(tabId, ref);
   }
