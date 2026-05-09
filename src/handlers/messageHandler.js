@@ -128,6 +128,11 @@ export async function handleMessage(message, sender) {
           } else {
             console.log('[Session] Session already running with same duration');
           }
+        } else if (timer.isSessionPaused()) {
+          // Resume a session that was paused when the previous learning tab closed
+          timer.resumeSessionTimer(() => {
+            console.log('[Session] Session complete!');
+          });
         } else {
           // Caps session if remaining of daily goal is lower than set session amount
           const dailyGoal = parseTime.toSystem(

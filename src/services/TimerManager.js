@@ -228,7 +228,7 @@ class TimerManager {
     }
   }
 
-  // Stop session timer
+  // Stop session timer and clear all state
   stopSessionTimer() {
     if (this.sessionIntervalRef) {
       clearInterval(this.sessionIntervalRef);
@@ -241,9 +241,36 @@ class TimerManager {
     this.sessionOnComplete = null;
   }
 
+  // Stop the interval but preserve remaining/elapsed so the session can be resumed
+  pauseSessionTimer() {
+    if (this.sessionIntervalRef) {
+      clearInterval(this.sessionIntervalRef);
+      this.sessionIntervalRef = undefined;
+    }
+  }
+
+  // Restart the interval from the current remaining state
+  resumeSessionTimer(onComplete) {
+    if (!this.isSessionPaused()) return;
+    this.sessionOnComplete = onComplete;
+    this.sessionIntervalRef = setInterval(() => {
+      this.decrementSession().catch(() => {});
+    }, 1000);
+  }
+
   // Check if session timer is running
   isSessionActive() {
     return Boolean(this.sessionIntervalRef);
+  }
+
+  // True when a session was paused mid-progress (tab closed, not yet completed)
+  isSessionPaused() {
+    return (
+      !this.sessionIntervalRef &&
+      this.sessionGoal > 0 &&
+      this.sessionRemaining > 0 &&
+      !this.sessionCompleted
+    );
   }
 
   // Decrement session reward timer

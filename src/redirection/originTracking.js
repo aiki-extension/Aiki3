@@ -80,7 +80,7 @@ export function createOriginTracking({
         'tab_closed',
       );
       timer.stopLearningSession();
-      timer.stopSessionTimer();
+      timer.pauseSessionTimer();
 
       // Don't re-enable redirects if a session reward is currently active —
       // closing the origin tab while on reward time should not cancel the reward.
