@@ -32,8 +32,8 @@ export function installPersistenceGuards(ensureFn, { wrapperFlag }) {
   wrapHistory('pushState');
   wrapHistory('replaceState');
 
-  window.addEventListener('popstate', ensureFn);
-  window.addEventListener('hashchange', ensureFn);
+  globalThis.window.addEventListener('popstate', ensureFn);
+  globalThis.window.addEventListener('hashchange', ensureFn);
   window.addEventListener('focus', ensureFn);
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) ensureFn();

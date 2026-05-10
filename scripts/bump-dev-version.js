@@ -1,4 +1,4 @@
-const fs = require('fs');
+const fs = require('node:fs');
 
 const version = require('../package.json').version;
 const manifest = JSON.parse(fs.readFileSync('./public/manifest.json', 'utf8'));

@@ -25,8 +25,8 @@ export async function bootstrapRewardOverlayIfNeeded() {
     const timerData = await fetchTimerState();
     if (
       !timerData ||
-      !(timerData.sessionRewardGoal > 0) ||
-      !(timerData.sessionRewardRemaining > 0)
+      timerData.sessionRewardGoal <= 0 ||
+      timerData.sessionRewardRemaining <= 0
     )
       return;
 

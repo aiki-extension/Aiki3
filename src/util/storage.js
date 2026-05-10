@@ -337,13 +337,13 @@ async function storeSession(data) {
   };
   if (
     !newData.hasOwnProperty('timeWastingDuration') ||
-    newData.timeWastingDuration === NaN
+    newData.timeWastingDuration === Number.isNaN
   ) {
     newData.timeWastingDuration = 0;
   }
   if (
     !newData.hasOwnProperty('learningDuration') ||
-    newData.learningDuration === NaN
+    newData.learningDuration === Number.isNaN
   ) {
     newData.learningDuration = 0;
   }
@@ -533,7 +533,7 @@ async function setParticipantRecord(record) {
 
 async function getParticipantRecord() {
   const result = await storage.get('participantRecord');
-  return result && result.participantRecord ? result.participantRecord : null;
+  return result?.participantRecord ? result.participantRecord : null;
 }
 
 function clearParticipantRecord() {
@@ -550,7 +550,7 @@ async function setUserPreferencesId(id) {
 
 async function getUserPreferencesId() {
   const result = await storage.get('userPreferencesId');
-  return result && result.userPreferencesId ? result.userPreferencesId : null;
+  return result?.userPreferencesId ? result.userPreferencesId : null;
 }
 
 // Global prompt lock (replaces per-tab promptLocks for 10-minute global cooldown)
@@ -560,7 +560,7 @@ async function getGlobalPromptLock() {
   const result = await storage.get('globalPromptLock');
 
   // Checks if we get valid data back from the function
-  return result && result.globalPromptLock ? result.globalPromptLock : null;
+  return result?.globalPromptLock ? result.globalPromptLock : null;
 }
 
 async function setGlobalPromptLock(value) {

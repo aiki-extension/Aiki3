@@ -39,7 +39,9 @@ body {
   padding: 0;
   margin: 0;
   box-sizing: border-box;
-  font-family: 'Montserrat', sans-serif;
+  font-family: var(--fontContent);
+  scrollbar-width: thin;
+  scrollbar-color: var(--thumbBG) var(--scrollbarBG);
 }
 
 a {
@@ -103,11 +105,6 @@ body::-webkit-scrollbar {
   width: 11px;
 }
 
-body {
-  scrollbar-width: thin;
-  scrollbar-color: var(--thumbBG) var(--scrollbarBG);
-}
-
 body::-webkit-scrollbar-track {
   background: var(--scrollbarBG);
 }
@@ -150,7 +147,7 @@ body::-webkit-scrollbar-thumb {
   background-color: hsla(0, 0%, 20%, 0.9);
   color: #fff;
   content: attr(data-tooltip);
-  font-family: var (--fontContent);
+  font-family: var(--fontContent);
   text-align: center;
   font-size: 14px;
   line-height: 1.2;

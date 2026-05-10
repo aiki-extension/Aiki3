@@ -37,7 +37,7 @@ export function removeOverlay() {
     if (elements.length > 0) {
       for (let i = elements.length - 1; i >= 0; i--) {
         const el = elements[i];
-        if (el && el.remove) {
+        if (el?.remove) {
           try {
             if (typeof el.cleanup === 'function') {
               el.cleanup();

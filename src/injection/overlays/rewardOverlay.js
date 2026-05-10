@@ -2,7 +2,6 @@ import browser from 'webextension-polyfill';
 import { checkCurrentPageIsTimeWastingSite } from '../shared/hostMatch';
 import { makeDraggable } from '../shared/makeDraggable';
 import {
-  removeOverlay,
   createCollapseButton,
   watchFullscreen,
   applyCollapsedStyle,
@@ -22,7 +21,7 @@ const ensureRewardOverlay = debounceEnsure(async () => {
   try {
     data = await browser.runtime.sendMessage({ type: 'timer:get' });
   } catch {}
-  if (!data || !(data.sessionRewardGoal > 0)) return;
+  if (!data || data.sessionRewardGoal <= 0) return;
   if (document.getElementById('aiki-reward-overlay')) return;
   if (!(await checkCurrentPageIsTimeWastingSite())) return;
   renderTimeWastingRewardOverlay();

@@ -12,20 +12,21 @@
       crossorigin="anonymous"
     />
 
-    <link
-      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap"
-      rel="stylesheet"
-    />
-
     <link rel="icon" type="image/png" href="/favicon.ico" />
     <link rel="stylesheet" href="/global.css" />
     <link rel="stylesheet" href="/build/bundle.css" />
+
     <!-- Importing fonts -->
-    <link rel="preconnect" href="https://fonts.gstatic.com" />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Roboto&display=swap"
-      rel="stylesheet"
-    />
+    <style>
+      @font-face {
+        font-family: 'Montserrat';
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+        src: url('/fonts/montserrat-v31-latin-regular.woff2') format('woff2');
+      }
+    </style>
+
     <!-- Bundle imports for boostrap etc -->
     <script defer src="/build/bundle.js"></script>
   </head>
