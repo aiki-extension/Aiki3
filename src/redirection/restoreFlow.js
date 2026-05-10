@@ -64,12 +64,12 @@ export function createRestoreFlow({
 
     // Read blockedOrigin before removeAllContentBlockers() clears storage.blockedOrigins
     const targetBlockedOrigin =
-      targetTabId !== undefined
-        ? await storage.blockedOrigins.get(targetTabId)
-        : null;
+      targetTabId === undefined
+        ? null
+        : await storage.blockedOrigins.get(targetTabId);
 
     const sessionTabId =
-      targetTabId !== undefined ? targetTabId : origin?.tabId;
+      targetTabId === undefined ? origin?.tabId : targetTabId;
     if (sessionTabId !== undefined) {
       await SessionService.finalizeSession(
         sessionTabId,
