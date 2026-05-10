@@ -1,4 +1,4 @@
-name: SonarQube Analysis
+name: SonarQube Cloud Analysis
 
 on:
   push:
@@ -6,6 +6,7 @@ on:
       - main
       - branch-*
   pull_request:
+  workflow_dispatch:
 
 jobs:
   sonar:
@@ -14,8 +15,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: SonarQube Scan
-        uses: SonarSource/sonarqube-scan-action@v8
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarqube-scan-action@v6
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: https://sonarcloud.io
+          SONAR_PROJECT_KEY: aiki-extension_Aiki3
+          SONAR_ORGANIZATION: aiki-extension
