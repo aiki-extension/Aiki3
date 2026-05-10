@@ -100,7 +100,7 @@ class TimerManager {
   async checkActive(tabId = undefined) {
     const window = await browser.windows.getCurrent();
     const views =
-      typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.getViews
+      typeof chrome !== 'undefined' && chrome.runtime?.getViews
         ? chrome.runtime.getViews({ type: 'popup' })
         : [];
     if (window.focused || views.length > 0) {
@@ -129,8 +129,7 @@ class TimerManager {
             origin.tabId !== undefined &&
             current.id === origin.tabId &&
             learningName &&
-            current.url &&
-            current.url.includes(learningName)
+            current.url?.includes(learningName)
           ) {
             return true;
           }
