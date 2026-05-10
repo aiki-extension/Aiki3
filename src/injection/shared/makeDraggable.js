@@ -118,7 +118,7 @@ export const makeDraggable = (element) => {
     dragState.currentY = y;
     dragState.intendedX = x;
     dragState.intendedY = y;
-    applySnappedPosition(x, y);
+    applySnappedPosition();
   };
 
   const updatePosition = (intendedX, intendedY) => {
@@ -145,16 +145,7 @@ export const makeDraggable = (element) => {
     dragState.intendedY = y;
     dragState.currentX = x;
     dragState.currentY = y;
-    applySnappedPosition(x, y);
-  };
-
-  const onResize = () => {
-    const { x, y } = snapToCorner();
-    dragState.intendedX = x;
-    dragState.intendedY = y;
-    dragState.currentX = x;
-    dragState.currentY = y;
-    applySnappedPosition(x, y);
+    applySnappedPosition();
   };
 
   const onPointerDown = (event) => {
@@ -218,7 +209,7 @@ export const makeDraggable = (element) => {
     dragState.intendedY = y;
     dragState.currentX = x;
     dragState.currentY = y;
-    applySnappedPosition(x, y);
+    applySnappedPosition();
 
     if (event.pointerId !== undefined) {
       element.releasePointerCapture(event.pointerId);
@@ -232,7 +223,7 @@ export const makeDraggable = (element) => {
   element.addEventListener('pointermove', onPointerMove);
   element.addEventListener('pointerup', endDrag);
   element.addEventListener('pointercancel', endDrag);
-  window.addEventListener('resize', onResize);
+  window.addEventListener('resize', syncIntendedPosition);
 
   return {
     cleanup: () => {
@@ -240,7 +231,7 @@ export const makeDraggable = (element) => {
       element.removeEventListener('pointermove', onPointerMove);
       element.removeEventListener('pointerup', endDrag);
       element.removeEventListener('pointercancel', endDrag);
-      window.removeEventListener('resize', onResize);
+      window.removeEventListener('resize', syncIntendedPosition);
     },
     syncIntendedPosition,
   };
