@@ -1,5 +1,5 @@
 import { getLearningUrl } from '../../services/siteDetector';
-import { removeOverlay } from '../shared/domHelpers';
+import { removeOverlay } from '../shared/overlayHelpers';
 import { createTimerPort } from '../shared/timerPort';
 import { formatDuration, formatDurationShort } from '../shared/formatters';
 

@@ -10,9 +10,6 @@ on:
         description: 'Version tag to publish (e.g. v3.0.1) — must match package.json'
         required: true
 
-permissions:
-  contents: write
-
 env:
   PUBLIC_API_BASE_URL: https://aiki.zeeguu.dev/api/
 
@@ -25,9 +22,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - id: read
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
           PKG_VERSION=$(node -p "require('./package.json').version")
-          TAG="${GITHUB_REF_NAME:-${{ inputs.version }}}"
+          TAG="${GITHUB_REF_NAME:-$INPUT_VERSION}"
           TAG_VERSION="${TAG#v}"
           echo "package.json: $PKG_VERSION"
           echo "tag:          $TAG_VERSION"
@@ -87,6 +86,8 @@ jobs:
             --auto-publish
 
   github_release:
+    permissions:
+      contents: write
     name: Create GitHub release
     needs: [publish_firefox, publish_chrome]
     runs-on: ubuntu-latest

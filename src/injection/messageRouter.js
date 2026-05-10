@@ -1,9 +1,9 @@
 import browser from 'webextension-polyfill';
 import { renderRedirectPrompt } from './overlays/redirectPrompt';
-import { renderLearningContent } from './overlays/learningPanel';
+import { renderLearningContent } from './overlays/learningOverlay';
 import { renderContentBlocker } from './overlays/contentBlocker';
 import { renderTimeWastingRewardOverlay } from './overlays/rewardOverlay';
-import { removeOverlay } from './shared/domHelpers';
+import { removeOverlay } from './shared/overlayHelpers';
 
 /**
  * Action keys are the strings the background script sends; some include
