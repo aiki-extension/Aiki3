@@ -24,6 +24,8 @@ class TimerManager {
     this.sessionRewardGoal = 0;
     this.sessionRewardElapsed = 0;
     this.sessionRewardOnComplete = null;
+
+    this.voluntaryLearningIntervalRef = undefined;
   }
 
   computeProgressPercent() {
@@ -95,7 +97,7 @@ class TimerManager {
     return Boolean(this.learningTimeIntervalRef);
   }
 
-  async checkActive() {
+  async checkActive(tabId = undefined) {
     const window = await browser.windows.getCurrent();
     const views =
       typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.getViews
@@ -108,30 +110,24 @@ class TimerManager {
       });
       if (currentTabs.length > 0) {
         const current = currentTabs[0];
+
+        // Voluntary learning: just check the specific tab is active.
+        if (tabId !== undefined) {
+          return current.id === tabId;
+        }
+
         const origin = await storage.origin.get();
 
         try {
           const learningUri = await getLearningUrl();
           const learningName = learningUri ? parseUrl(learningUri).name : '';
 
-          // Only count as active if the current tab is both the origin tab AND still on the learning host
+          // Only count time when the active tab is the redirected learning tab
+          // and it's still on the learning site.
           if (
             origin &&
             origin.tabId !== undefined &&
-            current.id === origin.tabId
-          ) {
-            if (
-              learningName &&
-              current.url &&
-              current.url.includes(learningName)
-            ) {
-              return true;
-            }
-            return false;
-          }
-
-          // Otherwise allow active if current tab is on the learning site
-          if (
+            current.id === origin.tabId &&
             learningName &&
             current.url &&
             current.url.includes(learningName)
@@ -165,26 +161,33 @@ class TimerManager {
     };
   }
 
+  // Increments dailyProgress by one second if the relevant tab is active.
+  // Returns true if active (callers can run their own logic on top).
+  async tickDailyProgress(tabId = undefined) {
+    if (!(await this.checkActive(tabId))) return false;
+    this.dailyProgress += 1000;
+    await storage.dailyProgress.set(this.dailyProgress);
+    return true;
+  }
+
   // Decrement session timer
   async decrementSession() {
-    if (await this.checkActive()) {
-      this.sessionElapsed += 1000;
+    if (!(await this.tickDailyProgress())) return;
 
-      if (this.sessionRemaining > 0) {
-        this.sessionRemaining -= 1000;
-        this.dailyProgress += 1000;
-        await storage.dailyProgress.set(this.dailyProgress);
+    this.sessionElapsed += 1000;
 
-        if (this.sessionRemaining <= 0) {
-          this.sessionRemaining = 0;
+    if (this.sessionRemaining > 0) {
+      this.sessionRemaining -= 1000;
 
-          if (!this.sessionCompleted) {
-            this.sessionCompleted = true;
+      if (this.sessionRemaining <= 0) {
+        this.sessionRemaining = 0;
 
-            if (typeof this.sessionOnComplete === 'function') {
-              this.sessionOnComplete();
-              this.sessionOnComplete = null;
-            }
+        if (!this.sessionCompleted) {
+          this.sessionCompleted = true;
+
+          if (typeof this.sessionOnComplete === 'function') {
+            this.sessionOnComplete();
+            this.sessionOnComplete = null;
           }
         }
       }
@@ -225,7 +228,7 @@ class TimerManager {
     }
   }
 
-  // Stop session timer
+  // Stop session timer and clear all state
   stopSessionTimer() {
     if (this.sessionIntervalRef) {
       clearInterval(this.sessionIntervalRef);
@@ -238,9 +241,36 @@ class TimerManager {
     this.sessionOnComplete = null;
   }
 
+  // Stop the interval but preserve remaining/elapsed so the session can be resumed
+  pauseSessionTimer() {
+    if (this.sessionIntervalRef) {
+      clearInterval(this.sessionIntervalRef);
+      this.sessionIntervalRef = undefined;
+    }
+  }
+
+  // Restart the interval from the current remaining state
+  resumeSessionTimer(onComplete) {
+    if (!this.isSessionPaused()) return;
+    this.sessionOnComplete = onComplete;
+    this.sessionIntervalRef = setInterval(() => {
+      this.decrementSession().catch(() => {});
+    }, 1000);
+  }
+
   // Check if session timer is running
   isSessionActive() {
     return Boolean(this.sessionIntervalRef);
+  }
+
+  // True when a session was paused mid-progress (tab closed, not yet completed)
+  isSessionPaused() {
+    return (
+      !this.sessionIntervalRef &&
+      this.sessionGoal > 0 &&
+      this.sessionRemaining > 0 &&
+      !this.sessionCompleted
+    );
   }
 
   // Decrement session reward timer
@@ -300,6 +330,21 @@ class TimerManager {
   // Check if session reward timer is running
   isSessionRewardActive() {
     return Boolean(this.sessionRewardIntervalRef);
+  }
+
+  async startVoluntaryLearningTimer(tabId) {
+    this.stopVoluntaryLearningTimer();
+    this.dailyProgress = await storage.dailyProgress.get();
+    this.voluntaryLearningIntervalRef = setInterval(() => {
+      this.tickDailyProgress(tabId).catch(() => {});
+    }, 1000);
+  }
+
+  stopVoluntaryLearningTimer() {
+    if (this.voluntaryLearningIntervalRef) {
+      clearInterval(this.voluntaryLearningIntervalRef);
+      this.voluntaryLearningIntervalRef = undefined;
+    }
   }
 
   getTime() {

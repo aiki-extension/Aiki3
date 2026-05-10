@@ -19,9 +19,16 @@ export async function bootstrapLearningOverlayIfNeeded() {
       bootstrapAttemptPending = false;
       return;
     }
+    let response;
     try {
-      await browser.runtime.sendMessage({ type: 'learning:autoStart' });
+      response = await browser.runtime.sendMessage({
+        type: 'learning:autoStart',
+      });
     } catch {}
+    if (response?.redirected === false) {
+      bootstrapAttemptPending = false;
+      return;
+    }
     await renderLearningContent();
   } catch {
     // swallow: best-effort bootstrap.

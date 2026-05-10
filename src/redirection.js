@@ -43,7 +43,6 @@ const redirectFlow = createRedirectFlow({
   promptControl,
   addLearningSiteLoadedListener,
   addOriginUpdatedListener,
-  removeOriginUpdatedListener,
   triggerLearningOverlay,
   getCheckActiveTab: () => checkActiveTab,
 });

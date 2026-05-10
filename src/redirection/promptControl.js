@@ -107,6 +107,14 @@ export function createPromptControl({ navigationGuards }) {
         await setPromptCooldown(details.tabId, details.url);
         await extraCallbacks.onContinue?.();
       },
+      onReturn: async () => {
+        // User chose to return to the learning site from this tab — update
+        // origin.tabId so the overlay fires when the learning site loads.
+        const origin = await storage.origin.get();
+        if (origin) {
+          await storage.origin.set({ ...origin, tabId: details.tabId });
+        }
+      },
     });
   }
 

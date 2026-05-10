@@ -19,6 +19,6 @@ export const formatDuration = (value) => {
 export const formatDurationShort = (value) => {
   if (typeof value !== 'number' || value <= 0) return '0m';
   const totalSeconds = Math.floor(value / 1000);
-  const minutes = Math.ceil(totalSeconds / 60);
-  return `${minutes}m`;
+  if (totalSeconds < 60) return `${totalSeconds}s`;
+  return `${Math.ceil(totalSeconds / 60)}m`;
 };

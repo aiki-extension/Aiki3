@@ -5,6 +5,7 @@ import { parseTime } from '../util/utilities';
 import { handleApiMessage } from './apiHandler';
 import redirection from '../redirection';
 import { getLearningUrl } from '../services/siteDetector';
+import SessionService from '../services/SessionService';
 import { MESSAGE_REDIRECTION_REFRESH_FILTERS } from '../values/messageTypeValues';
 
 /*
@@ -50,17 +51,10 @@ export async function handleMessage(message, sender) {
   if (message.type === 'learning:autoStart') {
     return (async () => {
       try {
-        // Ensure we have an origin set when user navigates directly to the learning site
-        if (sender?.tab?.id) {
-          const existingOrigin = await storage.origin.get();
-          if (!existingOrigin) {
-            await storage.origin.set({
-              url: 'https://www.reddit.com',
-              tabId: sender.tab.id,
-            });
-          }
+        if (await SessionService.checkVoluntaryLearning(sender?.tab?.id)) {
+          await SessionService.startVoluntaryLearning(sender?.tab?.id);
+          return { redirected: false };
         }
-
         // Get information on the daily goal
         const dailyGoal = parseTime.toSystem(
           await storage.timeSettings.learningTime.get(),
@@ -134,6 +128,11 @@ export async function handleMessage(message, sender) {
           } else {
             console.log('[Session] Session already running with same duration');
           }
+        } else if (timer.isSessionPaused()) {
+          // Resume a session that was paused when the previous learning tab closed
+          timer.resumeSessionTimer(() => {
+            console.log('[Session] Session complete!');
+          });
         } else {
           // Caps session if remaining of daily goal is lower than set session amount
           const dailyGoal = parseTime.toSystem(

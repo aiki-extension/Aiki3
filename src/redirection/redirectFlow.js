@@ -6,7 +6,6 @@ import SessionService from '../services/SessionService';
 import { getLearningUrl } from '../services/siteDetector';
 import { checkActiveTime } from './shared/operatingHours';
 import { startRewardSession } from './shared/rewardSession';
-import { isOriginTabStillOnLearningSite } from './shared/originValidation';
 import { isTrackedTimeWastingUrl } from './shared/siteFilter';
 
 /**
@@ -25,7 +24,6 @@ import { isTrackedTimeWastingUrl } from './shared/siteFilter';
  * @param {object} deps.promptControl
  * @param {() => Promise<void>} deps.addLearningSiteLoadedListener
  * @param {() => void} deps.addOriginUpdatedListener
- * @param {() => void} deps.removeOriginUpdatedListener
  * @param {(tabId: number) => void} deps.triggerLearningOverlay
  * @param {() => Function} deps.getCheckActiveTab - Lazy getter for checkActiveTab.
  */
@@ -34,7 +32,6 @@ export function createRedirectFlow({
   promptControl,
   addLearningSiteLoadedListener,
   addOriginUpdatedListener,
-  removeOriginUpdatedListener,
   triggerLearningOverlay,
   getCheckActiveTab,
 }) {
@@ -42,7 +39,7 @@ export function createRedirectFlow({
     addLearningSiteLoadedListener();
     navigationGuards.install();
     await SessionService.startSession(tabId, 'learning', learningUri, procUrl);
-    storage.origin.set({ url: procUrl });
+    storage.origin.set({ url: procUrl, tabId: tabId });
     addOriginUpdatedListener();
     await storage.globalPromptLock.remove();
 
@@ -148,22 +145,6 @@ export function createRedirectFlow({
           !timer.isSessionRewardActive()
         ) {
           console.log('ShouldRedirect', shouldRedirect);
-          const origin = await storage.origin.get();
-          console.log('Checking against this: ', origin);
-
-          // Validate that the origin learning tab still exists before showing blocker
-          if (origin && origin.tabId !== undefined) {
-            const isOriginValid = await isOriginTabStillOnLearningSite(origin);
-
-            // Clear stale origin if tab no longer exists or isn't on learning site
-            if (!isOriginValid) {
-              console.log('Origin tab no longer valid, clearing stale origin');
-              await storage.origin.remove();
-              removeOriginUpdatedListener();
-              promptControl.removeAllContentBlockers();
-              timer.stopLearningSession();
-            }
-          }
 
           const learningUri = await getLearningUrl();
           if (!learningUri) return;

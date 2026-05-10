@@ -1,4 +1,49 @@
 import storage from '../util/storage';
+import browser from 'webextension-polyfill';
+import timer from './TimerManager';
+import { getLearningUrl, isLearningSite } from './siteDetector';
+
+let removeVoluntaryListeners = null;
+
+function stopVoluntaryLearning() {
+  if (!removeVoluntaryListeners) return;
+  removeVoluntaryListeners();
+  removeVoluntaryListeners = null;
+  timer.stopVoluntaryLearningTimer();
+}
+
+async function startVoluntaryLearning(tabId) {
+  stopVoluntaryLearning();
+
+  await timer.startVoluntaryLearningTimer(tabId);
+
+  function onRemoved(closedTabId) {
+    if (closedTabId === tabId) stopVoluntaryLearning();
+  }
+
+  async function onUpdated(updatedTabId, changeInfo) {
+    if (updatedTabId !== tabId || !changeInfo.url) return;
+    const learningUri = await getLearningUrl();
+    if (learningUri && isLearningSite(changeInfo.url, learningUri)) return;
+    stopVoluntaryLearning();
+  }
+
+  browser.tabs.onRemoved.addListener(onRemoved);
+  browser.tabs.onUpdated.addListener(onUpdated);
+
+  removeVoluntaryListeners = () => {
+    browser.tabs.onRemoved.removeListener(onRemoved);
+    browser.tabs.onUpdated.removeListener(onUpdated);
+  };
+}
+
+// Returns true if the tab arrived via direct navigation (no redirect origin match).
+async function checkVoluntaryLearning(tabId) {
+  if (tabId === undefined) return false;
+  const existingOrigin = await storage.origin.get();
+  return !existingOrigin || existingOrigin.tabId !== tabId;
+}
+
 let cachedGoalSeconds = null;
 let lastGoalFetch = 0;
 
@@ -42,7 +87,7 @@ async function startSession(tabId, sessionType, siteUrl, triggerUrl = null) {
   };
 
   if (sessionType === 'learning') {
-    await setOriginIfMissing(tabId);
+    if (triggerUrl) await setOriginIfMissing(tabId);
     sessionData.learningUrl = siteUrl;
     sessionData.timeWastingUrl = triggerUrl;
   } else {
@@ -143,6 +188,9 @@ export default {
   finalizeSession,
   transferActiveSession,
   getGoalSeconds,
+  checkVoluntaryLearning,
+  startVoluntaryLearning,
+  stopVoluntaryLearning,
   logEventAsync: () => {},
   logControlledSession: async () => {},
 };
