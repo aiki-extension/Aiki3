@@ -10,7 +10,7 @@ import { getLearningUrl, isLearningSite } from '../../services/siteDetector';
  * @returns {Promise<boolean>}
  */
 export async function isOriginTabStillOnLearningSite(origin) {
-  if (!origin || origin.tabId === undefined) return false;
+  if (origin?.tabId === undefined) return false;
   try {
     const originTab = await browser.tabs.get(origin.tabId);
     const learningUri = await getLearningUrl();
