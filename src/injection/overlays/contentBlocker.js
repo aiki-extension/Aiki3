@@ -125,7 +125,8 @@ export function renderContentBlocker() {
           : 'No session in progress';
 
       if (goal > 0 && remaining <= 0) {
-        status.textContent = 'Session complete! Head back to claim your reward.';
+        status.textContent =
+          'Session complete! Head back to claim your reward.';
       } else if (goal > 0) {
         status.textContent = `Keep going for ${formatDuration(remaining)} more.`;
       } else {

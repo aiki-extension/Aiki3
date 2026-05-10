@@ -2,7 +2,6 @@ import browser from 'webextension-polyfill';
 import { checkCurrentPageIsTimeWastingSite } from '../shared/hostMatch';
 import { makeDraggable } from '../shared/makeDraggable';
 import {
-  removeOverlay,
   createCollapseButton,
   watchFullscreen,
   applyCollapsedStyle,
