@@ -104,4 +104,27 @@ export function watchFullscreen(overlay, panel) {
   };
 }
 
+export function applyCollapsedStyle(panel, fn, dragHandle) {
+  // Preserve positioning across the full style swap, otherwise the panel
+  // jumps to the default corner when the size changes.
+  const left = panel.style.left, right = panel.style.right;
+  const top = panel.style.top, bottom = panel.style.bottom;
+  const position = panel.style.position, transform = panel.style.transform;
+  fn();
+  if (position) panel.style.position = position;
+  if (left) panel.style.left = left;
+  if (right) panel.style.right = right;
+  if (top) panel.style.top = top;
+  if (bottom) panel.style.bottom = bottom;
+  if (transform) panel.style.transform = transform;
+  setTimeout(() => dragHandle?.syncIntendedPosition?.(), 300);
+}
+
+export function wireCollapseButton(collapseBtn, toggleCollapse) {
+  collapseBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleCollapse();
+  });
+}
+
 /* ----- Prompt Overlay Helpers ----- */

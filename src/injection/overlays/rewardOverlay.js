@@ -1,7 +1,7 @@
 import browser from 'webextension-polyfill';
 import { checkCurrentPageIsTimeWastingSite } from '../shared/hostMatch';
 import { makeDraggable } from '../shared/makeDraggable';
-import { removeOverlay, createCollapseButton, watchFullscreen } from '../shared/overlayHelpers';
+import { removeOverlay, createCollapseButton, watchFullscreen, applyCollapsedStyle, wireCollapseButton } from '../shared/overlayHelpers';
 import { createTimerPort } from '../shared/timerPort';
 import { formatDuration } from '../shared/formatters';
 import {
@@ -110,40 +110,15 @@ export function renderTimeWastingRewardOverlay() {
     localStorage.setItem(isCollapsedKey, isCollapsed.toString());
     collapseBtn.textContent = isCollapsed ? '▼' : '▲';
 
-    // Preserve positioning across the full style swap so the panel stays in
-    // the user's chosen corner when the size changes.
-    const currentLeft = panel.style.left;
-    const currentRight = panel.style.right;
-    const currentTop = panel.style.top;
-    const currentBottom = panel.style.bottom;
-    const currentPosition = panel.style.position;
-    const currentTransform = panel.style.transform;
-
-    panel.setAttribute('style', getPanelStyle(isCollapsed, currentBg));
-
-    if (currentPosition) panel.style.position = currentPosition;
-    if (currentLeft) panel.style.left = currentLeft;
-    if (currentRight) panel.style.right = currentRight;
-    if (currentTop) panel.style.top = currentTop;
-    if (currentBottom) panel.style.bottom = currentBottom;
-    if (currentTransform) panel.style.transform = currentTransform;
+    applyCollapsedStyle(panel, () => panel.setAttribute('style', getPanelStyle(isCollapsed, currentBg)), dragHandle);
 
     heading.style.display = isCollapsed ? 'none' : 'block';
     status.style.display = isCollapsed ? 'none' : 'block';
     barShell.style.height = isCollapsed ? '5px' : '8px';
     progressLabel.style.fontSize = isCollapsed ? '0.9em' : '0.85em';
     progressLabel.style.fontWeight = isCollapsed ? '600' : '400';
-
-    setTimeout(() => {
-      if (dragHandle && dragHandle.syncIntendedPosition) {
-        dragHandle.syncIntendedPosition();
-      }
-    }, 300);
   };
-  collapseBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    toggleCollapse();
-  });
+  wireCollapseButton(collapseBtn, toggleCollapse);
   
   panel.appendChild(
     collapseBtn,
