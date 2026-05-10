@@ -45,7 +45,7 @@ class NavigationGuards {
     if (tabId === undefined || tabId === null) return;
     try {
       const tab = await browser.tabs.get(tabId);
-      if (!tab || !tab.url) return;
+      if (!tab?.url) return;
 
       if (await siteDetector.checkIfTimeWastingSite(tab.url)) {
         await SessionService.startSession(tabId, 'timeWasting', tab.url);
@@ -142,7 +142,7 @@ class NavigationGuards {
         target: { tabId },
         func: (overlayId) => {
           const overlay = document.getElementById(overlayId);
-          if (overlay && overlay.remove) overlay.remove();
+          if (overlay?.remove) overlay.remove();
         },
         args: ['__aiki-preprompt'],
       });
