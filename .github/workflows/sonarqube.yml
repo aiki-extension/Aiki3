@@ -1,11 +1,10 @@
 name: SonarQube Cloud Analysis
 
 on:
-  push:
-    branches:
-      - main
-      - branch-*
-  pull_request:
+  # push:
+  #   branches:
+  #     - main
+  #     - branch-*
   workflow_dispatch:
 
 jobs:
