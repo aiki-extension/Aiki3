@@ -50,3 +50,7 @@ export function removeOverlay() {
     }
   } catch {}
 }
+
+/* Floating Overlay Helpers */
+
+/* Prompt Overlay Helpers */

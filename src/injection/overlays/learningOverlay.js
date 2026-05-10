@@ -1,5 +1,5 @@
 import browser from 'webextension-polyfill';
-import { isFullScreen, removeOverlay } from '../shared/domHelpers';
+import { isFullScreen, removeOverlay } from '../shared/overlayHelpers';
 import { makeDraggable } from '../shared/makeDraggable';
 import { createTimerPort } from '../shared/timerPort';
 import { formatDuration, formatDurationShort } from '../shared/formatters';
