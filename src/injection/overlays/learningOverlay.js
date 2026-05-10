@@ -251,8 +251,7 @@ export function renderLearningContent() {
           panel.style.background = defaultBg;
           claimRewardBtn.style.display = 'none';
         }
-      }
-    };
+  };
 
     const timerPort = createTimerPort(update);
 
