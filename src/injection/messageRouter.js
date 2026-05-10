@@ -1,6 +1,6 @@
 import browser from 'webextension-polyfill';
 import { renderRedirectPrompt } from './overlays/redirectPrompt';
-import { renderLearningContent } from './overlays/learningPanel';
+import { renderLearningContent } from './overlays/learningOverlay';
 import { renderContentBlocker } from './overlays/contentBlocker';
 import { renderTimeWastingRewardOverlay } from './overlays/rewardOverlay';
 import { removeOverlay } from './shared/domHelpers';

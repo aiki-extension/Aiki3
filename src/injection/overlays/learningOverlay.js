@@ -196,15 +196,19 @@ export function renderLearningContent() {
       e.stopPropagation();
       toggleCollapse();
     });
-
-    panel.appendChild(collapseBtn);
-    panel.appendChild(heading);
-    panel.appendChild(progressLabel);
-    panel.appendChild(barShell);
-    panel.appendChild(status);
-    panel.appendChild(claimRewardBtn);
+    
+    
+    panel.append(
+      collapseBtn,
+      heading,
+      progressLabel,
+      barShell,
+      status,
+      claimRewardBtn
+    );
     overlay.appendChild(panel);
     document.body.appendChild(overlay);
+
     installLearningOverlayPersistence();
 
     const dragHandle = makeDraggable(panel);

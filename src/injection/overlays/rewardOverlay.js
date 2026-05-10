@@ -149,12 +149,14 @@ export function renderTimeWastingRewardOverlay() {
     e.stopPropagation();
     toggleCollapse();
   });
-
-  panel.appendChild(collapseBtn);
-  panel.appendChild(heading);
-  panel.appendChild(progressLabel);
-  panel.appendChild(barShell);
-  panel.appendChild(status);
+  
+  panel.appendChild(
+    collapseBtn,
+    heading,
+    progressLabel,
+    barShell,
+    status
+  );
   overlay.appendChild(panel);
   document.body.appendChild(overlay);
 
