@@ -22,9 +22,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - id: read
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
           PKG_VERSION=$(node -p "require('./package.json').version")
-          TAG="${GITHUB_REF_NAME:-${{ inputs.version }}}"
+          TAG="${GITHUB_REF_NAME:-$INPUT_VERSION}"
           TAG_VERSION="${TAG#v}"
           echo "package.json: $PKG_VERSION"
           echo "tag:          $TAG_VERSION"
