@@ -17,8 +17,7 @@ export async function installationSetup() {
     // Fallback if polyfill is unavailable
     if (
       typeof chrome !== 'undefined' &&
-      chrome.runtime &&
-      chrome.runtime.openOptionsPage
+      chrome.runtime?.openOptionsPage
     ) {
       chrome.runtime.openOptionsPage();
     }
