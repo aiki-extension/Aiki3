@@ -130,7 +130,7 @@ export function renderTimeWastingRewardOverlay() {
   };
   wireCollapseButton(collapseBtn, toggleCollapse);
 
-  panel.appendChild(collapseBtn, heading, progressLabel, barShell, status);
+  panel.append(collapseBtn, heading, progressLabel, barShell, status);
   overlay.appendChild(panel);
   document.body.appendChild(overlay);
 
