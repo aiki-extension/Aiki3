@@ -40,7 +40,7 @@ async function counter() {
       currentWindow: true,
     });
 
-    if (!activeTab || !activeTab.url) return;
+    if (!activeTab?.url) return;
 
     const { name } = parseUrl(activeTab.url);
 
