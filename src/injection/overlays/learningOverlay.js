@@ -234,24 +234,22 @@ export function renderLearningContent() {
           claimRewardBtn.style.display = 'none';
         }
       } else if (msg.dailyGoal > 0 && msg.dailyProgress >= msg.dailyGoal) {
-          heading.textContent = '🎉 Daily Goal Reached!';
-          progressLabel.textContent = `${formatDuration(msg.dailyProgress)} completed`;
-          barFill.style.width = '100%';
-          barFill.style.background =
-            'linear-gradient(135deg, #22c55e, #14b8a6)';
-          status.textContent = 'Great work today! Come back tomorrow for more.';
-          panel.style.background = 'linear-gradient(135deg, #22c55e, #0ea5e9)';
-        } else {
-          heading.textContent = '📚 Aiki Learning';
-          progressLabel.textContent = 'Ready to learn';
-          barFill.style.width = '0%';
-          barFill.style.background =
-            'linear-gradient(135deg, #22c55e, #14b8a6)';
-          status.textContent = 'Visit a learning site to start a session.';
-          panel.style.background = defaultBg;
-          claimRewardBtn.style.display = 'none';
-        }
-  };
+        heading.textContent = '🎉 Daily Goal Reached!';
+        progressLabel.textContent = `${formatDuration(msg.dailyProgress)} completed`;
+        barFill.style.width = '100%';
+        barFill.style.background = 'linear-gradient(135deg, #22c55e, #14b8a6)';
+        status.textContent = 'Great work today! Come back tomorrow for more.';
+        panel.style.background = 'linear-gradient(135deg, #22c55e, #0ea5e9)';
+      } else {
+        heading.textContent = '📚 Aiki Learning';
+        progressLabel.textContent = 'Ready to learn';
+        barFill.style.width = '0%';
+        barFill.style.background = 'linear-gradient(135deg, #22c55e, #14b8a6)';
+        status.textContent = 'Visit a learning site to start a session.';
+        panel.style.background = defaultBg;
+        claimRewardBtn.style.display = 'none';
+      }
+    };
 
     const timerPort = createTimerPort(update);
 

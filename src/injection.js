@@ -47,5 +47,6 @@ onDomReady(() => {
 
 // Expose for background-injected scripts that call directly into the page.
 if (globalThis.window !== undefined) {
-  globalThis.window.renderTimeWastingRewardOverlay = renderTimeWastingRewardOverlay;
+  globalThis.window.renderTimeWastingRewardOverlay =
+    renderTimeWastingRewardOverlay;
 }
