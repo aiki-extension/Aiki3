@@ -86,7 +86,7 @@ jobs:
             --auto-publish
 
   github_release:
-    permissions: 
+    permissions:
       contents: write
     name: Create GitHub release
     needs: [publish_firefox, publish_chrome]
