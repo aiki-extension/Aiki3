@@ -6,7 +6,10 @@ import { handleApiMessage } from './apiHandler';
 import redirection from '../redirection';
 import { getLearningUrl } from '../services/siteDetector';
 import SessionService from '../services/SessionService';
-import { MESSAGE_REDIRECTION_REFRESH_FILTERS } from '../values/messageTypeValues';
+import {
+  MESSAGE_REDIRECTION_REFRESH_FILTERS,
+  MESSAGE_API_UPDATE_SESSION_DURATION,
+} from '../values/messageTypeValues';
 
 /*
 This module handles incoming messages from content scripts and other parts of the extension.
@@ -17,6 +20,11 @@ Auth messages are delegated to apiHandler.
 export async function handleMessage(message, sender) {
   if (!message || typeof message !== 'object') {
     return;
+  }
+
+  if (message.type === MESSAGE_API_UPDATE_SESSION_DURATION) {
+    const newDurationMs = (message.sessionDurationMinutes ?? 0) * 60 * 1000;
+    if (newDurationMs > 0) timer.applyNewSessionDuration(newDurationMs);
   }
 
   // Delegate all api:* messages to apiHandler
@@ -91,44 +99,35 @@ export async function handleMessage(message, sender) {
           // Gets current session goal
           const currentGoal = timer.getTime().sessionGoal;
 
-          // If settings changed, update the session with new duration
+          // If settings changed, restart the session from zero with the new duration
           if (currentGoal && currentGoal !== sessionDuration) {
             console.log(
-              '[Session] Settings changed, updating session duration from',
+              '[Session] Settings changed, restarting session with new duration from',
               currentGoal,
               'to',
               sessionDuration,
             );
 
-            // Calculate progress percentage
-            const elapsed = timer.getTime().sessionElapsed || 0;
-            const progressRatio = currentGoal > 0 ? elapsed / currentGoal : 0;
-
-            // Apply same progress ratio to new duration
-            const newElapsed = Math.floor(sessionDuration * progressRatio);
-            const newRemaining = sessionDuration - newElapsed;
-
-            // Update the timer with new goal and adjusted remaining time
             timer.stopSessionTimer();
             timer.sessionGoal = sessionDuration;
-            timer.sessionRemaining = Math.max(0, newRemaining);
-            timer.sessionElapsed = newElapsed;
+            timer.sessionRemaining = sessionDuration;
+            timer.sessionElapsed = 0;
 
-            // Restart the timer interval
             timer.sessionIntervalRef = setInterval(() => {
               timer.decrementSession().catch(() => {});
             }, 1000);
-
-            console.log(
-              '[Session] Updated session - goal:',
-              sessionDuration,
-              'remaining:',
-              newRemaining,
-            );
           } else {
             console.log('[Session] Session already running with same duration');
           }
         } else if (timer.isSessionPaused()) {
+          // If settings changed while the session was paused, reset progress before resuming
+          const pausedGoal = timer.getTime().sessionGoal;
+          if (pausedGoal && pausedGoal !== sessionDuration) {
+            timer.sessionGoal = sessionDuration;
+            timer.sessionRemaining = sessionDuration;
+            timer.sessionElapsed = 0;
+            timer.sessionCompleted = false;
+          }
           // Resume a session that was paused when the previous learning tab closed
           timer.resumeSessionTimer(() => {
             console.log('[Session] Session complete!');

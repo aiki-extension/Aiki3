@@ -111,20 +111,21 @@ export function renderContentBlocker() {
 
     const update = (msg) => {
       if (!msg) return;
-      const goal = typeof msg.dailyGoal === 'number' ? msg.dailyGoal : 0;
-      const progress =
-        typeof msg.dailyProgress === 'number' ? msg.dailyProgress : 0;
-      const remaining = Math.max(goal - progress, 0);
-      const percent = goal > 0 ? Math.min(100, (progress / goal) * 100) : 0;
+      const goal = typeof msg.sessionGoal === 'number' ? msg.sessionGoal : 0;
+      const elapsed =
+        typeof msg.sessionElapsed === 'number' ? msg.sessionElapsed : 0;
+      const remaining =
+        typeof msg.sessionRemaining === 'number' ? msg.sessionRemaining : 0;
+      const percent = goal > 0 ? Math.min(100, (elapsed / goal) * 100) : 0;
 
       barFill.style.width = `${percent}%`;
       progressLabel.textContent =
         goal > 0
-          ? `${formatDuration(progress)} / ${formatDurationShort(goal)}`
-          : 'No learning goal set yet';
+          ? `${formatDuration(elapsed)} / ${formatDurationShort(goal)}`
+          : 'No session in progress';
 
-      if (goal > 0 && remaining === 0) {
-        status.textContent = 'Goal complete! Take a well-deserved break.';
+      if (goal > 0 && remaining <= 0) {
+        status.textContent = 'Session complete! Head back to claim your reward.';
       } else if (goal > 0) {
         status.textContent = `Keep going for ${formatDuration(remaining)} more.`;
       } else {
