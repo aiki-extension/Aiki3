@@ -233,8 +233,7 @@ export function renderLearningContent() {
           status.textContent = `Keep going for ${formatDuration(sessionRemaining)} more.`;
           claimRewardBtn.style.display = 'none';
         }
-      } else {
-        if (msg.dailyGoal > 0 && msg.dailyProgress >= msg.dailyGoal) {
+      } else if (msg.dailyGoal > 0 && msg.dailyProgress >= msg.dailyGoal) {
           heading.textContent = '🎉 Daily Goal Reached!';
           progressLabel.textContent = `${formatDuration(msg.dailyProgress)} completed`;
           barFill.style.width = '100%';
