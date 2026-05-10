@@ -10,9 +10,6 @@ on:
         description: 'Version tag to publish (e.g. v3.0.1) — must match package.json'
         required: true
 
-permissions:
-  contents: write
-
 env:
   PUBLIC_API_BASE_URL: https://aiki.zeeguu.dev/api/
 
@@ -87,6 +84,8 @@ jobs:
             --auto-publish
 
   github_release:
+    permissions: 
+      contents: write
     name: Create GitHub release
     needs: [publish_firefox, publish_chrome]
     runs-on: ubuntu-latest
