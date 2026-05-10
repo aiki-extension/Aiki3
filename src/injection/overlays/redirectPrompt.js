@@ -48,7 +48,7 @@ export function renderRedirectPrompt(originUrl) {
 
     const getCurrentHost = () => {
       try {
-        return window.location.hostname || '';
+        return globalThis.window.location.hostname || '';
       } catch {
         return '';
       }
