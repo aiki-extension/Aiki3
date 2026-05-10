@@ -52,20 +52,27 @@ export function removeOverlay() {
 }
 
 /* ----- Floating Overlay Helpers ----- */
-export function createCollapseButton(isCollapsed, {
-  color = 'rgba(255,255,255,0.6)',
-  hoverColor = 'rgba(255,255,255,0.95)',
-  top = '6px',
-  right = '8px',
-} = {}) {
+export function createCollapseButton(
+  isCollapsed,
+  {
+    color = 'rgba(255,255,255,0.6)',
+    hoverColor = 'rgba(255,255,255,0.95)',
+    top = '6px',
+    right = '8px',
+  } = {},
+) {
   const btn = document.createElement('button');
   btn.textContent = isCollapsed ? '▼' : '▲';
   btn.setAttribute(
     'style',
     `position: absolute; top: ${top}; right: ${right}; background: transparent; border: none; color: ${color}; cursor: pointer; font-size: 10px; padding: 4px; transition: color 0.2s;`,
   );
-  btn.addEventListener('mouseenter', () => { btn.style.color = hoverColor; });
-  btn.addEventListener('mouseleave', () => { btn.style.color = color; });
+  btn.addEventListener('mouseenter', () => {
+    btn.style.color = hoverColor;
+  });
+  btn.addEventListener('mouseleave', () => {
+    btn.style.color = color;
+  });
   return btn;
 }
 
@@ -107,9 +114,12 @@ export function watchFullscreen(overlay, panel) {
 export function applyCollapsedStyle(panel, fn, dragHandle) {
   // Preserve positioning across the full style swap, otherwise the panel
   // jumps to the default corner when the size changes.
-  const left = panel.style.left, right = panel.style.right;
-  const top = panel.style.top, bottom = panel.style.bottom;
-  const position = panel.style.position, transform = panel.style.transform;
+  const left = panel.style.left,
+    right = panel.style.right;
+  const top = panel.style.top,
+    bottom = panel.style.bottom;
+  const position = panel.style.position,
+    transform = panel.style.transform;
   fn();
   if (position) panel.style.position = position;
   if (left) panel.style.left = left;

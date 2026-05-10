@@ -1,7 +1,13 @@
 import browser from 'webextension-polyfill';
 import { checkCurrentPageIsTimeWastingSite } from '../shared/hostMatch';
 import { makeDraggable } from '../shared/makeDraggable';
-import { removeOverlay, createCollapseButton, watchFullscreen, applyCollapsedStyle, wireCollapseButton } from '../shared/overlayHelpers';
+import {
+  removeOverlay,
+  createCollapseButton,
+  watchFullscreen,
+  applyCollapsedStyle,
+  wireCollapseButton,
+} from '../shared/overlayHelpers';
 import { createTimerPort } from '../shared/timerPort';
 import { formatDuration } from '../shared/formatters';
 import {
@@ -70,7 +76,7 @@ export function renderTimeWastingRewardOverlay() {
     color: 'rgba(248, 250, 252, 0.6)',
     hoverColor: 'rgba(248, 250, 252, 0.95)',
   });
-  
+
   const heading = document.createElement('strong');
   heading.textContent = '🎉 Reward time';
   heading.setAttribute(
@@ -110,7 +116,11 @@ export function renderTimeWastingRewardOverlay() {
     localStorage.setItem(isCollapsedKey, isCollapsed.toString());
     collapseBtn.textContent = isCollapsed ? '▼' : '▲';
 
-    applyCollapsedStyle(panel, () => panel.setAttribute('style', getPanelStyle(isCollapsed, currentBg)), dragHandle);
+    applyCollapsedStyle(
+      panel,
+      () => panel.setAttribute('style', getPanelStyle(isCollapsed, currentBg)),
+      dragHandle,
+    );
 
     heading.style.display = isCollapsed ? 'none' : 'block';
     status.style.display = isCollapsed ? 'none' : 'block';
@@ -119,14 +129,8 @@ export function renderTimeWastingRewardOverlay() {
     progressLabel.style.fontWeight = isCollapsed ? '600' : '400';
   };
   wireCollapseButton(collapseBtn, toggleCollapse);
-  
-  panel.appendChild(
-    collapseBtn,
-    heading,
-    progressLabel,
-    barShell,
-    status
-  );
+
+  panel.appendChild(collapseBtn, heading, progressLabel, barShell, status);
   overlay.appendChild(panel);
   document.body.appendChild(overlay);
 

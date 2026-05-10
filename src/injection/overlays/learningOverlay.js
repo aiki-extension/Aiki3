@@ -1,5 +1,11 @@
 import browser from 'webextension-polyfill';
-import { removeOverlay, createCollapseButton, watchFullscreen, applyCollapsedStyle, wireCollapseButton } from '../shared/overlayHelpers';
+import {
+  removeOverlay,
+  createCollapseButton,
+  watchFullscreen,
+  applyCollapsedStyle,
+  wireCollapseButton,
+} from '../shared/overlayHelpers';
 import { makeDraggable } from '../shared/makeDraggable';
 import { createTimerPort } from '../shared/timerPort';
 import { formatDuration, formatDurationShort } from '../shared/formatters';
@@ -60,8 +66,10 @@ export function renderLearningContent() {
 
     panel.setAttribute('style', getPanelStyle(isCollapsed));
 
-   const collapseBtn = createCollapseButton(isCollapsed, { top: '4px', right: '6px' });
-
+    const collapseBtn = createCollapseButton(isCollapsed, {
+      top: '4px',
+      right: '6px',
+    });
 
     const heading = document.createElement('strong');
     heading.textContent = '📚 Learning Session';
@@ -124,7 +132,11 @@ export function renderLearningContent() {
       localStorage.setItem(isCollapsedKey, isCollapsed.toString());
       collapseBtn.textContent = isCollapsed ? '▼' : '▲';
 
-      applyCollapsedStyle(panel, () => panel.setAttribute('style', getPanelStyle(isCollapsed)), dragHandle);
+      applyCollapsedStyle(
+        panel,
+        () => panel.setAttribute('style', getPanelStyle(isCollapsed)),
+        dragHandle,
+      );
 
       heading.style.display = isCollapsed ? 'none' : 'block';
       status.style.display = isCollapsed ? 'none' : 'block';
@@ -133,15 +145,14 @@ export function renderLearningContent() {
       progressLabel.style.fontWeight = isCollapsed ? '600' : '400';
     };
     wireCollapseButton(collapseBtn, toggleCollapse);
-    
-    
+
     panel.append(
       collapseBtn,
       heading,
       progressLabel,
       barShell,
       status,
-      claimRewardBtn
+      claimRewardBtn,
     );
     overlay.appendChild(panel);
     document.body.appendChild(overlay);
