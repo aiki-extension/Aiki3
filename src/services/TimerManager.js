@@ -227,6 +227,24 @@ class TimerManager {
     }
   }
 
+  // Reset the session to a new duration, preserving the running/paused state.
+  // Called when the user changes the session duration setting mid-session.
+  applyNewSessionDuration(durationMs) {
+    const wasActive = this.isSessionActive();
+    if (wasActive) this.stopSessionTimer();
+    if (wasActive || this.isSessionPaused()) {
+      this.sessionGoal = durationMs;
+      this.sessionRemaining = durationMs;
+      this.sessionElapsed = 0;
+      this.sessionCompleted = false;
+      if (wasActive) {
+        this.sessionIntervalRef = setInterval(() => {
+          this.decrementSession().catch(() => {});
+        }, 1000);
+      }
+    }
+  }
+
   // Stop session timer and clear all state
   stopSessionTimer() {
     if (this.sessionIntervalRef) {

@@ -66,7 +66,7 @@ export function createRedirectFlow({
       return;
     }
 
-    if (origin) {
+    if (origin && timer.sessionElapsed > 0) {
       promptControl.renderContentBlocker({ tabId, frameId: 0, url: procUrl });
     } else {
       promptRedirect(tabId, learningUri, procUrl);
