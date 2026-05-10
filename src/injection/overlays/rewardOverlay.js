@@ -1,6 +1,7 @@
 import browser from 'webextension-polyfill';
 import { checkCurrentPageIsTimeWastingSite } from '../shared/hostMatch';
 import { makeDraggable } from '../shared/makeDraggable';
+import { removeOverlay, createCollapseButton, watchFullscreen } from '../shared/overlayHelpers';
 import { createTimerPort } from '../shared/timerPort';
 import { formatDuration } from '../shared/formatters';
 import {
@@ -63,19 +64,13 @@ export function renderTimeWastingRewardOverlay() {
   let currentBg = 'linear-gradient(135deg, #ADD8E6, #32CD32)';
   panel.setAttribute('style', getPanelStyle(isCollapsed, currentBg));
 
-  const collapseBtn = document.createElement('button');
-  collapseBtn.textContent = isCollapsed ? '▼' : '▲';
-  collapseBtn.setAttribute(
-    'style',
-    'position: absolute; top: 4px; right: 6px; background: transparent; border: none; color: rgba(255, 255, 255, 0.6); cursor: pointer; font-size: 10px; padding: 4px; transition: color 0.2s;',
-  );
-  collapseBtn.addEventListener('mouseenter', () => {
-    collapseBtn.style.color = 'rgba(255, 255, 255, 0.95)';
-  });
-  collapseBtn.addEventListener('mouseleave', () => {
-    collapseBtn.style.color = 'rgba(255, 255, 255, 0.6)';
-  });
+  const stopWatchingFullscreen = watchFullscreen(overlay, panel);
 
+  const collapseBtn = createCollapseButton(isCollapsed, {
+    color: 'rgba(248, 250, 252, 0.6)',
+    hoverColor: 'rgba(248, 250, 252, 0.95)',
+  });
+  
   const heading = document.createElement('strong');
   heading.textContent = '🎉 Reward time';
   heading.setAttribute(
@@ -225,6 +220,7 @@ export function renderTimeWastingRewardOverlay() {
     cleanupCalled = true;
     dragHandle.cleanup();
     timerPort.cleanup();
+    stopWatchingFullscreen();
     try {
       overlay.remove();
     } catch {}

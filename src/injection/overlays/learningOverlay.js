@@ -1,5 +1,5 @@
 import browser from 'webextension-polyfill';
-import { isFullScreen, removeOverlay } from '../shared/overlayHelpers';
+import { removeOverlay, createCollapseButton, watchFullscreen } from '../shared/overlayHelpers';
 import { makeDraggable } from '../shared/makeDraggable';
 import { createTimerPort } from '../shared/timerPort';
 import { formatDuration, formatDurationShort } from '../shared/formatters';
@@ -56,52 +56,12 @@ export function renderLearningContent() {
     const getPanelStyle = (collapsed) =>
       `pointer-events: auto; padding: ${collapsed ? '10px 14px' : 'clamp(16px, 3vw, 22px)'}; min-width: ${collapsed ? '140px' : '260px'}; max-width: ${collapsed ? '180px' : '320px'}; margin: 8px; background: rgba(15, 23, 42, 0.96); color: #f8fafc; border-radius: ${collapsed ? '12px' : '18px'}; box-shadow: 0 24px 45px rgba(15, 23, 42, 0.45); font-family: 'Inter', 'Segoe UI', sans-serif; display: flex; flex-direction: column; gap: ${collapsed ? '6px' : '12px'}; cursor: grab; position: relative; font-size: 14px; transition: all 0.3s ease;`;
 
-    function updateOverlayVisibility() {
-      if (isFullScreen()) {
-        // Cache position before hiding so fullscreen toggling doesn't reset
-        // the user's chosen corner.
-        panel.dataset.savedLeft = panel.style.left || '';
-        panel.dataset.savedRight = panel.style.right || '';
-        panel.dataset.savedTop = panel.style.top || '';
-        panel.dataset.savedBottom = panel.style.bottom || '';
-        overlay.style.display = 'none';
-      } else {
-        overlay.style.display = 'flex';
-        requestAnimationFrame(() => {
-          if (panel.dataset.savedLeft !== undefined) {
-            panel.style.left = panel.dataset.savedLeft;
-            panel.style.right = panel.dataset.savedRight;
-            panel.style.top = panel.dataset.savedTop;
-            panel.style.bottom = panel.dataset.savedBottom;
-          }
-        });
-      }
-    }
-
-    document.addEventListener('fullscreenchange', updateOverlayVisibility);
-    document.addEventListener(
-      'webkitfullscreenchange',
-      updateOverlayVisibility,
-    );
-    document.addEventListener('mozfullscreenchange', updateOverlayVisibility);
-    document.addEventListener('MSFullscreenChange', updateOverlayVisibility);
-
-    updateOverlayVisibility();
+    const stopWatchingFullscreen = watchFullscreen(overlay, panel);
 
     panel.setAttribute('style', getPanelStyle(isCollapsed));
 
-    const collapseBtn = document.createElement('button');
-    collapseBtn.textContent = isCollapsed ? '▼' : '▲';
-    collapseBtn.setAttribute(
-      'style',
-      'position: absolute; top: 6px; right: 8px; background: transparent; border: none; color: rgba(248, 250, 252, 0.6); cursor: pointer; font-size: 10px; padding: 4px; transition: color 0.2s;',
-    );
-    collapseBtn.addEventListener('mouseenter', () => {
-      collapseBtn.style.color = 'rgba(248, 250, 252, 0.95)';
-    });
-    collapseBtn.addEventListener('mouseleave', () => {
-      collapseBtn.style.color = 'rgba(248, 250, 252, 0.6)';
-    });
+   const collapseBtn = createCollapseButton(isCollapsed, { top: '4px', right: '6px' });
+
 
     const heading = document.createElement('strong');
     heading.textContent = '📚 Learning Session';
@@ -318,19 +278,7 @@ export function renderLearningContent() {
       try {
         removeOverlay();
       } catch {}
-      document.removeEventListener('fullscreenchange', updateOverlayVisibility);
-      document.removeEventListener(
-        'webkitfullscreenchange',
-        updateOverlayVisibility,
-      );
-      document.removeEventListener(
-        'mozfullscreenchange',
-        updateOverlayVisibility,
-      );
-      document.removeEventListener(
-        'MSFullscreenChange',
-        updateOverlayVisibility,
-      );
+      stopWatchingFullscreen();
     };
 
     overlay.cleanup = cleanup;
