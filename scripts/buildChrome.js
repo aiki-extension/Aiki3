@@ -2,8 +2,8 @@
  * Build script for Chrome
  * Restores the Chrome-specific manifest to public/manifest.json
  */
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const publicDir = path.join(__dirname, '..', 'public');
 const chromeManifest = path.join(publicDir, 'manifest.chrome.json');

@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { execFileSync } = require('child_process');
+const { execFileSync } = require('node:child_process');
 
 const apiKey = (process.env.AMO_API_KEY || '').trim();
 const apiSecret = (process.env.AMO_API_SECRET || '').trim();

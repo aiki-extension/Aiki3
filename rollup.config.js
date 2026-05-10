@@ -24,7 +24,7 @@ function serve() {
   return {
     writeBundle() {
       if (server) return;
-      server = require('child_process').spawn(
+      server = require('node:child_process').spawn(
         'npm',
         ['run', 'start', '--', '--dev'],
         {
