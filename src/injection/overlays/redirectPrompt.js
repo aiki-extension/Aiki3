@@ -1,5 +1,5 @@
 import { STYLES, applyButtonHoverStyles } from '../shared/styles';
-import { removeOverlay } from '../shared/domHelpers';
+import { removeOverlay } from '../shared/overlayHelpers';
 
 /**
  * Render the modal redirect prompt asking the user whether to continue on the

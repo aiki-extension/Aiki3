@@ -1,7 +1,7 @@
 import browser from 'webextension-polyfill';
 import { getLearningUrl } from '../../services/siteDetector';
 import { currentPageIsLearningSite } from '../shared/hostMatch';
-import { renderLearningContent } from '../overlays/learningPanel';
+import { renderLearningContent } from '../overlays/learningOverlay';
 
 let bootstrapAttemptPending = false;
 

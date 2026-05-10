@@ -1,6 +1,13 @@
 import browser from 'webextension-polyfill';
 import { checkCurrentPageIsTimeWastingSite } from '../shared/hostMatch';
 import { makeDraggable } from '../shared/makeDraggable';
+import {
+  removeOverlay,
+  createCollapseButton,
+  watchFullscreen,
+  applyCollapsedStyle,
+  wireCollapseButton,
+} from '../shared/overlayHelpers';
 import { createTimerPort } from '../shared/timerPort';
 import { formatDuration } from '../shared/formatters';
 import {
@@ -63,17 +70,11 @@ export function renderTimeWastingRewardOverlay() {
   let currentBg = 'linear-gradient(135deg, #ADD8E6, #32CD32)';
   panel.setAttribute('style', getPanelStyle(isCollapsed, currentBg));
 
-  const collapseBtn = document.createElement('button');
-  collapseBtn.textContent = isCollapsed ? '▼' : '▲';
-  collapseBtn.setAttribute(
-    'style',
-    'position: absolute; top: 4px; right: 6px; background: transparent; border: none; color: rgba(255, 255, 255, 0.6); cursor: pointer; font-size: 10px; padding: 4px; transition: color 0.2s;',
-  );
-  collapseBtn.addEventListener('mouseenter', () => {
-    collapseBtn.style.color = 'rgba(255, 255, 255, 0.95)';
-  });
-  collapseBtn.addEventListener('mouseleave', () => {
-    collapseBtn.style.color = 'rgba(255, 255, 255, 0.6)';
+  const stopWatchingFullscreen = watchFullscreen(overlay, panel);
+
+  const collapseBtn = createCollapseButton(isCollapsed, {
+    color: 'rgba(248, 250, 252, 0.6)',
+    hoverColor: 'rgba(248, 250, 252, 0.95)',
   });
 
   const heading = document.createElement('strong');
@@ -115,46 +116,21 @@ export function renderTimeWastingRewardOverlay() {
     localStorage.setItem(isCollapsedKey, isCollapsed.toString());
     collapseBtn.textContent = isCollapsed ? '▼' : '▲';
 
-    // Preserve positioning across the full style swap so the panel stays in
-    // the user's chosen corner when the size changes.
-    const currentLeft = panel.style.left;
-    const currentRight = panel.style.right;
-    const currentTop = panel.style.top;
-    const currentBottom = panel.style.bottom;
-    const currentPosition = panel.style.position;
-    const currentTransform = panel.style.transform;
-
-    panel.setAttribute('style', getPanelStyle(isCollapsed, currentBg));
-
-    if (currentPosition) panel.style.position = currentPosition;
-    if (currentLeft) panel.style.left = currentLeft;
-    if (currentRight) panel.style.right = currentRight;
-    if (currentTop) panel.style.top = currentTop;
-    if (currentBottom) panel.style.bottom = currentBottom;
-    if (currentTransform) panel.style.transform = currentTransform;
+    applyCollapsedStyle(
+      panel,
+      () => panel.setAttribute('style', getPanelStyle(isCollapsed, currentBg)),
+      dragHandle,
+    );
 
     heading.style.display = isCollapsed ? 'none' : 'block';
     status.style.display = isCollapsed ? 'none' : 'block';
     barShell.style.height = isCollapsed ? '5px' : '8px';
     progressLabel.style.fontSize = isCollapsed ? '0.9em' : '0.85em';
     progressLabel.style.fontWeight = isCollapsed ? '600' : '400';
-
-    setTimeout(() => {
-      if (dragHandle && dragHandle.syncIntendedPosition) {
-        dragHandle.syncIntendedPosition();
-      }
-    }, 300);
   };
-  collapseBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    toggleCollapse();
-  });
+  wireCollapseButton(collapseBtn, toggleCollapse);
 
-  panel.appendChild(collapseBtn);
-  panel.appendChild(heading);
-  panel.appendChild(progressLabel);
-  panel.appendChild(barShell);
-  panel.appendChild(status);
+  panel.append(collapseBtn, heading, progressLabel, barShell, status);
   overlay.appendChild(panel);
   document.body.appendChild(overlay);
 
@@ -223,6 +199,7 @@ export function renderTimeWastingRewardOverlay() {
     cleanupCalled = true;
     dragHandle.cleanup();
     timerPort.cleanup();
+    stopWatchingFullscreen();
     try {
       overlay.remove();
     } catch {}
