@@ -10,18 +10,18 @@ Aiki³ is the third generation of our focus tool. It sits quietly in your browse
  
 If you just want to try it out, grab the latest release from the [Releases page](https://github.com/aiki-extension/Aiki3/releases).
  
-### Firefox — `.xpi` file
+### Firefox - `.xpi` file
  
 1. Download `aiki3-firefox.xpi` from the latest release
 2. Open Firefox and go to `about:addons`
 3. Click the gear icon ⚙️ → **Install Add-on From File...**
-4. Select the downloaded `.xpi` file — done
-### Chrome — `.zip` file
+4. Select the downloaded `.xpi` file - done
+### Chrome - `.zip` file
  
 1. Download `aiki3-chrome.zip` from the latest release and unzip it
 2. Open Chrome and go to `chrome://extensions`
 3. Enable **Developer mode** (top right toggle)
-4. Click **Load unpacked** and select the unzipped folder — done
+4. Click **Load unpacked** and select the unzipped folder - done
 > **Note:** Chrome requires Developer mode to be on for manually loaded extensions. This is normal for extensions not distributed through the Chrome Web Store.
  
 ---
@@ -34,7 +34,7 @@ If you'd rather build from source (or you're contributing), here's how to get se
  
 - [Node.js](https://nodejs.org) v18 or higher
 - npm (comes bundled with Node.js)
-- The [Aiki³ Backend](https://github.com/aiki-extension/Aiki3-Backend) running locally — follow the setup guide in that repo
+- The [Aiki³ Backend](https://github.com/aiki-extension/Aiki3-Backend) running locally - follow the setup guide in that repo
 ### Setup
  
 ```bash
@@ -94,10 +94,10 @@ npm run format    # Auto-format with Prettier
  
 ## Tech Stack
  
-- **[Svelte](https://svelte.dev/)** — UI components
-- **[Rollup](https://rollupjs.org/)** — bundler
-- **[webextension-polyfill](https://github.com/mozilla/webextension-polyfill)** — cross-browser compatibility
-- **Manifest V3** — for both Chrome and Firefox
+- **[Svelte](https://svelte.dev/)** - UI components
+- **[Rollup](https://rollupjs.org/)** - bundler
+- **[webextension-polyfill](https://github.com/mozilla/webextension-polyfill)** - cross-browser compatibility
+- **Manifest V3** - for both Chrome and Firefox
 ---
  
 ## Project Structure
@@ -122,7 +122,7 @@ Aiki3/
  
 ## Contributing
  
-This is an open student project — contributions and feedback are welcome. If you spot a bug or have a suggestion, feel free to open an issue or a pull request.
+This is an open student project - contributions and feedback are welcome. If you spot a bug or have a suggestion, feel free to open an issue or a pull request.
  
 Before submitting a PR, make sure lint and formatting checks pass:
  
