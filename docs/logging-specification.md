@@ -16,14 +16,14 @@ Every event must include: `userId`, `inviteCode`, `featureFlags` (full object), 
 ## Sessions
 
 - Session started (session ID, type: learning / timeWasting / voluntary, site domain, trigger domain, goal seconds)
-- Session ended (session ID, type, site domain, duration seconds, goal seconds, completed, reason: skip / continue / tab\_closed / tab\_switch / extension\_disabled / reward\_claimed / goal\_met)
+- Session ended (session ID, type, site domain, duration seconds, goal seconds, completed, reason: skip / continue / tab_closed / tab_switch / extension_disabled / reward_claimed / goal_met)
 - Daily learning goal reached (goal seconds, total progress seconds)
 
 ---
 
 ## Reward
 
-- Reward started (source: claim\_button / auto\_goal\_met, duration seconds, site domain)
+- Reward started (source: claim_button / auto_goal_met, duration seconds, site domain)
 - Reward ended (duration seconds)
 
 ---
